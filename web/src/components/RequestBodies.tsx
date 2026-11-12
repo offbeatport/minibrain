@@ -70,8 +70,8 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
     const change = useMutation({
         mutationFn: (kept: boolean) =>
             unwrap(
-                api.PUT("/api/models/{slug}/request-bodies", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/request-bodies", {
+                    params: { path: { name: detail.slug } },
                     body: { kept },
                 }),
             ),

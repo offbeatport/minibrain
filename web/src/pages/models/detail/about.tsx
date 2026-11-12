@@ -57,16 +57,8 @@ function EditForm({
     const save = useMutation({
         mutationFn: async (): Promise<unknown> => {
             const body = kind === "tags" ? { tags: splitTags(text) } : { description: text.trim() };
-            if (row.kind === "base") {
-                return unwrap(
-                    api.PATCH("/api/base-models/{key}", {
-                        params: { path: { key: row.key } },
-                        body,
-                    }),
-                );
-            }
             return unwrap(
-                api.PATCH("/api/models/{slug}", { params: { path: { slug: row.key } }, body }),
+                api.PATCH("/api/models/{name}", { params: { path: { name: row.key } }, body }),
             );
         },
         onSuccess: async () => {

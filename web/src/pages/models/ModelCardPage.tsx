@@ -49,14 +49,14 @@ function cardKey(target: Target) {
 }
 
 function cardPath(target: Target) {
-    return { params: { path: target } };
+    return { params: { path: { name: target.slug, number: target.number } } };
 }
 
 function useModelCard(target: Target) {
     return useQuery({
         queryKey: cardKey(target),
         queryFn: () =>
-            unwrap(api.GET("/api/models/{slug}/versions/{number}/card", cardPath(target))),
+            unwrap(api.GET("/api/models/{name}/versions/{number}/card", cardPath(target))),
         refetchInterval: (query) =>
             BUSY.has(query.state.data?.card.version.status ?? "") ? 2000 : false,
     });
@@ -138,7 +138,7 @@ function EditDialog({
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.PUT("/api/models/{slug}/versions/{number}/card", {
+                api.PUT("/api/models/{name}/versions/{number}/card", {
                     ...cardPath(target),
                     body: draft,
                 }),

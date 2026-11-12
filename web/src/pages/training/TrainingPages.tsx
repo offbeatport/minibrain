@@ -20,7 +20,7 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useEffect, useState } from "react";
-import type { JobInfo, ModelSummary } from "~/api/client";
+import type { JobInfo, ModelRow } from "~/api/client";
 import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob, useModels } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
@@ -111,7 +111,11 @@ const COLUMNS: ColumnDef<JobInfo, unknown>[] = sortedById([
     ATTEMPT_COLUMN,
 ]);
 
-function ModelChoice({ item }: { item: ModelSummary }) {
+function versionCount(count: number): string {
+    return count === 1 ? "1 version" : `${count} versions`;
+}
+
+function ModelChoice({ item }: { item: ModelRow }) {
     return (
         <>
             <PublisherLogo name={item.name} custom avatar={item.avatar} />
@@ -120,7 +124,7 @@ function ModelChoice({ item }: { item: ModelSummary }) {
                 <span className="truncate text-sm text-muted-foreground">{`On ${item.base_model}`}</span>
             </span>
             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-                {item.versions === 1 ? "1 version" : `${item.versions} versions`}
+                {versionCount(item.versions?.length ?? 0)}
             </span>
         </>
     );
@@ -152,12 +156,12 @@ function TrainPicker({
                 ) : (
                     <SearchList
                         items={items}
-                        itemKey={(item) => item.slug}
-                        itemText={(item) => `${item.name} ${item.slug} ${item.base_model}`}
+                        itemKey={(item) => item.key}
+                        itemText={(item) => `${item.name} ${item.key} ${item.base_model}`}
                         renderItem={(item) => <ModelChoice item={item} />}
                         onPick={(item) => {
                             onOpenChange(false);
-                            router.history.push(trainHref(item.slug));
+                            router.history.push(trainHref(item.key));
                         }}
                         label="Search models"
                         placeholder="Search by name or base model"
@@ -249,7 +253,7 @@ function Runs() {
         deleted: true,
     }));
     const modelOptions = [
-        ...(owned.data ?? []).map((item) => ({ value: item.slug, label: item.name })),
+        ...(owned.data ?? []).map((item) => ({ value: item.key, label: item.name })),
         ...deleted,
     ].map((item) => modelOption({ ...item, count: facets.data?.models[item.value] ?? 0 }));
     const statusOptions = JOB_STATUSES.map((status) => ({

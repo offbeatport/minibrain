@@ -296,8 +296,8 @@ export function usePromote() {
     return useMutation({
         mutationFn: (target: Target) =>
             unwrap(
-                api.POST("/api/models/{slug}/versions/{number}/promote", {
-                    params: { path: target },
+                api.POST("/api/models/{name}/versions/{number}/promote", {
+                    params: { path: { name: target.slug, number: target.number } },
                 }),
             ),
         onSuccess: () => client.invalidateQueries(),

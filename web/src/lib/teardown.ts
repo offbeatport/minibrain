@@ -28,19 +28,9 @@ export function isLiveRow(row: ModelRow): boolean {
 
 export function setDeployed(row: ModelRow, deployed: boolean) {
     const body = { deployed };
-    return row.kind === "base"
-        ? unwrap(
-              api.POST("/api/base-models/{key}/deploy", {
-                  params: { path: { key: row.key } },
-                  body,
-              }),
-          )
-        : unwrap(
-              api.POST("/api/models/{slug}/deploy", {
-                  params: { path: { slug: row.key } },
-                  body,
-              }),
-          );
+    return unwrap(
+        api.POST("/api/models/{name}/deploy", { params: { path: { name: row.key } }, body }),
+    );
 }
 
 export type DeleteOptions = { cascade?: boolean; undeploy?: boolean; cancelJobs?: boolean };
@@ -48,20 +38,12 @@ export type DeleteOptions = { cascade?: boolean; undeploy?: boolean; cancelJobs?
 export function deleteModel(row: ModelRow, options: DeleteOptions = {}) {
     const undeploy = options.undeploy ?? false;
     const cancel_jobs = options.cancelJobs ?? false;
-    return row.kind === "base"
-        ? unwrap(
-              api.DELETE("/api/base-models/{key}", {
-                  params: {
-                      path: { key: row.key },
-                      query: { cascade: options.cascade ?? false, undeploy, cancel_jobs },
-                  },
-              }),
-          )
-        : unwrap(
-              api.DELETE("/api/models/{slug}", {
-                  params: { path: { slug: row.key }, query: { undeploy, cancel_jobs } },
-              }),
-          );
+    const cascade = row.kind === "base" && (options.cascade ?? false);
+    return unwrap(
+        api.DELETE("/api/models/{name}", {
+            params: { path: { name: row.key }, query: { cascade, undeploy, cancel_jobs } },
+        }),
+    );
 }
 
 export function needsReview(teardown: Teardown | null | undefined): boolean {

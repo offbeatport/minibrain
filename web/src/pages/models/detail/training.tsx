@@ -415,9 +415,9 @@ function AddData({ detail }: { detail: ModelDetail }) {
     const [dataset, setDataset] = useState(detail.dataset ?? "");
     const prepare = useMutation({
         mutationFn: async () => {
-            const path = { params: { path: { slug } } };
-            await unwrap(api.PUT("/api/models/{slug}/dataset", { ...path, body: { dataset } }));
-            return unwrap(api.POST("/api/models/{slug}/dataset-versions", path));
+            const path = { params: { path: { name: slug } } };
+            await unwrap(api.PUT("/api/models/{name}/dataset", { ...path, body: { dataset } }));
+            return unwrap(api.POST("/api/models/{name}/dataset-versions", path));
         },
         onSettled: invalidate,
     });
@@ -445,8 +445,8 @@ function DataSection({ row, detail }: { row: ModelRow; detail: ModelDetail }) {
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/models/{slug}/dataset-versions", {
-                    params: { path: { slug: row.key } },
+                api.POST("/api/models/{name}/dataset-versions", {
+                    params: { path: { name: row.key } },
                 }),
             ),
         onSettled: () => client.invalidateQueries(),
@@ -556,8 +556,8 @@ function ScoreButton({ row, detail }: { row: ModelRow; detail: ModelDetail | und
     const score = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/models/{slug}/versions", {
-                    params: { path: { slug: row.key } },
+                api.POST("/api/models/{name}/versions", {
+                    params: { path: { name: row.key } },
                     body: { kind: "prompt" },
                 }),
             ),

@@ -66,21 +66,9 @@ export function EditModelDialog({
                 description: description.trim(),
                 tags: splitTags(tags),
             };
-            if (row.kind === "base") {
-                await unwrap(
-                    api.PATCH("/api/base-models/{key}", {
-                        params: { path: { key: row.key } },
-                        body,
-                    }),
-                );
-            } else {
-                await unwrap(
-                    api.PATCH("/api/models/{slug}", {
-                        params: { path: { slug: row.key } },
-                        body,
-                    }),
-                );
-            }
+            await unwrap(
+                api.PATCH("/api/models/{name}", { params: { path: { name: row.key } }, body }),
+            );
         },
         onSuccess: async () => {
             await refresh();
@@ -209,8 +197,8 @@ export function TestBaseDialog({
     const test = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/base-models/{key}/test", {
-                    params: { path: { key: row?.key ?? "" } },
+                api.POST("/api/models/{name}/test", {
+                    params: { path: { name: row?.key ?? "" } },
                     body: { text, max_tokens: 128 },
                 }),
             ),

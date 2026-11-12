@@ -3,7 +3,6 @@ import type { components, paths } from "./schema";
 
 type Schemas = components["schemas"];
 
-export type ModelSummary = Schemas["ModelSummary"];
 export type ModelDetail = Schemas["ModelDetail"];
 export type ModelAvatar = Schemas["ModelAvatar"];
 export type ModelCreate = Schemas["ModelCreate"];

@@ -11,7 +11,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Current Session */
+        /** Read the current session */
         get: operations["current_session_api_auth_session_get"];
         put?: never;
         post?: never;
@@ -30,7 +30,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Login */
+        /** Sign in with a password */
         post: operations["login_api_auth_login_post"];
         delete?: never;
         options?: never;
@@ -47,7 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Logout */
+        /** Sign out */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
         options?: never;
@@ -64,7 +64,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Setup */
+        /** Create the first admin from a setup link */
         post: operations["setup_api_auth_setup_post"];
         delete?: never;
         options?: never;
@@ -81,7 +81,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset */
+        /** Set a password from a reset link */
         post: operations["reset_api_auth_reset_post"];
         delete?: never;
         options?: never;
@@ -96,7 +96,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Start */
+        /** Start single sign-on */
         get: operations["oidc_start_api_auth_oidc_start_get"];
         put?: never;
         post?: never;
@@ -113,7 +113,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Oidc Callback */
+        /** Finish single sign-on */
         get: operations["oidc_callback_api_auth_oidc_callback_get"];
         put?: never;
         post?: never;
@@ -130,10 +130,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Accounts */
+        /** List accounts */
         get: operations["accounts_api_accounts_get"];
         put?: never;
-        /** Add Account */
+        /** Add an account */
         post: operations["add_account_api_accounts_post"];
         delete?: never;
         options?: never;
@@ -154,7 +154,7 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Account */
+        /** Change an account's role or status */
         patch: operations["update_account_api_accounts__account_id__patch"];
         trace?: never;
     };
@@ -167,7 +167,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reset Password */
+        /** Make a password reset link */
         post: operations["reset_password_api_accounts__account_id__password_link_post"];
         delete?: never;
         options?: never;
@@ -182,10 +182,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List All */
-        get: operations["list_all_api_models_get"];
+        /**
+         * List models
+         * @description Custom and base models as rows: availability, activity, deployment, versions and usage, most recently changed first.
+         */
+        get: operations["list_models_api_models_get"];
         put?: never;
-        /** Create */
+        /** Create a custom model */
         post: operations["create_api_models_post"];
         delete?: never;
         options?: never;
@@ -193,7 +196,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/duplicate": {
+    "/api/models/{name}/duplicate": {
         parameters: {
             query?: never;
             header?: never;
@@ -202,8 +205,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Duplicate */
-        post: operations["duplicate_api_models__slug__duplicate_post"];
+        /** Duplicate a custom model */
+        post: operations["duplicate_api_models__name__duplicate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -218,7 +221,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Default Name
+         * Suggest a model name and its API name
          * @description A free name and the API name it gets; with name, the API name that name would get.
          */
         get: operations["default_name_api_models_name_get"];
@@ -230,26 +233,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read */
-        get: operations["read_api_models__slug__get"];
-        put?: never;
-        post?: never;
-        /** Delete */
-        delete: operations["delete_api_models__slug__delete"];
-        options?: never;
-        head?: never;
-        /** Update */
-        patch: operations["update_api_models__slug__patch"];
-        trace?: never;
-    };
-    "/api/models/{slug}/avatar": {
+    "/api/models/{name}/avatar": {
         parameters: {
             query?: never;
             header?: never;
@@ -257,8 +241,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change Avatar */
-        put: operations["change_avatar_api_models__slug__avatar_put"];
+        /** Change a custom model's avatar */
+        put: operations["change_avatar_api_models__name__avatar_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -266,7 +250,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/deploy": {
+    "/api/models/{name}/request-bodies": {
         parameters: {
             query?: never;
             header?: never;
@@ -274,25 +258,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
-        /** Deploy */
-        post: operations["deploy_api_models__slug__deploy_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/{slug}/request-bodies": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Keep Request Bodies */
-        put: operations["keep_request_bodies_api_models__slug__request_bodies_put"];
+        /** Keep or drop request inputs and answers */
+        put: operations["keep_request_bodies_api_models__name__request_bodies_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -309,7 +276,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create Sample */
+        /** Create the sample model */
         post: operations["create_sample_api_models_sample_post"];
         delete?: never;
         options?: never;
@@ -317,7 +284,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/dataset": {
+    "/api/models/{name}/dataset": {
         parameters: {
             query?: never;
             header?: never;
@@ -325,8 +292,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Choose Dataset */
-        put: operations["choose_dataset_api_models__slug__dataset_put"];
+        /** Choose the dataset a custom model trains on */
+        put: operations["choose_dataset_api_models__name__dataset_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -334,7 +301,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/mapping": {
+    "/api/models/{name}/mapping": {
         parameters: {
             query?: never;
             header?: never;
@@ -342,8 +309,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Mapping */
-        put: operations["update_mapping_api_models__slug__mapping_put"];
+        /** Change the mapping of a custom model's dataset */
+        put: operations["update_mapping_api_models__name__mapping_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -351,7 +318,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/query": {
+    "/api/models/{name}/query": {
         parameters: {
             query?: never;
             header?: never;
@@ -360,23 +327,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Query */
-        post: operations["query_api_models__slug__query_post"];
+        /** Run SQL over a custom model's sources */
+        post: operations["query_api_models__name__query_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/preview": {
+    "/api/models/{name}/preview": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Preview */
-        get: operations["preview_api_models__slug__preview_get"];
+        /** Preview a custom model's training rows */
+        get: operations["preview_api_models__name__preview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -385,7 +352,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/dataset-versions": {
+    "/api/models/{name}/dataset-versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -394,23 +361,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Build Dataset Version */
-        post: operations["build_dataset_version_api_models__slug__dataset_versions_post"];
+        /** Build a dataset version for a custom model */
+        post: operations["build_dataset_version_api_models__name__dataset_versions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/golden": {
+    "/api/models/{name}/golden": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Golden */
-        get: operations["golden_api_models__slug__golden_get"];
+        /** List a custom model's test set */
+        get: operations["golden_api_models__name__golden_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -419,7 +386,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/contract/check": {
+    "/api/models/{name}/contract/check": {
         parameters: {
             query?: never;
             header?: never;
@@ -428,15 +395,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Check Contract */
-        post: operations["check_contract_api_models__slug__contract_check_post"];
+        /** Check what a contract change breaks */
+        post: operations["check_contract_api_models__name__contract_check_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/contract": {
+    "/api/models/{name}/contract": {
         parameters: {
             query?: never;
             header?: never;
@@ -444,8 +411,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Contract */
-        put: operations["update_contract_api_models__slug__contract_put"];
+        /** Change a custom model's contract */
+        put: operations["update_contract_api_models__name__contract_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -453,7 +420,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/label-proposal/dismissal": {
+    "/api/models/{name}/label-proposal/dismissal": {
         parameters: {
             query?: never;
             header?: never;
@@ -461,8 +428,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Dismiss Labels */
-        put: operations["dismiss_labels_api_models__slug__label_proposal_dismissal_put"];
+        /** Dismiss proposed labels */
+        put: operations["dismiss_labels_api_models__name__label_proposal_dismissal_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -470,7 +437,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/graders": {
+    "/api/models/{name}/graders": {
         parameters: {
             query?: never;
             header?: never;
@@ -478,8 +445,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Graders */
-        put: operations["update_graders_api_models__slug__graders_put"];
+        /** Change a custom model's graders */
+        put: operations["update_graders_api_models__name__graders_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -487,7 +454,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/promotion": {
+    "/api/models/{name}/promotion": {
         parameters: {
             query?: never;
             header?: never;
@@ -495,8 +462,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Promotion */
-        put: operations["update_promotion_api_models__slug__promotion_put"];
+        /** Change a custom model's promotion rule */
+        put: operations["update_promotion_api_models__name__promotion_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -504,7 +471,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/instructions": {
+    "/api/models/{name}/instructions": {
         parameters: {
             query?: never;
             header?: never;
@@ -512,8 +479,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Instructions */
-        put: operations["update_instructions_api_models__slug__instructions_put"];
+        /** Change a custom model's instructions */
+        put: operations["update_instructions_api_models__name__instructions_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -521,7 +488,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/judge": {
+    "/api/models/{name}/judge": {
         parameters: {
             query?: never;
             header?: never;
@@ -529,8 +496,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Judge */
-        put: operations["update_judge_api_models__slug__judge_put"];
+        /** Change a custom model's judge */
+        put: operations["update_judge_api_models__name__judge_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -538,7 +505,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/base-options": {
+    "/api/models/{name}/base-options": {
         parameters: {
             query?: never;
             header?: never;
@@ -549,7 +516,7 @@ export interface paths {
          * List the bases a custom model can move to
          * @description Installed bases with what the model would lose on each, and the full-precision variant to download.
          */
-        get: operations["base_options_api_models__slug__base_options_get"];
+        get: operations["base_options_api_models__name__base_options_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -558,7 +525,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/base": {
+    "/api/models/{name}/base": {
         parameters: {
             query?: never;
             header?: never;
@@ -571,14 +538,14 @@ export interface paths {
          * Move a custom model to another base
          * @description New versions are made on the new base, starting with a prompt-only version scored at once. What is live keeps serving on its own base until a version on the new base is deployed.
          */
-        post: operations["switch_base_api_models__slug__base_post"];
+        post: operations["switch_base_api_models__name__base_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/model-pages/{name}": {
+    "/api/models/{name}/overview": {
         parameters: {
             query?: never;
             header?: never;
@@ -589,7 +556,7 @@ export interface paths {
          * Summarise a model for its page
          * @description Base keys and custom slugs share one namespace, so a name finds either kind of model.
          */
-        get: operations["read_model_page_api_model_pages__name__get"];
+        get: operations["read_model_page_api_models__name__overview_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -598,7 +565,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-pages/{name}/traffic": {
+    "/api/models/{name}/traffic": {
         parameters: {
             query?: never;
             header?: never;
@@ -609,7 +576,7 @@ export interface paths {
          * Chart a model's requests by version
          * @description Requests, errors, latency and device time per bucket and per version for the range, with what changed in it, the errors by status, the busiest keys and the replicas serving it.
          */
-        get: operations["read_model_traffic_api_model_pages__name__traffic_get"];
+        get: operations["read_model_traffic_api_models__name__traffic_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -618,7 +585,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/model-pages/{name}/activity": {
+    "/api/models/{name}/activity": {
         parameters: {
             query?: never;
             header?: never;
@@ -629,7 +596,7 @@ export interface paths {
          * List what changed on a model
          * @description Audited changes to the model, its versions, its keys and its jobs, newest first, as sentences.
          */
-        get: operations["read_model_activity_api_model_pages__name__activity_get"];
+        get: operations["read_model_activity_api_models__name__activity_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -645,10 +612,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Sources */
+        /** List sources */
         get: operations["list_sources_api_sources_get"];
         put?: never;
-        /** Upload Source */
+        /** Upload a file as a source */
         post: operations["upload_source_api_sources_post"];
         delete?: never;
         options?: never;
@@ -663,7 +630,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Folder Roots */
+        /** List server folders for sources */
         get: operations["folder_roots_api_data_folders_get"];
         put?: never;
         post?: never;
@@ -682,7 +649,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Folder Source */
+        /** Add a server folder source */
         post: operations["add_folder_source_api_sources_folders_post"];
         delete?: never;
         options?: never;
@@ -699,7 +666,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Delta Source */
+        /** Add a Delta table source */
         post: operations["add_delta_source_api_sources_delta_post"];
         delete?: never;
         options?: never;
@@ -714,7 +681,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Samples */
+        /** List sample files */
         get: operations["list_samples_api_samples_get"];
         put?: never;
         post?: never;
@@ -733,7 +700,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Sample Source */
+        /** Add a sample file as a source */
         post: operations["add_sample_source_api_samples__file__post"];
         delete?: never;
         options?: never;
@@ -748,15 +715,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Source */
+        /** Read a source */
         get: operations["read_source_api_sources__source_id__get"];
         put?: never;
         post?: never;
-        /** Delete Source */
+        /** Delete a source */
         delete: operations["delete_source_api_sources__source_id__delete"];
         options?: never;
         head?: never;
-        /** Update Source */
+        /** Change a source */
         patch: operations["update_source_api_sources__source_id__patch"];
         trace?: never;
     };
@@ -767,7 +734,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Source Rows */
+        /** Read a source's rows */
         get: operations["source_rows_api_sources__source_id__rows_get"];
         put?: never;
         post?: never;
@@ -784,7 +751,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Source Stats */
+        /** Read a source's column statistics */
         get: operations["source_stats_api_sources__source_id__stats_get"];
         put?: never;
         post?: never;
@@ -803,7 +770,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Source Query */
+        /** Run SQL over a source */
         post: operations["source_query_api_sources__source_id__query_post"];
         delete?: never;
         options?: never;
@@ -820,7 +787,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Any Query */
+        /** Run SQL over any sources */
         post: operations["any_query_api_query_post"];
         delete?: never;
         options?: never;
@@ -835,10 +802,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Datasets */
+        /** List datasets */
         get: operations["list_datasets_api_datasets_get"];
         put?: never;
-        /** Create Dataset */
+        /** Create a dataset */
         post: operations["create_dataset_api_datasets_post"];
         delete?: never;
         options?: never;
@@ -853,15 +820,15 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Dataset */
+        /** Read a dataset */
         get: operations["read_dataset_api_datasets__slug__get"];
         put?: never;
         post?: never;
-        /** Delete Dataset */
+        /** Delete a dataset */
         delete: operations["delete_dataset_api_datasets__slug__delete"];
         options?: never;
         head?: never;
-        /** Update Dataset */
+        /** Rename or describe a dataset */
         patch: operations["update_dataset_api_datasets__slug__patch"];
         trace?: never;
     };
@@ -873,7 +840,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Dataset Mapping */
+        /** Change a dataset's mapping */
         put: operations["update_dataset_mapping_api_datasets__slug__mapping_put"];
         post?: never;
         delete?: never;
@@ -889,7 +856,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Dataset Preview */
+        /** Preview a dataset's rows */
         get: operations["dataset_preview_api_datasets__slug__preview_get"];
         put?: never;
         post?: never;
@@ -908,7 +875,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dataset Query */
+        /** Run SQL over a dataset's sources */
         post: operations["dataset_query_api_datasets__slug__query_post"];
         delete?: never;
         options?: never;
@@ -923,10 +890,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Dataset Versions */
+        /** List a dataset's versions */
         get: operations["list_dataset_versions_api_datasets__slug__versions_get"];
         put?: never;
-        /** Save Dataset Version */
+        /** Save a dataset version */
         post: operations["save_dataset_version_api_datasets__slug__versions_post"];
         delete?: never;
         options?: never;
@@ -941,7 +908,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Diff Dataset Versions */
+        /** Compare two dataset versions */
         get: operations["diff_dataset_versions_api_dataset_versions__dataset_version_id__diff__other_id__get"];
         put?: never;
         post?: never;
@@ -959,10 +926,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Dismiss Check */
+        /** Dismiss a data check */
         put: operations["dismiss_check_api_datasets__slug__checks__check__dismissal_put"];
         post?: never;
-        /** Restore Check */
+        /** Restore a dismissed data check */
         delete: operations["restore_check_api_datasets__slug__checks__check__dismissal_delete"];
         options?: never;
         head?: never;
@@ -976,9 +943,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Data Settings */
+        /** Read data settings */
         get: operations["read_data_settings_api_settings_data_get"];
-        /** Update Data Settings */
+        /** Change data settings */
         put: operations["update_data_settings_api_settings_data_put"];
         post?: never;
         delete?: never;
@@ -994,10 +961,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Folders */
+        /** List dataset folders */
         get: operations["read_folders_api_dataset_folders_get"];
         put?: never;
-        /** Add Folder */
+        /** Add a dataset folder */
         post: operations["add_folder_api_dataset_folders_post"];
         delete?: never;
         options?: never;
@@ -1015,11 +982,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove */
+        /** Remove a dataset folder */
         delete: operations["remove_api_dataset_folders__folder_id__delete"];
         options?: never;
         head?: never;
-        /** Rename */
+        /** Rename a dataset folder */
         patch: operations["rename_api_dataset_folders__folder_id__patch"];
         trace?: never;
     };
@@ -1031,7 +998,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Move */
+        /** Move a dataset folder */
         put: operations["move_api_dataset_folders__folder_id__parent_put"];
         post?: never;
         delete?: never;
@@ -1048,7 +1015,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Place Dataset */
+        /** Move a dataset into a folder */
         put: operations["place_dataset_api_datasets__slug__folder_put"];
         post?: never;
         delete?: never;
@@ -1064,10 +1031,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Connections */
+        /** List connections */
         get: operations["read_connections_api_connections_get"];
         put?: never;
-        /** Add Connection */
+        /** Add a connection */
         post: operations["add_connection_api_connections_post"];
         delete?: never;
         options?: never;
@@ -1083,10 +1050,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change Connection */
+        /** Change a connection */
         put: operations["change_connection_api_connections__connection_id__put"];
         post?: never;
-        /** Remove Connection */
+        /** Remove a connection */
         delete: operations["remove_connection_api_connections__connection_id__delete"];
         options?: never;
         head?: never;
@@ -1102,7 +1069,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Connection */
+        /** Test connection settings */
         post: operations["test_connection_api_connections_test_post"];
         delete?: never;
         options?: never;
@@ -1119,7 +1086,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Saved Connection */
+        /** Test a saved connection */
         post: operations["test_saved_connection_api_connections__connection_id__test_post"];
         delete?: never;
         options?: never;
@@ -1134,7 +1101,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Connection Tables */
+        /** List a connection's tables */
         get: operations["connection_tables_api_connections__connection_id__tables_get"];
         put?: never;
         post?: never;
@@ -1151,7 +1118,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Extensions */
+        /** List DuckDB extensions */
         get: operations["read_extensions_api_extensions_get"];
         put?: never;
         post?: never;
@@ -1170,7 +1137,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add S3 Source */
+        /** Add an S3 source */
         post: operations["add_s3_source_api_sources_s3_post"];
         delete?: never;
         options?: never;
@@ -1187,7 +1154,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Database Source */
+        /** Add a database source */
         post: operations["add_database_source_api_sources_database_post"];
         delete?: never;
         options?: never;
@@ -1204,7 +1171,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add Iceberg Source */
+        /** Add an Iceberg source */
         post: operations["add_iceberg_source_api_sources_iceberg_post"];
         delete?: never;
         options?: never;
@@ -1212,24 +1179,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/all-models": {
+    "/api/models/inspect": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List All Models */
-        get: operations["list_all_models_api_all_models_get"];
+        get?: never;
+        put?: never;
+        /** Check a folder or bucket before importing a base model */
+        post: operations["inspect_api_models_inspect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a base model from a folder or bucket */
+        post: operations["import_model_api_models_import_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Verify a base model's files */
+        post: operations["verify_base_api_models__name__verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/repair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Download a base model's damaged files again */
+        post: operations["repair_base_api_models__name__repair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/reimport": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import a base model's files again from another location */
+        post: operations["reimport_base_api_models__name__reimport_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/relocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Point a base model at files that moved */
+        post: operations["relocate_base_api_models__name__relocate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/recheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear a base model's start-up failure */
+        post: operations["recheck_base_api_models__name__recheck_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry a base model's failed download or import */
+        post: operations["retry_base_api_models__name__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a prompt to a base model */
+        post: operations["test_base_api_models__name__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read a model
+         * @description Custom and base models share one namespace of API names, so a name finds either kind.
+         */
+        get: operations["read_model_api_models__name__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a model
+         * @description Base models need the Admin role. Deleting runs in the background; the row shows its progress. With undeploy, a deployed model is stopped first; with cancel_jobs, its running jobs are cancelled; with cascade, a base model's custom models are deleted with it.
+         */
+        delete: operations["delete_model_api_models__name__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename, describe or tag a model
+         * @description Base models need the Admin role. Custom and base models share one namespace of API names, so a name finds either kind.
+         */
+        patch: operations["update_model_api_models__name__patch"];
         trace?: never;
     };
-    "/api/base-models/inspect": {
+    "/api/models/{name}/deploy": {
         parameters: {
             query?: never;
             header?: never;
@@ -1238,180 +1369,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Inspect */
-        post: operations["inspect_api_base_models_inspect_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/import": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Import Model */
-        post: operations["import_model_api_base_models_import_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Base */
-        get: operations["read_base_api_base_models__key__get"];
-        put?: never;
-        post?: never;
-        /** Delete Base Model */
-        delete: operations["delete_base_model_api_base_models__key__delete"];
-        options?: never;
-        head?: never;
-        /** Update Base */
-        patch: operations["update_base_api_base_models__key__patch"];
-        trace?: never;
-    };
-    "/api/base-models/{key}/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Verify Base */
-        post: operations["verify_base_api_base_models__key__verify_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/repair": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Repair Base */
-        post: operations["repair_base_api_base_models__key__repair_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/reimport": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reimport Base */
-        post: operations["reimport_base_api_base_models__key__reimport_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/relocate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Relocate Base */
-        post: operations["relocate_base_api_base_models__key__relocate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/recheck": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Recheck Base */
-        post: operations["recheck_base_api_base_models__key__recheck_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retry Base */
-        post: operations["retry_base_api_base_models__key__retry_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/deploy": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Deploy Base */
-        post: operations["deploy_base_api_base_models__key__deploy_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/base-models/{key}/test": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Test Base */
-        post: operations["test_base_api_base_models__key__test_post"];
+        /**
+         * Deploy or undeploy a model
+         * @description Deploying serves the model on /v1 under its API name. Undeploying answers 202 while it stops.
+         */
+        post: operations["deploy_model_api_models__name__deploy_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1425,7 +1387,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Catalogue */
+        /** List the model catalogue */
         get: operations["catalogue_api_catalog_get"];
         put?: never;
         post?: never;
@@ -1444,7 +1406,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Download */
+        /** Download a catalogue model */
         post: operations["download_api_catalog__catalog_id__download_post"];
         delete?: never;
         options?: never;
@@ -1461,7 +1423,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add From Hub */
+        /** Add a Hugging Face model to the catalogue */
         post: operations["add_from_hub_api_catalog_hub_post"];
         delete?: never;
         options?: never;
@@ -1479,7 +1441,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Remove From Catalogue */
+        /** Remove a model from the catalogue */
         delete: operations["remove_from_catalogue_api_catalog__catalog_id__delete"];
         options?: never;
         head?: never;
@@ -1495,7 +1457,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Sync */
+        /** Sync the catalogue */
         post: operations["sync_api_catalog_sync_post"];
         delete?: never;
         options?: never;
@@ -1510,9 +1472,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Settings */
+        /** Read catalogue settings */
         get: operations["read_settings_api_catalog_settings_get"];
-        /** Update Settings */
+        /** Change catalogue settings */
         put: operations["update_settings_api_catalog_settings_put"];
         post?: never;
         delete?: never;
@@ -1528,7 +1490,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Pools */
+        /** List compute pools */
         get: operations["list_pools_api_compute_pools_get"];
         put?: never;
         post?: never;
@@ -1545,9 +1507,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Prices */
+        /** Read device prices */
         get: operations["read_prices_api_compute_prices_get"];
-        /** Update Prices */
+        /** Change device prices */
         put: operations["update_prices_api_compute_prices_put"];
         post?: never;
         delete?: never;
@@ -1563,7 +1525,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Policies */
+        /** List policies */
         get: operations["policies_api_policies_get"];
         put?: never;
         post?: never;
@@ -1581,7 +1543,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change Policy */
+        /** Change a policy */
         put: operations["change_policy_api_policies__name__put"];
         post?: never;
         delete?: never;
@@ -1597,9 +1559,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Encryption Status */
+        /** Read encryption status */
         get: operations["encryption_status_api_settings_encryption_get"];
-        /** Change Encryption */
+        /** Change encryption settings */
         put: operations["change_encryption_api_settings_encryption_put"];
         post?: never;
         delete?: never;
@@ -1617,7 +1579,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Encryption */
+        /** Test an encryption key */
         post: operations["test_encryption_api_settings_encryption_test_post"];
         delete?: never;
         options?: never;
@@ -1634,7 +1596,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Start Task */
+        /** Start a re-encryption task */
         post: operations["start_task_api_settings_encryption_tasks_post"];
         delete?: never;
         options?: never;
@@ -1649,7 +1611,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Events */
+        /** List audit events */
         get: operations["list_events_api_audit_get"];
         put?: never;
         post?: never;
@@ -1666,7 +1628,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Facets */
+        /** Count audit events by filter */
         get: operations["facets_api_audit_facets_get"];
         put?: never;
         post?: never;
@@ -1683,7 +1645,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Export */
+        /** Export the audit log */
         get: operations["export_api_audit_export_get"];
         put?: never;
         post?: never;
@@ -1700,7 +1662,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Chain */
+        /** Check the audit hash chain */
         get: operations["chain_api_audit_chain_get"];
         put?: never;
         post?: never;
@@ -1717,7 +1679,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Event */
+        /** Read an audit event */
         get: operations["event_api_audit__event_id__get"];
         put?: never;
         post?: never;
@@ -1727,50 +1689,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions": {
+    "/api/models/{name}/versions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List Versions */
-        get: operations["list_versions_api_models__slug__versions_get"];
+        /** List a custom model's versions */
+        get: operations["list_versions_api_models__name__versions_get"];
         put?: never;
-        /** Add Version */
-        post: operations["add_version_api_models__slug__versions_post"];
+        /** Add a version: prompt-only or trained */
+        post: operations["add_version_api_models__name__versions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/files": {
+    "/api/models/{name}/versions/{number}/files": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Version Files */
-        get: operations["version_files_api_models__slug__versions__number__files_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/models/{slug}/versions/{number}/answers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Version Answers */
-        get: operations["version_answers_api_models__slug__versions__number__answers_get"];
+        /** List a version's files */
+        get: operations["version_files_api_models__name__versions__number__files_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1779,7 +1724,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}": {
+    "/api/models/{name}/versions/{number}/answers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the answers a version was scored on */
+        get: operations["version_answers_api_models__name__versions__number__answers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/versions/{number}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1789,14 +1751,14 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Delete Version */
-        delete: operations["delete_version_api_models__slug__versions__number__delete"];
+        /** Delete a version */
+        delete: operations["delete_version_api_models__name__versions__number__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/promote": {
+    "/api/models/{name}/versions/{number}/promote": {
         parameters: {
             query?: never;
             header?: never;
@@ -1805,15 +1767,15 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Promote Version */
-        post: operations["promote_version_api_models__slug__versions__number__promote_post"];
+        /** Make a version live */
+        post: operations["promote_version_api_models__name__versions__number__promote_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/test": {
+    "/api/models/{name}/versions/{number}/test": {
         parameters: {
             query?: never;
             header?: never;
@@ -1822,8 +1784,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Version */
-        post: operations["test_version_api_models__slug__versions__number__test_post"];
+        /** Send a prompt to a version */
+        post: operations["test_version_api_models__name__versions__number__test_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1837,7 +1799,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Presets */
+        /** List model presets */
         get: operations["list_presets_api_presets_get"];
         put?: never;
         post?: never;
@@ -1854,9 +1816,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Judge */
+        /** Read the default judge */
         get: operations["read_judge_api_settings_judge_get"];
-        /** Update Judge */
+        /** Change the default judge */
         put: operations["update_judge_api_settings_judge_put"];
         post?: never;
         delete?: never;
@@ -1872,9 +1834,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Safety */
+        /** Read the default safety model */
         get: operations["read_safety_api_settings_safety_get"];
-        /** Update Safety */
+        /** Change the default safety model */
         put: operations["update_safety_api_settings_safety_put"];
         post?: never;
         delete?: never;
@@ -1883,7 +1845,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/safety": {
+    "/api/models/{name}/safety": {
         parameters: {
             query?: never;
             header?: never;
@@ -1891,8 +1853,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Model Safety */
-        put: operations["update_model_safety_api_models__slug__safety_put"];
+        /** Change a custom model's safety model */
+        put: operations["update_model_safety_api_models__name__safety_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1907,7 +1869,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Targets */
+        /** List models the Playground can call */
         get: operations["list_targets_api_playground_models_get"];
         put?: never;
         post?: never;
@@ -1944,10 +1906,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Presets */
+        /** List Playground presets */
         get: operations["list_presets_api_playground_presets_get"];
         put?: never;
-        /** Create Preset */
+        /** Save a Playground preset */
         post: operations["create_preset_api_playground_presets_post"];
         delete?: never;
         options?: never;
@@ -1963,10 +1925,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Preset */
+        /** Change a Playground preset */
         put: operations["update_preset_api_playground_presets__preset_id__put"];
         post?: never;
-        /** Delete Preset */
+        /** Delete a Playground preset */
         delete: operations["delete_preset_api_playground_presets__preset_id__delete"];
         options?: never;
         head?: never;
@@ -2013,15 +1975,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/training-plan": {
+    "/api/models/{name}/training-plan": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Training Plan */
-        get: operations["get_training_plan_api_models__slug__training_plan_get"];
+        /** Plan a training run */
+        get: operations["get_training_plan_api_models__name__training_plan_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2030,17 +1992,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/card": {
+    "/api/models/{name}/versions/{number}/card": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Read Card */
-        get: operations["read_card_api_models__slug__versions__number__card_get"];
-        /** Edit Card */
-        put: operations["edit_card_api_models__slug__versions__number__card_put"];
+        /** Read a version's model card */
+        get: operations["read_card_api_models__name__versions__number__card_get"];
+        /** Edit a version's model card */
+        put: operations["edit_card_api_models__name__versions__number__card_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2048,15 +2010,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/card.json": {
+    "/api/models/{name}/versions/{number}/card.json": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Card Json */
-        get: operations["card_json_api_models__slug__versions__number__card_json_get"];
+        /** Download a version's model card as JSON */
+        get: operations["card_json_api_models__name__versions__number__card_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2065,15 +2027,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/card.md": {
+    "/api/models/{name}/versions/{number}/card.md": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Card Markdown */
-        get: operations["card_markdown_api_models__slug__versions__number__card_md_get"];
+        /** Download a version's model card as Markdown */
+        get: operations["card_markdown_api_models__name__versions__number__card_md_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2082,15 +2044,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/versions/{number}/aibom.json": {
+    "/api/models/{name}/versions/{number}/aibom.json": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Aibom Json */
-        get: operations["aibom_json_api_models__slug__versions__number__aibom_json_get"];
+        /** Download a version's AI bill of materials */
+        get: operations["aibom_json_api_models__name__versions__number__aibom_json_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2106,7 +2068,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Feedback */
+        /** List feedback */
         get: operations["list_feedback_api_feedback_get"];
         put?: never;
         post?: never;
@@ -2123,7 +2085,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Feedback Facets */
+        /** Count feedback by filter */
         get: operations["feedback_facets_api_feedback_facets_get"];
         put?: never;
         post?: never;
@@ -2140,7 +2102,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Feedback */
+        /** Read feedback */
         get: operations["read_feedback_api_feedback__feedback_id__get"];
         put?: never;
         post?: never;
@@ -2159,7 +2121,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Review Feedback */
+        /** Accept or reject feedback */
         post: operations["review_feedback_api_feedback__feedback_id__review_post"];
         delete?: never;
         options?: never;
@@ -2176,7 +2138,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Assign Feedback */
+        /** Assign feedback to me */
         post: operations["assign_feedback_api_feedback__feedback_id__assign_post"];
         delete?: never;
         options?: never;
@@ -2184,7 +2146,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/feedback": {
+    "/api/models/{name}/feedback": {
         parameters: {
             query?: never;
             header?: never;
@@ -2193,23 +2155,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Playground Feedback */
-        post: operations["playground_feedback_api_models__slug__feedback_post"];
+        /** Rate an answer from the Playground */
+        post: operations["playground_feedback_api_models__name__feedback_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/feedback/summary": {
+    "/api/models/{name}/feedback/summary": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Feedback Summary */
-        get: operations["feedback_summary_api_models__slug__feedback_summary_get"];
+        /** Count a model's feedback since its last version */
+        get: operations["feedback_summary_api_models__name__feedback_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2218,7 +2180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/{slug}/test-examples": {
+    "/api/models/{name}/test-examples": {
         parameters: {
             query?: never;
             header?: never;
@@ -2226,13 +2188,13 @@ export interface paths {
             cookie?: never;
         };
         /** List test examples */
-        get: operations["list_test_examples_api_models__slug__test_examples_get"];
+        get: operations["list_test_examples_api_models__name__test_examples_get"];
         put?: never;
         /**
          * Save a test example
          * @description Adds a conversation and its expected answer to the model's accepted feedback, held out for scoring: it joins the held-out rows of the dataset version the next model version starts from, so that version is scored on it. Audited as feedback.example.
          */
-        post: operations["save_test_example_api_models__slug__test_examples_post"];
+        post: operations["save_test_example_api_models__name__test_examples_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2246,10 +2208,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Keys */
+        /** List API keys */
         get: operations["list_keys_api_keys_get"];
         put?: never;
-        /** Add Key */
+        /** Create an API key */
         post: operations["add_key_api_keys_post"];
         delete?: never;
         options?: never;
@@ -2265,7 +2227,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Update Models */
+        /** Change the models a key covers */
         put: operations["update_models_api_keys__key_id__models_put"];
         post?: never;
         delete?: never;
@@ -2284,7 +2246,7 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** Revoke */
+        /** Revoke an API key */
         delete: operations["revoke_api_keys__key_id__delete"];
         options?: never;
         head?: never;
@@ -2298,7 +2260,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Jobs */
+        /** List jobs */
         get: operations["list_jobs_api_jobs_get"];
         put?: never;
         post?: never;
@@ -2315,7 +2277,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Job Facets */
+        /** Count jobs by filter */
         get: operations["job_facets_api_jobs_facets_get"];
         put?: never;
         post?: never;
@@ -2332,11 +2294,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Job */
+        /** Read a job */
         get: operations["read_job_api_jobs__job_id__get"];
         put?: never;
         post?: never;
-        /** Delete Job */
+        /** Delete a job */
         delete: operations["delete_job_api_jobs__job_id__delete"];
         options?: never;
         head?: never;
@@ -2369,7 +2331,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel Jobs */
+        /** Cancel jobs */
         post: operations["cancel_jobs_api_jobs_cancel_post"];
         delete?: never;
         options?: never;
@@ -2386,7 +2348,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry Jobs */
+        /** Retry jobs */
         post: operations["retry_jobs_api_jobs_retry_post"];
         delete?: never;
         options?: never;
@@ -2403,7 +2365,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel Job */
+        /** Cancel a job */
         post: operations["cancel_job_api_jobs__job_id__cancel_post"];
         delete?: never;
         options?: never;
@@ -2420,7 +2382,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Retry Job */
+        /** Retry a job */
         post: operations["retry_job_api_jobs__job_id__retry_post"];
         delete?: never;
         options?: never;
@@ -2437,7 +2399,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Delete Jobs */
+        /** Delete jobs */
         post: operations["delete_jobs_api_jobs_delete_post"];
         delete?: never;
         options?: never;
@@ -2452,7 +2414,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Download */
+        /** Download a job artifact */
         get: operations["download_api_artifacts__artifact_id__get"];
         put?: never;
         post?: never;
@@ -2469,7 +2431,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Job Metrics */
+        /** Read a job's training metrics */
         get: operations["job_metrics_api_jobs__job_id__metrics_get"];
         put?: never;
         post?: never;
@@ -2486,7 +2448,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Request Overview */
+        /** Chart requests across models */
         get: operations["request_overview_api_requests_overview_get"];
         put?: never;
         post?: never;
@@ -2503,7 +2465,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Requests */
+        /** List requests */
         get: operations["list_requests_api_requests_get"];
         put?: never;
         post?: never;
@@ -2520,7 +2482,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Request Facets */
+        /** Count requests by filter */
         get: operations["request_facets_api_requests_facets_get"];
         put?: never;
         post?: never;
@@ -2537,7 +2499,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Request Summary */
+        /** Summarise requests */
         get: operations["request_summary_api_requests_summary_get"];
         put?: never;
         post?: never;
@@ -2554,7 +2516,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Request */
+        /** Read a request */
         get: operations["read_request_api_requests__request_id__get"];
         put?: never;
         post?: never;
@@ -2572,7 +2534,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Read Reserved
+         * Read a reserved API name
          * @description An API name kept after its model was deleted, so it never reaches another model.
          */
         get: operations["read_reserved_api_reserved_names__name__get"];
@@ -2591,7 +2553,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** OpenAPI document for /v1 */
+        /** OpenAPI document for the OpenAI-compatible API */
         get: operations["gateway_reference_api_openapi_v1_json_get"];
         put?: never;
         post?: never;
@@ -2608,7 +2570,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** OpenAPI document for /api */
+        /** OpenAPI document for the Management API */
         get: operations["management_reference_api_openapi_api_json_get"];
         put?: never;
         post?: never;
@@ -2625,7 +2587,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Install */
+        /** Read install facts */
         get: operations["install_api_system_install_get"];
         put?: never;
         post?: never;
@@ -2642,7 +2604,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Diagnostics */
+        /** Download diagnostics */
         get: operations["diagnostics_api_system_diagnostics_get"];
         put?: never;
         post?: never;
@@ -2659,7 +2621,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** System */
+        /** Read the version and features */
         get: operations["system_api_system_get"];
         put?: never;
         post?: never;
@@ -2676,9 +2638,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Storage */
+        /** Read storage settings */
         get: operations["read_storage_api_settings_storage_get"];
-        /** Update Storage */
+        /** Change storage settings */
         put: operations["update_storage_api_settings_storage_put"];
         post?: never;
         delete?: never;
@@ -2696,7 +2658,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Test Storage */
+        /** Test storage settings */
         post: operations["test_storage_api_settings_storage_test_post"];
         delete?: never;
         options?: never;
@@ -2711,7 +2673,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Infrastructure */
+        /** List servers, devices and engines */
         get: operations["infrastructure_api_system_infrastructure_get"];
         put?: never;
         post?: never;
@@ -2728,7 +2690,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Install Settings */
+        /** Read install settings */
         get: operations["install_settings_api_settings_get"];
         put?: never;
         post?: never;
@@ -2812,398 +2774,6 @@ export interface paths {
          * @description The feedback waits in the review queue; accepted answers join the model's next training data.
          */
         post: operations["feedback_v1_feedback_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/register": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Register Worker */
-        post: operations["register_worker_internal_worker_register_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/claim": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Claim */
-        post: operations["claim_internal_worker_claim_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/jobs/{job_id}/heartbeat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Heartbeat */
-        post: operations["heartbeat_internal_worker_jobs__job_id__heartbeat_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/jobs/{job_id}/events": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Events */
-        post: operations["events_internal_worker_jobs__job_id__events_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/jobs/{job_id}/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete */
-        post: operations["complete_internal_worker_jobs__job_id__complete_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/jobs/{job_id}/fail": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Fail */
-        post: operations["fail_internal_worker_jobs__job_id__fail_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/artifacts/{artifact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Download Artifact */
-        get: operations["download_artifact_internal_worker_artifacts__artifact_id__get"];
-        /** Upload Artifact */
-        put: operations["upload_artifact_internal_worker_artifacts__artifact_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/bases/{base_model_id}/stored": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Stored */
-        get: operations["stored_internal_worker_bases__base_model_id__stored_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/bases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bases */
-        get: operations["bases_internal_worker_bases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/bases/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Base Weights */
-        get: operations["base_weights_internal_worker_bases__key__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/worker/bases/{key}/files/{path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Base File */
-        get: operations["base_file_internal_worker_bases__key__files__path__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/engines": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Register Engine */
-        post: operations["register_engine_internal_gateway_engines_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/gateways": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Report Gateway */
-        post: operations["report_gateway_internal_gateway_gateways_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/bases": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Bases */
-        get: operations["bases_internal_gateway_bases_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/bases/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Base Weights */
-        get: operations["base_weights_internal_gateway_bases__key__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/bases/{key}/files/{path}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Base File */
-        get: operations["base_file_internal_gateway_bases__key__files__path__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Config */
-        get: operations["config_internal_gateway_config_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/logs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Logs */
-        post: operations["logs_internal_gateway_logs_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/feedback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Feedback */
-        post: operations["feedback_internal_gateway_feedback_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/internal/gateway/artifacts/{artifact_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Artifact */
-        get: operations["artifact_internal_gateway_artifacts__artifact_id__get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/healthz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Healthz */
-        get: operations["healthz_healthz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/readyz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Readyz */
-        get: operations["readyz_readyz_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/metrics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Metrics */
-        get: operations["metrics_metrics_get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3518,26 +3088,8 @@ export interface components {
              */
             refusal: string | null;
         };
-        /** BaseFile */
-        BaseFile: {
-            /** Path */
-            path: string;
-            /** Size */
-            size: number;
-            /** Sha256 */
-            sha256?: string | null;
-            /** Url */
-            url?: string | null;
-            /** Key */
-            key?: string | null;
-        };
         /** BaseModelDetail */
         BaseModelDetail: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "base" | "custom";
             /** Key */
             key: string;
             /** Name */
@@ -3585,6 +3137,8 @@ export interface components {
              * @default []
              */
             versions?: components["schemas"]["VersionRow"][];
+            /** Active Jobs */
+            active_jobs: number;
             /**
              * Key Count
              * @default 0
@@ -3614,6 +3168,11 @@ export interface components {
              * @description A base's format, such as BF16, FP8 or GGUF Q8_0.
              */
             variant_label?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "base";
             /** Source */
             source: string;
             /** Repo */
@@ -3704,22 +3263,6 @@ export interface components {
              * @description On this install, or downloading or importing.
              */
             installed: boolean;
-        };
-        /** BaseWeights */
-        BaseWeights: {
-            /** Spec */
-            spec: {
-                [key: string]: unknown;
-            };
-            /**
-             * Store
-             * @default folder
-             */
-            store?: string;
-            /** Content Hash */
-            content_hash?: string | null;
-            /** Files */
-            files: components["schemas"]["BaseFile"][];
         };
         /** Body_upload_source_api_sources_post */
         Body_upload_source_api_sources_post: {
@@ -4491,15 +4034,6 @@ export interface components {
             /** Dismissed */
             dismissed: boolean;
         };
-        /** ClaimRequest */
-        ClaimRequest: {
-            worker: components["schemas"]["WorkerBody"];
-            /**
-             * Wait
-             * @default 0
-             */
-            wait?: number;
-        };
         /** ColumnInfo */
         ColumnInfo: {
             /** Name */
@@ -4521,21 +4055,6 @@ export interface components {
             min: string | null;
             /** Max */
             max: string | null;
-        };
-        /** CompleteBody */
-        CompleteBody: {
-            /** Token */
-            token: string;
-            /** Result */
-            result?: {
-                [key: string]: unknown;
-            };
-            /** Outputs */
-            outputs?: {
-                [key: string]: string;
-            };
-            /** Log */
-            log?: string | null;
         };
         /** CompletionChoice */
         CompletionChoice: {
@@ -5302,42 +4821,6 @@ export interface components {
                 [key: string]: unknown;
             };
         };
-        /** EngineBody */
-        EngineBody: {
-            /** Id */
-            id: string;
-            /** Host */
-            host: string;
-            /** Url */
-            url: string;
-            /** Base Model */
-            base_model: string;
-            /** Engine */
-            engine: string;
-            /** State */
-            state: string;
-            /**
-             * Pool
-             * @default local
-             */
-            pool?: string;
-            /**
-             * Hardware
-             * @default {}
-             */
-            hardware?: {
-                [key: string]: unknown;
-            };
-            /**
-             * Managed
-             * @default false
-             */
-            managed?: boolean;
-            /** Error */
-            error?: string | null;
-            /** Code */
-            code?: string | null;
-        };
         /** ErrorDetail */
         ErrorDetail: {
             /** Detail */
@@ -5391,40 +4874,6 @@ export interface components {
             /** Eval Loss */
             eval_loss: number;
         };
-        /** EventBody */
-        EventBody: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "event" | "log";
-            /**
-             * Message
-             * @default
-             */
-            message?: string;
-            /** Data */
-            data?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Level
-             * @default info
-             * @enum {string}
-             */
-            level?: "debug" | "info" | "warning" | "error";
-            /** Name */
-            name?: string | null;
-            /** At */
-            at?: string | null;
-        };
-        /** EventsBody */
-        EventsBody: {
-            /** Token */
-            token: string;
-            /** Events */
-            events?: components["schemas"]["EventBody"][];
-        };
         /** ExampleAnswer */
         ExampleAnswer: {
             /** Messages */
@@ -5476,45 +4925,6 @@ export interface components {
             command: string;
             /** Extensions */
             extensions: components["schemas"]["ExtensionInfo"][];
-        };
-        /** FailBody */
-        FailBody: {
-            /** Token */
-            token: string;
-            /** Error */
-            error: string;
-            /**
-             * Retryable
-             * @default true
-             */
-            retryable?: boolean;
-            /** Log */
-            log?: string | null;
-            /** Code */
-            code?: string | null;
-        };
-        /** FeedbackBody */
-        FeedbackBody: {
-            /** Model Id */
-            model_id: number;
-            /** Origin */
-            origin: string;
-            /** Rating */
-            rating: string;
-            /** Response Id */
-            response_id?: string | null;
-            /** Version */
-            version?: number | null;
-            /** Key Id */
-            key_id?: number | null;
-            /** Input */
-            input?: string | null;
-            /** Output */
-            output?: string | null;
-            /** Correction */
-            correction?: string | null;
-            /** Comment */
-            comment?: string | null;
         };
         /** FeedbackDetail */
         FeedbackDetail: {
@@ -5725,11 +5135,6 @@ export interface components {
              */
             output?: string | null;
         };
-        /** FeedbackStored */
-        FeedbackStored: {
-            /** Id */
-            id: number;
-        };
         /** FeedbackSummary */
         FeedbackSummary: {
             /** Version */
@@ -5821,25 +5226,6 @@ export interface components {
              * @description Accepted; the arguments are not constrained.
              */
             strict?: boolean | null;
-        };
-        /** GatewayBody */
-        GatewayBody: {
-            /** Id */
-            id: string;
-            /** Host */
-            host: string;
-            /** Version */
-            version: string;
-            /**
-             * Routes
-             * @default []
-             */
-            routes?: string[];
-            /**
-             * Bases
-             * @default []
-             */
-            bases?: string[];
         };
         /** GpuInfo */
         GpuInfo: {
@@ -5935,13 +5321,6 @@ export interface components {
             kind: "repair" | "reimport" | "relocate" | "remove" | "resume" | "storage" | "get_access" | "pick_variant" | "find_smaller" | "try_again" | "verify" | "open_base" | "retrain";
             /** Label */
             label: string;
-        };
-        /** HeartbeatResponse */
-        HeartbeatResponse: {
-            /** Cancel */
-            cancel: boolean;
-            /** Lease Expires At */
-            lease_expires_at: string;
         };
         /** HubAddRequest */
         HubAddRequest: {
@@ -6724,13 +6103,6 @@ export interface components {
             /** After */
             after: number;
         };
-        /** LiveBases */
-        LiveBases: {
-            /** Bases */
-            bases: {
-                [key: string]: string | null;
-            };
-        };
         /** LoadedModel */
         LoadedModel: {
             /** Base Model */
@@ -6747,55 +6119,6 @@ export interface components {
             /** Connection Id */
             connection_id?: number | null;
         };
-        /** LogBody */
-        LogBody: {
-            /**
-             * At
-             * Format: date-time
-             */
-            at: string;
-            /** Key Id */
-            key_id: number | null;
-            /** Model Id */
-            model_id: number | null;
-            /** Model */
-            model: string;
-            /** Version */
-            version: number | null;
-            /** Status */
-            status: number;
-            /** Latency Ms */
-            latency_ms: number;
-            /** Contract */
-            contract?: number | null;
-            /**
-             * Prompt Tokens
-             * @default 0
-             */
-            prompt_tokens?: number;
-            /**
-             * Completion Tokens
-             * @default 0
-             */
-            completion_tokens?: number;
-            /** Response Id */
-            response_id?: string | null;
-            /** Input */
-            input?: string | null;
-            /** Output */
-            output?: string | null;
-            /** Finish Reason */
-            finish_reason?: string | null;
-            /** Safety */
-            safety?: {
-                [key: string]: unknown;
-            } | null;
-            /**
-             * Kind
-             * @default chat
-             */
-            kind?: string;
-        };
         /** LoggedRequest */
         LoggedRequest: {
             /**
@@ -6809,11 +6132,6 @@ export interface components {
             latency_ms: number;
             /** Key Name */
             key_name: string | null;
-        };
-        /** LogsBody */
-        LogsBody: {
-            /** Entries */
-            entries: components["schemas"]["LogBody"][];
         };
         /** MachinePlanInfo */
         MachinePlanInfo: {
@@ -7065,6 +6383,11 @@ export interface components {
             /** Active Jobs */
             active_jobs: number;
             avatar?: components["schemas"]["ModelAvatar"] | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "custom";
             source: components["schemas"]["SourceInfo"] | null;
             mapping: components["schemas"]["MappingInfo"];
             /** Dataset */
@@ -7188,11 +6511,6 @@ export interface components {
         };
         /** ModelRow */
         ModelRow: {
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "base" | "custom";
             /** Key */
             key: string;
             /** Name */
@@ -7240,6 +6558,8 @@ export interface components {
              * @default []
              */
             versions?: components["schemas"]["VersionRow"][];
+            /** Active Jobs */
+            active_jobs: number;
             /**
              * Key Count
              * @default 0
@@ -7269,6 +6589,11 @@ export interface components {
              * @description A base's format, such as BF16, FP8 or GGUF Q8_0.
              */
             variant_label?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "base" | "custom";
         };
         /** ModelSafety */
         ModelSafety: {
@@ -7325,33 +6650,6 @@ export interface components {
             /** Text */
             text: string;
             action: components["schemas"]["StatusAction"] | null;
-        };
-        /** ModelSummary */
-        ModelSummary: {
-            /** Slug */
-            slug: string;
-            /** Name */
-            name: string;
-            /** Preset */
-            preset: string;
-            /** Base Model */
-            base_model: string;
-            /** Current Version */
-            current_version: number | null;
-            /**
-             * Deployed
-             * @default false
-             */
-            deployed?: boolean;
-            /** Main Metric */
-            main_metric?: string | null;
-            /** Current Score */
-            current_score: number | null;
-            /** Versions */
-            versions: number;
-            /** Active Jobs */
-            active_jobs: number;
-            avatar?: components["schemas"]["ModelAvatar"] | null;
         };
         /** ModelTraffic */
         ModelTraffic: {
@@ -8397,6 +7695,11 @@ export interface components {
             /** Active Jobs */
             active_jobs: number;
             avatar?: components["schemas"]["ModelAvatar"] | null;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "custom";
             source: components["schemas"]["SourceInfo"] | null;
             mapping: components["schemas"]["MappingInfo"];
             /** Dataset */
@@ -8875,20 +8178,6 @@ export interface components {
             /** Total Bytes */
             total_bytes: number | null;
         };
-        /** StoredArtifact */
-        StoredArtifact: {
-            /** Id */
-            id: string;
-            /** Size */
-            size: number;
-        };
-        /** StoredFiles */
-        StoredFiles: {
-            /** Files */
-            files: {
-                [key: string]: unknown;
-            }[];
-        };
         /** SystemInfo */
         SystemInfo: {
             device: components["schemas"]["DeviceInfo"];
@@ -9135,11 +8424,6 @@ export interface components {
             op: ">=" | "<=" | ">" | "<" | "==";
             /** Value */
             value: number;
-        };
-        /** TokenBody */
-        TokenBody: {
-            /** Token */
-            token: string;
         };
         /** TokenUsage */
         TokenUsage: {
@@ -9819,29 +9103,6 @@ export interface components {
             /** Completion Tokens */
             completion_tokens: number;
         };
-        /** WorkerBody */
-        WorkerBody: {
-            /** Id */
-            id: string;
-            /** Host */
-            host: string;
-            /** Kinds */
-            kinds: string[];
-            /**
-             * Gpus
-             * @default 1
-             */
-            gpus?: number;
-            /**
-             * Pool
-             * @default local
-             */
-            pool?: string;
-            /** Hardware */
-            hardware?: {
-                [key: string]: unknown;
-            };
-        };
     };
     responses: never;
     parameters: never;
@@ -10168,9 +9429,12 @@ export interface operations {
             };
         };
     };
-    list_all_api_models_get: {
+    list_models_api_models_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Only custom or only base models. */
+                kind?: ("custom" | "base") | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10183,7 +9447,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModelSummary"][];
+                    "application/json": components["schemas"]["ModelRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -10221,12 +9494,12 @@ export interface operations {
             };
         };
     };
-    duplicate_api_models__slug__duplicate_post: {
+    duplicate_api_models__name__duplicate_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10288,112 +9561,12 @@ export interface operations {
             };
         };
     };
-    read_api_models__slug__get: {
+    change_avatar_api_models__name__avatar_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    delete_api_models__slug__delete: {
-        parameters: {
-            query?: {
-                undeploy?: boolean;
-                cancel_jobs?: boolean;
-            };
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRow"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_api_models__slug__patch: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ModelUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    change_avatar_api_models__slug__avatar_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10423,47 +9596,12 @@ export interface operations {
             };
         };
     };
-    deploy_api_models__slug__deploy_post: {
+    keep_request_bodies_api_models__name__request_bodies_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DeployRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    keep_request_bodies_api_models__slug__request_bodies_put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10513,12 +9651,12 @@ export interface operations {
             };
         };
     };
-    choose_dataset_api_models__slug__dataset_put: {
+    choose_dataset_api_models__name__dataset_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10548,12 +9686,12 @@ export interface operations {
             };
         };
     };
-    update_mapping_api_models__slug__mapping_put: {
+    update_mapping_api_models__name__mapping_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10583,12 +9721,12 @@ export interface operations {
             };
         };
     };
-    query_api_models__slug__query_post: {
+    query_api_models__name__query_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10618,12 +9756,12 @@ export interface operations {
             };
         };
     };
-    preview_api_models__slug__preview_get: {
+    preview_api_models__name__preview_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10649,12 +9787,12 @@ export interface operations {
             };
         };
     };
-    build_dataset_version_api_models__slug__dataset_versions_post: {
+    build_dataset_version_api_models__name__dataset_versions_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10680,12 +9818,12 @@ export interface operations {
             };
         };
     };
-    golden_api_models__slug__golden_get: {
+    golden_api_models__name__golden_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10711,12 +9849,12 @@ export interface operations {
             };
         };
     };
-    check_contract_api_models__slug__contract_check_post: {
+    check_contract_api_models__name__contract_check_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10746,12 +9884,12 @@ export interface operations {
             };
         };
     };
-    update_contract_api_models__slug__contract_put: {
+    update_contract_api_models__name__contract_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10781,12 +9919,12 @@ export interface operations {
             };
         };
     };
-    dismiss_labels_api_models__slug__label_proposal_dismissal_put: {
+    dismiss_labels_api_models__name__label_proposal_dismissal_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10816,12 +9954,12 @@ export interface operations {
             };
         };
     };
-    update_graders_api_models__slug__graders_put: {
+    update_graders_api_models__name__graders_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10851,12 +9989,12 @@ export interface operations {
             };
         };
     };
-    update_promotion_api_models__slug__promotion_put: {
+    update_promotion_api_models__name__promotion_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10886,12 +10024,12 @@ export interface operations {
             };
         };
     };
-    update_instructions_api_models__slug__instructions_put: {
+    update_instructions_api_models__name__instructions_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10921,12 +10059,12 @@ export interface operations {
             };
         };
     };
-    update_judge_api_models__slug__judge_put: {
+    update_judge_api_models__name__judge_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10956,12 +10094,12 @@ export interface operations {
             };
         };
     };
-    base_options_api_models__slug__base_options_get: {
+    base_options_api_models__name__base_options_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -10987,12 +10125,12 @@ export interface operations {
             };
         };
     };
-    switch_base_api_models__slug__base_post: {
+    switch_base_api_models__name__base_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -11022,7 +10160,7 @@ export interface operations {
             };
         };
     };
-    read_model_page_api_model_pages__name__get: {
+    read_model_page_api_models__name__overview_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -11053,7 +10191,7 @@ export interface operations {
             };
         };
     };
-    read_model_traffic_api_model_pages__name__traffic_get: {
+    read_model_traffic_api_models__name__traffic_get: {
         parameters: {
             query?: {
                 range?: "24h" | "7d" | "30d";
@@ -11086,7 +10224,7 @@ export interface operations {
             };
         };
     };
-    read_model_activity_api_model_pages__name__activity_get: {
+    read_model_activity_api_models__name__activity_get: {
         parameters: {
             query?: {
                 limit?: number;
@@ -12669,27 +11807,7 @@ export interface operations {
             };
         };
     };
-    list_all_models_api_all_models_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ModelRow"][];
-                };
-            };
-        };
-    };
-    inspect_api_base_models_inspect_post: {
+    inspect_api_models_inspect_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -12722,7 +11840,7 @@ export interface operations {
             };
         };
     };
-    import_model_api_base_models_import_post: {
+    import_model_api_models_import_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -12755,12 +11873,144 @@ export interface operations {
             };
         };
     };
-    read_base_api_base_models__key__get: {
+    verify_base_api_models__name__verify_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                key: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    repair_base_api_models__name__repair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reimport_base_api_models__name__reimport_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    relocate_base_api_models__name__relocate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recheck_base_api_models__name__recheck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
             };
             cookie?: never;
         };
@@ -12786,16 +12036,113 @@ export interface operations {
             };
         };
     };
-    delete_base_model_api_base_models__key__delete: {
+    retry_base_api_models__name__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_base_api_models__name__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_model_api_models__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelDetail"] | components["schemas"]["BaseModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_model_api_models__name__delete: {
         parameters: {
             query?: {
-                cascade?: boolean;
                 undeploy?: boolean;
                 cancel_jobs?: boolean;
+                cascade?: boolean;
             };
             header?: never;
             path: {
-                key: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -12821,12 +12168,12 @@ export interface operations {
             };
         };
     };
-    update_base_api_base_models__key__patch: {
+    update_model_api_models__name__patch: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                key: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -12842,7 +12189,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
+                    "application/json": components["schemas"]["ModelDetail"] | components["schemas"]["BaseModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -12856,206 +12203,12 @@ export interface operations {
             };
         };
     };
-    verify_base_api_base_models__key__verify_post: {
+    deploy_model_api_models__name__deploy_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    repair_base_api_base_models__key__repair_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    reimport_base_api_base_models__key__reimport_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LocationRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    relocate_base_api_base_models__key__relocate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LocationRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    recheck_base_api_base_models__key__recheck_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    retry_base_api_base_models__key__retry_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    deploy_base_api_base_models__key__deploy_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -13071,42 +12224,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BaseModelDetail"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    test_base_api_base_models__key__test_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TestRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TestResponse"];
+                    "application/json": components["schemas"]["ModelDetail"] | components["schemas"]["BaseModelDetail"];
                 };
             };
             /** @description Validation Error */
@@ -13713,12 +12831,12 @@ export interface operations {
             };
         };
     };
-    list_versions_api_models__slug__versions_get: {
+    list_versions_api_models__name__versions_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -13744,12 +12862,12 @@ export interface operations {
             };
         };
     };
-    add_version_api_models__slug__versions_post: {
+    add_version_api_models__name__versions_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -13779,12 +12897,12 @@ export interface operations {
             };
         };
     };
-    version_files_api_models__slug__versions__number__files_get: {
+    version_files_api_models__name__versions__number__files_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -13811,14 +12929,14 @@ export interface operations {
             };
         };
     };
-    version_answers_api_models__slug__versions__number__answers_get: {
+    version_answers_api_models__name__versions__number__answers_get: {
         parameters: {
             query?: {
                 against?: number | null;
             };
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -13845,14 +12963,14 @@ export interface operations {
             };
         };
     };
-    delete_version_api_models__slug__versions__number__delete: {
+    delete_version_api_models__name__versions__number__delete: {
         parameters: {
             query?: {
                 cancel_jobs?: boolean;
             };
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -13886,12 +13004,12 @@ export interface operations {
             };
         };
     };
-    promote_version_api_models__slug__versions__number__promote_post: {
+    promote_version_api_models__name__versions__number__promote_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -13918,12 +13036,12 @@ export interface operations {
             };
         };
     };
-    test_version_api_models__slug__versions__number__test_post: {
+    test_version_api_models__name__versions__number__test_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14080,12 +13198,12 @@ export interface operations {
             };
         };
     };
-    update_model_safety_api_models__slug__safety_put: {
+    update_model_safety_api_models__name__safety_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -14488,7 +13606,7 @@ export interface operations {
             };
         };
     };
-    get_training_plan_api_models__slug__training_plan_get: {
+    get_training_plan_api_models__name__training_plan_get: {
         parameters: {
             query?: {
                 strategy?: ("lora" | "qlora") | null;
@@ -14510,7 +13628,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -14536,12 +13654,12 @@ export interface operations {
             };
         };
     };
-    read_card_api_models__slug__versions__number__card_get: {
+    read_card_api_models__name__versions__number__card_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14568,12 +13686,12 @@ export interface operations {
             };
         };
     };
-    edit_card_api_models__slug__versions__number__card_put: {
+    edit_card_api_models__name__versions__number__card_put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14604,12 +13722,12 @@ export interface operations {
             };
         };
     };
-    card_json_api_models__slug__versions__number__card_json_get: {
+    card_json_api_models__name__versions__number__card_json_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14634,12 +13752,12 @@ export interface operations {
             };
         };
     };
-    card_markdown_api_models__slug__versions__number__card_md_get: {
+    card_markdown_api_models__name__versions__number__card_md_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14664,12 +13782,12 @@ export interface operations {
             };
         };
     };
-    aibom_json_api_models__slug__versions__number__aibom_json_get: {
+    aibom_json_api_models__name__versions__number__aibom_json_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
                 number: number;
             };
             cookie?: never;
@@ -14865,12 +13983,12 @@ export interface operations {
             };
         };
     };
-    playground_feedback_api_models__slug__feedback_post: {
+    playground_feedback_api_models__name__feedback_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -14900,12 +14018,12 @@ export interface operations {
             };
         };
     };
-    feedback_summary_api_models__slug__feedback_summary_get: {
+    feedback_summary_api_models__name__feedback_summary_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -14931,12 +14049,12 @@ export interface operations {
             };
         };
     };
-    list_test_examples_api_models__slug__test_examples_get: {
+    list_test_examples_api_models__name__test_examples_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -14962,12 +14080,12 @@ export interface operations {
             };
         };
     };
-    save_test_example_api_models__slug__test_examples_post: {
+    save_test_example_api_models__name__test_examples_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                slug: string;
+                name: string;
             };
             cookie?: never;
         };
@@ -16217,780 +15335,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorDetail"];
-                };
-            };
-        };
-    };
-    register_worker_internal_worker_register_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["WorkerBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    claim_internal_worker_claim_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ClaimRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    heartbeat_internal_worker_jobs__job_id__heartbeat_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                job_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TokenBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HeartbeatResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    events_internal_worker_jobs__job_id__events_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                job_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EventsBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    complete_internal_worker_jobs__job_id__complete_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                job_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    fail_internal_worker_jobs__job_id__fail_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                job_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FailBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    download_artifact_internal_worker_artifacts__artifact_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                artifact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    upload_artifact_internal_worker_artifacts__artifact_id__put: {
-        parameters: {
-            query?: never;
-            header: {
-                "x-artifact-kind": string;
-                "x-artifact-packing": string;
-                "x-artifact-name": string;
-                "x-artifact-replace"?: string;
-                authorization?: string;
-            };
-            path: {
-                artifact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StoredArtifact"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stored_internal_worker_bases__base_model_id__stored_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                base_model_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StoredFiles"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bases_internal_worker_bases_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LiveBases"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    base_weights_internal_worker_bases__key__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseWeights"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    base_file_internal_worker_bases__key__files__path__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                key: string;
-                path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    register_engine_internal_gateway_engines_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["EngineBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    report_gateway_internal_gateway_gateways_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["GatewayBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    bases_internal_gateway_bases_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LiveBases"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    base_weights_internal_gateway_bases__key__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BaseWeights"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    base_file_internal_gateway_bases__key__files__path__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                key: string;
-                path: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    config_internal_gateway_config_get: {
-        parameters: {
-            query?: {
-                version?: string;
-                wait?: number;
-            };
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    logs_internal_gateway_logs_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LogsBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    feedback_internal_gateway_feedback_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FeedbackBody"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FeedbackStored"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    artifact_internal_gateway_artifacts__artifact_id__get: {
-        parameters: {
-            query?: never;
-            header?: {
-                authorization?: string;
-            };
-            path: {
-                artifact_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": unknown;
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    healthz_healthz_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    readyz_readyz_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        [key: string]: string;
-                    };
-                };
-            };
-        };
-    };
-    metrics_metrics_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
                 };
             };
         };

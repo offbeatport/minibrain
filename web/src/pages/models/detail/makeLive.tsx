@@ -100,8 +100,8 @@ export function MakeLiveDialog({
     const promote = useMutation({
         mutationFn: (target: number) =>
             unwrap(
-                api.POST("/api/models/{slug}/versions/{number}/promote", {
-                    params: { path: { slug: row.key, number: target } },
+                api.POST("/api/models/{name}/versions/{number}/promote", {
+                    params: { path: { name: row.key, number: target } },
                 }),
             ),
         onSuccess: async (_, target) => {

@@ -120,7 +120,7 @@ export function EntryAction({ entry, on }: { entry: CatalogEntry; on: Actions })
     const failed = entry.added.find((added) => added.availability.state === "not_downloaded");
     const retry = useMutation({
         mutationFn: (key: string) =>
-            unwrap(api.POST("/api/base-models/{key}/retry", { params: { path: { key } } })),
+            unwrap(api.POST("/api/models/{name}/retry", { params: { path: { name: key } } })),
         onSuccess: on.refresh,
     });
     const can = useCan();

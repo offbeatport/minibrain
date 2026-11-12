@@ -25,7 +25,7 @@ type Dialogs = "reimport" | "relocate" | "get_access";
 type Opened = { kind: Dialogs; row: ModelRow };
 
 function target(row: ModelRow) {
-    return { params: { path: { key: row.key } } };
+    return { params: { path: { name: row.key } } };
 }
 
 function listed(paths: string[]): string {
@@ -35,7 +35,7 @@ function listed(paths: string[]): string {
 }
 
 function retry(row: ModelRow) {
-    return unwrap(api.POST("/api/base-models/{key}/retry", target(row)));
+    return unwrap(api.POST("/api/models/{name}/retry", target(row)));
 }
 
 function confirmation(row: ModelRow, action: HealthAction): Confirmation | null {
@@ -51,7 +51,7 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
                 </p>
             ),
             confirmLabel: "Repair",
-            run: () => unwrap(api.POST("/api/base-models/{key}/repair", target(row))),
+            run: () => unwrap(api.POST("/api/models/{name}/repair", target(row))),
         };
     }
     if (action.kind === "verify") {
@@ -64,7 +64,7 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
                 </p>
             ),
             confirmLabel: "Verify files",
-            run: () => unwrap(api.POST("/api/base-models/{key}/verify", target(row))),
+            run: () => unwrap(api.POST("/api/models/{name}/verify", target(row))),
         };
     }
     if (action.kind === "resume") {
@@ -85,7 +85,7 @@ function confirmation(row: ModelRow, action: HealthAction): Confirmation | null 
                 </p>
             ),
             confirmLabel: "Try again",
-            run: () => unwrap(api.POST("/api/base-models/{key}/recheck", target(row))),
+            run: () => unwrap(api.POST("/api/models/{name}/recheck", target(row))),
         };
     }
     return null;
@@ -179,8 +179,8 @@ function LocationDialog({
             }
             const request = { ...target(row), body: { location: location.trim() } };
             return relocating
-                ? unwrap(api.POST("/api/base-models/{key}/relocate", request))
-                : unwrap(api.POST("/api/base-models/{key}/reimport", request));
+                ? unwrap(api.POST("/api/models/{name}/relocate", request))
+                : unwrap(api.POST("/api/models/{name}/reimport", request));
         },
         onSuccess: async () => {
             await refresh();

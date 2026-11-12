@@ -212,8 +212,8 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const assign = useMutation({
         mutationFn: (slug: string) =>
             unwrap(
-                api.PUT("/api/models/{slug}/dataset", {
-                    params: { path: { slug } },
+                api.PUT("/api/models/{name}/dataset", {
+                    params: { path: { name: slug } },
                     body: { dataset: dataset.slug },
                 }),
             ),

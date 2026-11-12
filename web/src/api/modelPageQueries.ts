@@ -16,7 +16,7 @@ export function useModelTraffic(name: string, range: TrafficRange) {
         queryKey: ["all-models", "traffic", name, range],
         queryFn: () =>
             unwrap(
-                api.GET("/api/model-pages/{name}/traffic", {
+                api.GET("/api/models/{name}/traffic", {
                     params: { path: { name }, query: { range } },
                 }),
             ),
@@ -31,7 +31,7 @@ export function useModelActivity(name: string, limit = 40) {
         queryKey: ["all-models", "activity", name, limit],
         queryFn: () =>
             unwrap(
-                api.GET("/api/model-pages/{name}/activity", {
+                api.GET("/api/models/{name}/activity", {
                     params: { path: { name }, query: { limit } },
                 }),
             ),

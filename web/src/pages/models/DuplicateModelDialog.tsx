@@ -67,8 +67,8 @@ export function DuplicateModelDialog({
     const duplicate = useMutation({
         mutationFn: (source: ModelRow) =>
             unwrap(
-                api.POST("/api/models/{slug}/duplicate", {
-                    params: { path: { slug: source.key } },
+                api.POST("/api/models/{name}/duplicate", {
+                    params: { path: { name: source.key } },
                     body: { name: trimmed },
                 }),
             ),

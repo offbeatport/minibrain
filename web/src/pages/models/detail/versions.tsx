@@ -232,8 +232,8 @@ function deleteVersions(row: ModelRow, numbers: number[]) {
     return Promise.all(
         numbers.map((number) =>
             unwrap(
-                api.DELETE("/api/models/{slug}/versions/{number}", {
-                    params: { path: { slug: row.key, number }, query: { cancel_jobs: true } },
+                api.DELETE("/api/models/{name}/versions/{number}", {
+                    params: { path: { name: row.key, number }, query: { cancel_jobs: true } },
                 }),
             ),
         ),

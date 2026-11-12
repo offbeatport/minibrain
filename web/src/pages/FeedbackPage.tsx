@@ -161,9 +161,9 @@ export function FeedbackPage() {
         id === null ? update({ item: "" }) : open({ item: String(id) });
     const modelOptions = (owned.data ?? []).map((item) =>
         modelOption({
-            value: item.slug,
+            value: item.key,
             label: item.name,
-            count: facets.data?.models[item.slug] ?? 0,
+            count: facets.data?.models[item.key] ?? 0,
         }),
     );
     const statusOptions = FEEDBACK_STATUSES.map((status) => ({

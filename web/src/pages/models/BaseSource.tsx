@@ -92,7 +92,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
         queryKey: ["all-models", "inspect", path, connection],
         queryFn: () =>
             unwrap(
-                api.POST("/api/base-models/inspect", {
+                api.POST("/api/models/inspect", {
                     body: { location: path, connection_id: connection },
                 }),
             ),
@@ -109,7 +109,7 @@ export function useSourcePlan(state: SourceState): SourcePlan {
             name: found?.name ?? undefined,
             run: async () => {
                 const imported = await unwrap(
-                    api.POST("/api/base-models/import", {
+                    api.POST("/api/models/import", {
                         body: {
                             name: found?.name || "Imported model",
                             location,

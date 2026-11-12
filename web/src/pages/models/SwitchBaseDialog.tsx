@@ -31,7 +31,9 @@ export function useBaseOptions(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: ["model", slug, "base-options"],
         queryFn: () =>
-            unwrap(api.GET("/api/models/{slug}/base-options", { params: { path: { slug } } })),
+            unwrap(
+                api.GET("/api/models/{name}/base-options", { params: { path: { name: slug } } }),
+            ),
         enabled,
     });
 }
@@ -151,8 +153,8 @@ export function SwitchBaseDialog({
         mutationFn: async (source: ModelRow) => {
             const base = downloading ? await plan.run() : chosen;
             return unwrap(
-                api.POST("/api/models/{slug}/base", {
-                    params: { path: { slug: source.key } },
+                api.POST("/api/models/{name}/base", {
+                    params: { path: { name: source.key } },
                     body: { base_model: base },
                 }),
             );

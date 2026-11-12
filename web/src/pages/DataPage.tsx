@@ -324,8 +324,8 @@ function DatasetSection({ detail }: { detail: ModelDetail }) {
     const build = useMutation({
         mutationFn: () =>
             unwrap(
-                api.POST("/api/models/{slug}/dataset-versions", {
-                    params: { path: { slug: detail.slug } },
+                api.POST("/api/models/{name}/dataset-versions", {
+                    params: { path: { name: detail.slug } },
                 }),
             ),
         onSuccess: () => refresh(),
@@ -399,8 +399,8 @@ function DatasetPicker({ detail }: { detail: ModelDetail }) {
     const choose = useMutation({
         mutationFn: (dataset: string) =>
             unwrap(
-                api.PUT("/api/models/{slug}/dataset", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/dataset", {
+                    params: { path: { name: detail.slug } },
                     body: { dataset },
                 }),
             ),
@@ -458,7 +458,7 @@ export function DataSections({ slug }: { slug: string }) {
     if (!data) {
         return null;
     }
-    const path = { params: { path: { slug } } };
+    const path = { params: { path: { name: slug } } };
     return (
         <>
             <DatasetPicker detail={data} />
@@ -468,12 +468,12 @@ export function DataSections({ slug }: { slug: string }) {
                     columns={data.source.columns.map((column) => column.name)}
                     mapping={data.mapping}
                     onSave={(body) =>
-                        unwrap(api.PUT("/api/models/{slug}/mapping", { ...path, body })).then(
+                        unwrap(api.PUT("/api/models/{name}/mapping", { ...path, body })).then(
                             refresh,
                         )
                     }
                     onRun={(sql) =>
-                        unwrap(api.POST("/api/models/{slug}/query", { ...path, body: { sql } }))
+                        unwrap(api.POST("/api/models/{name}/query", { ...path, body: { sql } }))
                     }
                 />
             )}
@@ -485,7 +485,7 @@ export function DataSections({ slug }: { slug: string }) {
 
 function ModelData({ slug }: { slug: string }) {
     const models = useModels();
-    const model = models.data?.find((item) => item.slug === slug);
+    const model = models.data?.find((item) => item.key === slug);
     return (
         <Page>
             <PageHeader

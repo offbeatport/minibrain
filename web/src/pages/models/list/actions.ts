@@ -4,22 +4,22 @@ import type { Entry } from "../entries";
 
 export function promoteVersion(slug: string, number: number) {
     return unwrap(
-        api.POST("/api/models/{slug}/versions/{number}/promote", {
-            params: { path: { slug, number } },
+        api.POST("/api/models/{name}/versions/{number}/promote", {
+            params: { path: { name: slug, number } },
         }),
     );
 }
 
 function deleteVersion(row: ModelRow, number: number, cancelJobs: boolean) {
     return removed(
-        api.DELETE("/api/models/{slug}/versions/{number}", {
-            params: { path: { slug: row.key, number }, query: { cancel_jobs: cancelJobs } },
+        api.DELETE("/api/models/{name}/versions/{number}", {
+            params: { path: { name: row.key, number }, query: { cancel_jobs: cancelJobs } },
         }),
     );
 }
 
 export function retryDownload(row: ModelRow) {
-    return unwrap(api.POST("/api/base-models/{key}/retry", { params: { path: { key: row.key } } }));
+    return unwrap(api.POST("/api/models/{name}/retry", { params: { path: { name: row.key } } }));
 }
 
 export async function deployRows(rows: ModelRow[], deployed: boolean): Promise<void> {

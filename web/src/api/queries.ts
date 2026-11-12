@@ -1,5 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { type JobInfo, type ModelRow, type VersionInfo, api, unwrap } from "./client";
+import {
+    type BaseModelDetail,
+    type JobInfo,
+    type ModelDetail,
+    type ModelRow,
+    type VersionInfo,
+    api,
+    unwrap,
+} from "./client";
 
 const ACTIVE_JOB = new Set(["queued", "running"]);
 const ACTIVE_VERSION = new Set(["training", "evaluating", "deleting"]);
@@ -44,10 +52,31 @@ export function isModelMoving(row: ModelRow): boolean {
 }
 
 export function loadAllModels() {
-    return unwrap(api.GET("/api/all-models"));
+    return unwrap(api.GET("/api/models", {}));
 }
 
 const path = (slug: string) => ({ params: { path: { slug } } });
+const modelPath = (name: string) => ({ params: { path: { name } } });
+
+async function loadDetail(name: string) {
+    return unwrap(api.GET("/api/models/{name}", modelPath(name)));
+}
+
+export async function loadCustomModel(name: string): Promise<ModelDetail> {
+    const found = await loadDetail(name);
+    if (found.kind !== "custom") {
+        throw new Error(`${name} is a base model, not a custom model`);
+    }
+    return found;
+}
+
+export async function loadBaseModel(name: string): Promise<BaseModelDetail> {
+    const found = await loadDetail(name);
+    if (found.kind !== "base") {
+        throw new Error(`${name} is a custom model, not a base model`);
+    }
+    return found;
+}
 
 export function isActiveJob(job: JobInfo): boolean {
     return ACTIVE_JOB.has(job.status);
@@ -60,7 +89,7 @@ export function isActiveVersion(version: VersionInfo): boolean {
 export function useModels() {
     return useQuery({
         queryKey: keys.models,
-        queryFn: () => unwrap(api.GET("/api/models")),
+        queryFn: () => unwrap(api.GET("/api/models", { params: { query: { kind: "custom" } } })),
         refetchInterval: (query) =>
             query.state.data?.some((item) => item.active_jobs > 0) ? POLL_MS : false,
     });
@@ -69,7 +98,7 @@ export function useModels() {
 export function useModel(slug: string) {
     return useQuery({
         queryKey: keys.model(slug),
-        queryFn: () => unwrap(api.GET("/api/models/{slug}", path(slug))),
+        queryFn: () => loadCustomModel(slug),
         refetchInterval: (query) => ((query.state.data?.active_jobs ?? 0) > 0 ? POLL_MS : false),
         enabled: slug !== "",
     });
@@ -78,7 +107,7 @@ export function useModel(slug: string) {
 export function usePreview(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.preview(slug),
-        queryFn: () => unwrap(api.GET("/api/models/{slug}/preview", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{name}/preview", modelPath(slug))),
         enabled,
         retry: false,
     });
@@ -137,7 +166,7 @@ export function useDatasetPreview(slug: string, enabled: boolean) {
 export function useGolden(slug: string, enabled: boolean) {
     return useQuery({
         queryKey: keys.golden(slug),
-        queryFn: () => unwrap(api.GET("/api/models/{slug}/golden", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{name}/golden", modelPath(slug))),
         enabled,
     });
 }
@@ -145,7 +174,7 @@ export function useGolden(slug: string, enabled: boolean) {
 export function useVersions(slug: string) {
     return useQuery({
         queryKey: keys.versions(slug),
-        queryFn: () => unwrap(api.GET("/api/models/{slug}/versions", path(slug))),
+        queryFn: () => unwrap(api.GET("/api/models/{name}/versions", modelPath(slug))),
         refetchInterval: (query) => (query.state.data?.some(isActiveVersion) ? POLL_MS : false),
         enabled: slug !== "",
     });
@@ -260,7 +289,7 @@ export function useCatalog(pool?: string) {
 export function useBaseModel(key: string) {
     return useQuery({
         queryKey: keys.baseModel(key),
-        queryFn: () => unwrap(api.GET("/api/base-models/{key}", { params: { path: { key } } })),
+        queryFn: () => loadBaseModel(key),
         refetchInterval: (query) =>
             query.state.data && isModelMoving(query.state.data) ? POLL_MS : 15000,
         enabled: key !== "",
@@ -294,8 +323,8 @@ export function useVersionAnswers(slug: string, number: number, enabled: boolean
         queryKey: keys.answers(slug, number),
         queryFn: () =>
             unwrap(
-                api.GET("/api/models/{slug}/versions/{number}/answers", {
-                    params: { path: { slug, number } },
+                api.GET("/api/models/{name}/versions/{number}/answers", {
+                    params: { path: { name: slug, number } },
                 }),
             ),
         enabled,
@@ -307,8 +336,8 @@ export function useVersionFiles(slug: string, number: number | null | undefined)
         queryKey: keys.versionFiles(slug, number ?? -1),
         queryFn: () =>
             unwrap(
-                api.GET("/api/models/{slug}/versions/{number}/files", {
-                    params: { path: { slug, number: number ?? 0 } },
+                api.GET("/api/models/{name}/versions/{number}/files", {
+                    params: { path: { name: slug, number: number ?? 0 } },
                 }),
             ),
         enabled: number !== null && number !== undefined,
@@ -319,7 +348,7 @@ export function useVersionFiles(slug: string, number: number | null | undefined)
 export function useModelPage(name: string) {
     return useQuery({
         queryKey: keys.modelPage(name),
-        queryFn: () => unwrap(api.GET("/api/model-pages/{name}", { params: { path: { name } } })),
+        queryFn: () => unwrap(api.GET("/api/models/{name}/overview", modelPath(name))),
         refetchInterval: 30000,
     });
 }

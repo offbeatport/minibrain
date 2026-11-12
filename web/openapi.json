@@ -8,9 +8,9 @@
     "/api/auth/session": {
       "get": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Current Session",
+        "summary": "Read the current session",
         "operationId": "current_session_api_auth_session_get",
         "responses": {
           "200": {
@@ -29,9 +29,9 @@
     "/api/auth/login": {
       "post": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Login",
+        "summary": "Sign in with a password",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
@@ -70,9 +70,9 @@
     "/api/auth/logout": {
       "post": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Logout",
+        "summary": "Sign out",
         "operationId": "logout_api_auth_logout_post",
         "responses": {
           "204": {
@@ -84,9 +84,9 @@
     "/api/auth/setup": {
       "post": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Setup",
+        "summary": "Create the first admin from a setup link",
         "operationId": "setup_api_auth_setup_post",
         "requestBody": {
           "content": {
@@ -125,9 +125,9 @@
     "/api/auth/reset": {
       "post": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Reset",
+        "summary": "Set a password from a reset link",
         "operationId": "reset_api_auth_reset_post",
         "requestBody": {
           "content": {
@@ -166,9 +166,9 @@
     "/api/auth/oidc/start": {
       "get": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Oidc Start",
+        "summary": "Start single sign-on",
         "operationId": "oidc_start_api_auth_oidc_start_get",
         "parameters": [
           {
@@ -202,9 +202,9 @@
     "/api/auth/oidc/callback": {
       "get": {
         "tags": [
-          "auth"
+          "Accounts"
         ],
-        "summary": "Oidc Callback",
+        "summary": "Finish single sign-on",
         "operationId": "oidc_callback_api_auth_oidc_callback_get",
         "parameters": [
           {
@@ -268,9 +268,9 @@
     "/api/accounts": {
       "get": {
         "tags": [
-          "accounts"
+          "Accounts"
         ],
-        "summary": "Accounts",
+        "summary": "List accounts",
         "operationId": "accounts_api_accounts_get",
         "responses": {
           "200": {
@@ -287,9 +287,9 @@
       },
       "post": {
         "tags": [
-          "accounts"
+          "Accounts"
         ],
-        "summary": "Add Account",
+        "summary": "Add an account",
         "operationId": "add_account_api_accounts_post",
         "requestBody": {
           "content": {
@@ -328,9 +328,9 @@
     "/api/accounts/{account_id}": {
       "patch": {
         "tags": [
-          "accounts"
+          "Accounts"
         ],
-        "summary": "Update Account",
+        "summary": "Change an account's role or status",
         "operationId": "update_account_api_accounts__account_id__patch",
         "parameters": [
           {
@@ -380,9 +380,9 @@
     "/api/accounts/{account_id}/password-link": {
       "post": {
         "tags": [
-          "accounts"
+          "Accounts"
         ],
-        "summary": "Reset Password",
+        "summary": "Make a password reset link",
         "operationId": "reset_password_api_accounts__account_id__password_link_post",
         "parameters": [
           {
@@ -420,44 +420,21 @@
       }
     },
     "/api/models": {
-      "get": {
-        "tags": [
-          "models"
-        ],
-        "summary": "List All",
-        "operationId": "list_all_api_models_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ModelSummary"
-                  },
-                  "type": "array",
-                  "title": "Response List All Api Models Get"
-                }
-              }
-            }
-          }
-        }
-      },
       "post": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Create",
+        "summary": "Create a custom model",
         "operationId": "create_api_models_post",
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ModelCreate"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "201": {
@@ -481,23 +458,81 @@
             }
           }
         }
-      }
-    },
-    "/api/models/{slug}/duplicate": {
-      "post": {
+      },
+      "get": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Duplicate",
-        "operationId": "duplicate_api_models__slug__duplicate_post",
+        "summary": "List models",
+        "description": "Custom and base models as rows: availability, activity, deployment, versions and usage, most recently changed first.",
+        "operationId": "list_models_api_models_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "custom",
+                    "base"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only custom or only base models.",
+              "title": "Kind"
+            },
+            "description": "Only custom or only base models."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelRow"
+                  },
+                  "title": "Response List Models Api Models Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{name}/duplicate": {
+      "post": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Duplicate a custom model",
+        "operationId": "duplicate_api_models__name__duplicate_post",
+        "parameters": [
+          {
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -538,9 +573,9 @@
     "/api/models/name": {
       "get": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Default Name",
+        "summary": "Suggest a model name and its API name",
         "description": "A free name and the API name it gets; with name, the API name that name would get.",
         "operationId": "default_name_api_models_name_get",
         "parameters": [
@@ -596,173 +631,21 @@
         }
       }
     },
-    "/api/models/{slug}": {
-      "patch": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Update",
-        "operationId": "update_api_models__slug__patch",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ModelUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Read",
-        "operationId": "read_api_models__slug__get",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Delete",
-        "operationId": "delete_api_models__slug__delete",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          },
-          {
-            "name": "undeploy",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Undeploy"
-            }
-          },
-          {
-            "name": "cancel_jobs",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Cancel Jobs"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelRow"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/models/{slug}/avatar": {
+    "/api/models/{name}/avatar": {
       "put": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Change Avatar",
-        "operationId": "change_avatar_api_models__slug__avatar_put",
+        "summary": "Change a custom model's avatar",
+        "operationId": "change_avatar_api_models__name__avatar_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -800,73 +683,21 @@
         }
       }
     },
-    "/api/models/{slug}/deploy": {
-      "post": {
-        "tags": [
-          "models"
-        ],
-        "summary": "Deploy",
-        "operationId": "deploy_api_models__slug__deploy_post",
-        "parameters": [
-          {
-            "name": "slug",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Slug"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeployRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/models/{slug}/request-bodies": {
+    "/api/models/{name}/request-bodies": {
       "put": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Keep Request Bodies",
-        "operationId": "keep_request_bodies_api_models__slug__request_bodies_put",
+        "summary": "Keep or drop request inputs and answers",
+        "operationId": "keep_request_bodies_api_models__name__request_bodies_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -907,9 +738,9 @@
     "/api/models/sample": {
       "post": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Create Sample",
+        "summary": "Create the sample model",
         "operationId": "create_sample_api_models_sample_post",
         "responses": {
           "201": {
@@ -925,21 +756,21 @@
         }
       }
     },
-    "/api/models/{slug}/dataset": {
+    "/api/models/{name}/dataset": {
       "put": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Choose Dataset",
-        "operationId": "choose_dataset_api_models__slug__dataset_put",
+        "summary": "Choose the dataset a custom model trains on",
+        "operationId": "choose_dataset_api_models__name__dataset_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -977,21 +808,21 @@
         }
       }
     },
-    "/api/models/{slug}/mapping": {
+    "/api/models/{name}/mapping": {
       "put": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Update Mapping",
-        "operationId": "update_mapping_api_models__slug__mapping_put",
+        "summary": "Change the mapping of a custom model's dataset",
+        "operationId": "update_mapping_api_models__name__mapping_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1029,21 +860,21 @@
         }
       }
     },
-    "/api/models/{slug}/query": {
+    "/api/models/{name}/query": {
       "post": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Query",
-        "operationId": "query_api_models__slug__query_post",
+        "summary": "Run SQL over a custom model's sources",
+        "operationId": "query_api_models__name__query_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1081,21 +912,21 @@
         }
       }
     },
-    "/api/models/{slug}/preview": {
+    "/api/models/{name}/preview": {
       "get": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Preview",
-        "operationId": "preview_api_models__slug__preview_get",
+        "summary": "Preview a custom model's training rows",
+        "operationId": "preview_api_models__name__preview_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1123,21 +954,21 @@
         }
       }
     },
-    "/api/models/{slug}/dataset-versions": {
+    "/api/models/{name}/dataset-versions": {
       "post": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Build Dataset Version",
-        "operationId": "build_dataset_version_api_models__slug__dataset_versions_post",
+        "summary": "Build a dataset version for a custom model",
+        "operationId": "build_dataset_version_api_models__name__dataset_versions_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1165,21 +996,21 @@
         }
       }
     },
-    "/api/models/{slug}/golden": {
+    "/api/models/{name}/golden": {
       "get": {
         "tags": [
-          "models"
+          "Data"
         ],
-        "summary": "Golden",
-        "operationId": "golden_api_models__slug__golden_get",
+        "summary": "List a custom model's test set",
+        "operationId": "golden_api_models__name__golden_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1193,7 +1024,7 @@
                   "items": {
                     "$ref": "#/components/schemas/ExampleInfo"
                   },
-                  "title": "Response Golden Api Models  Slug  Golden Get"
+                  "title": "Response Golden Api Models  Name  Golden Get"
                 }
               }
             }
@@ -1211,21 +1042,21 @@
         }
       }
     },
-    "/api/models/{slug}/contract/check": {
+    "/api/models/{name}/contract/check": {
       "post": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Check Contract",
-        "operationId": "check_contract_api_models__slug__contract_check_post",
+        "summary": "Check what a contract change breaks",
+        "operationId": "check_contract_api_models__name__contract_check_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1263,21 +1094,21 @@
         }
       }
     },
-    "/api/models/{slug}/contract": {
+    "/api/models/{name}/contract": {
       "put": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Update Contract",
-        "operationId": "update_contract_api_models__slug__contract_put",
+        "summary": "Change a custom model's contract",
+        "operationId": "update_contract_api_models__name__contract_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1315,21 +1146,21 @@
         }
       }
     },
-    "/api/models/{slug}/label-proposal/dismissal": {
+    "/api/models/{name}/label-proposal/dismissal": {
       "put": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Dismiss Labels",
-        "operationId": "dismiss_labels_api_models__slug__label_proposal_dismissal_put",
+        "summary": "Dismiss proposed labels",
+        "operationId": "dismiss_labels_api_models__name__label_proposal_dismissal_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1367,21 +1198,21 @@
         }
       }
     },
-    "/api/models/{slug}/graders": {
+    "/api/models/{name}/graders": {
       "put": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Update Graders",
-        "operationId": "update_graders_api_models__slug__graders_put",
+        "summary": "Change a custom model's graders",
+        "operationId": "update_graders_api_models__name__graders_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1419,21 +1250,21 @@
         }
       }
     },
-    "/api/models/{slug}/promotion": {
+    "/api/models/{name}/promotion": {
       "put": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Update Promotion",
-        "operationId": "update_promotion_api_models__slug__promotion_put",
+        "summary": "Change a custom model's promotion rule",
+        "operationId": "update_promotion_api_models__name__promotion_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1471,21 +1302,21 @@
         }
       }
     },
-    "/api/models/{slug}/instructions": {
+    "/api/models/{name}/instructions": {
       "put": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Update Instructions",
-        "operationId": "update_instructions_api_models__slug__instructions_put",
+        "summary": "Change a custom model's instructions",
+        "operationId": "update_instructions_api_models__name__instructions_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1523,21 +1354,21 @@
         }
       }
     },
-    "/api/models/{slug}/judge": {
+    "/api/models/{name}/judge": {
       "put": {
         "tags": [
-          "models"
+          "Evaluations"
         ],
-        "summary": "Update Judge",
-        "operationId": "update_judge_api_models__slug__judge_put",
+        "summary": "Change a custom model's judge",
+        "operationId": "update_judge_api_models__name__judge_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1575,22 +1406,22 @@
         }
       }
     },
-    "/api/models/{slug}/base-options": {
+    "/api/models/{name}/base-options": {
       "get": {
         "tags": [
-          "models"
+          "Models"
         ],
         "summary": "List the bases a custom model can move to",
         "description": "Installed bases with what the model would lose on each, and the full-precision variant to download.",
-        "operationId": "base_options_api_models__slug__base_options_get",
+        "operationId": "base_options_api_models__name__base_options_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1618,22 +1449,22 @@
         }
       }
     },
-    "/api/models/{slug}/base": {
+    "/api/models/{name}/base": {
       "post": {
         "tags": [
-          "models"
+          "Models"
         ],
         "summary": "Move a custom model to another base",
         "description": "New versions are made on the new base, starting with a prompt-only version scored at once. What is live keeps serving on its own base until a version on the new base is deployed.",
-        "operationId": "switch_base_api_models__slug__base_post",
+        "operationId": "switch_base_api_models__name__base_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -1671,14 +1502,14 @@
         }
       }
     },
-    "/api/model-pages/{name}": {
+    "/api/models/{name}/overview": {
       "get": {
         "tags": [
-          "models"
+          "Models"
         ],
         "summary": "Summarise a model for its page",
         "description": "Base keys and custom slugs share one namespace, so a name finds either kind of model.",
-        "operationId": "read_model_page_api_model_pages__name__get",
+        "operationId": "read_model_page_api_models__name__overview_get",
         "parameters": [
           {
             "name": "name",
@@ -1714,14 +1545,14 @@
         }
       }
     },
-    "/api/model-pages/{name}/traffic": {
+    "/api/models/{name}/traffic": {
       "get": {
         "tags": [
-          "models"
+          "Monitoring"
         ],
         "summary": "Chart a model's requests by version",
         "description": "Requests, errors, latency and device time per bucket and per version for the range, with what changed in it, the errors by status, the busiest keys and the replicas serving it.",
-        "operationId": "read_model_traffic_api_model_pages__name__traffic_get",
+        "operationId": "read_model_traffic_api_models__name__traffic_get",
         "parameters": [
           {
             "name": "name",
@@ -1772,14 +1603,14 @@
         }
       }
     },
-    "/api/model-pages/{name}/activity": {
+    "/api/models/{name}/activity": {
       "get": {
         "tags": [
-          "models"
+          "Models"
         ],
         "summary": "List what changed on a model",
         "description": "Audited changes to the model, its versions, its keys and its jobs, newest first, as sentences.",
-        "operationId": "read_model_activity_api_model_pages__name__activity_get",
+        "operationId": "read_model_activity_api_models__name__activity_get",
         "parameters": [
           {
             "name": "name",
@@ -1830,9 +1661,9 @@
     "/api/sources": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "List Sources",
+        "summary": "List sources",
         "operationId": "list_sources_api_sources_get",
         "responses": {
           "200": {
@@ -1853,9 +1684,9 @@
       },
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Upload Source",
+        "summary": "Upload a file as a source",
         "operationId": "upload_source_api_sources_post",
         "parameters": [
           {
@@ -1925,9 +1756,9 @@
     "/api/data/folders": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Folder Roots",
+        "summary": "List server folders for sources",
         "operationId": "folder_roots_api_data_folders_get",
         "responses": {
           "200": {
@@ -1946,9 +1777,9 @@
     "/api/sources/folders": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Add Folder Source",
+        "summary": "Add a server folder source",
         "operationId": "add_folder_source_api_sources_folders_post",
         "requestBody": {
           "content": {
@@ -2007,9 +1838,9 @@
     "/api/sources/delta": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Add Delta Source",
+        "summary": "Add a Delta table source",
         "operationId": "add_delta_source_api_sources_delta_post",
         "requestBody": {
           "content": {
@@ -2068,9 +1899,9 @@
     "/api/samples": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "List Samples",
+        "summary": "List sample files",
         "operationId": "list_samples_api_samples_get",
         "responses": {
           "200": {
@@ -2093,9 +1924,9 @@
     "/api/samples/{file}": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Add Sample Source",
+        "summary": "Add a sample file as a source",
         "operationId": "add_sample_source_api_samples__file__post",
         "parameters": [
           {
@@ -2164,9 +1995,9 @@
     "/api/sources/{source_id}": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Read Source",
+        "summary": "Read a source",
         "operationId": "read_source_api_sources__source_id__get",
         "parameters": [
           {
@@ -2204,9 +2035,9 @@
       },
       "patch": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Update Source",
+        "summary": "Change a source",
         "operationId": "update_source_api_sources__source_id__patch",
         "parameters": [
           {
@@ -2264,9 +2095,9 @@
       },
       "delete": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Delete Source",
+        "summary": "Delete a source",
         "operationId": "delete_source_api_sources__source_id__delete",
         "parameters": [
           {
@@ -2299,9 +2130,9 @@
     "/api/sources/{source_id}/rows": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Source Rows",
+        "summary": "Read a source's rows",
         "operationId": "source_rows_api_sources__source_id__rows_get",
         "parameters": [
           {
@@ -2341,9 +2172,9 @@
     "/api/sources/{source_id}/stats": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Source Stats",
+        "summary": "Read a source's column statistics",
         "operationId": "source_stats_api_sources__source_id__stats_get",
         "parameters": [
           {
@@ -2383,9 +2214,9 @@
     "/api/sources/{source_id}/query": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Source Query",
+        "summary": "Run SQL over a source",
         "operationId": "source_query_api_sources__source_id__query_post",
         "parameters": [
           {
@@ -2435,9 +2266,9 @@
     "/api/query": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Any Query",
+        "summary": "Run SQL over any sources",
         "operationId": "any_query_api_query_post",
         "requestBody": {
           "content": {
@@ -2476,9 +2307,9 @@
     "/api/datasets": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "List Datasets",
+        "summary": "List datasets",
         "operationId": "list_datasets_api_datasets_get",
         "responses": {
           "200": {
@@ -2499,9 +2330,9 @@
       },
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Create Dataset",
+        "summary": "Create a dataset",
         "operationId": "create_dataset_api_datasets_post",
         "requestBody": {
           "content": {
@@ -2550,9 +2381,9 @@
     "/api/datasets/{slug}": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Read Dataset",
+        "summary": "Read a dataset",
         "operationId": "read_dataset_api_datasets__slug__get",
         "parameters": [
           {
@@ -2590,9 +2421,9 @@
       },
       "patch": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Update Dataset",
+        "summary": "Rename or describe a dataset",
         "operationId": "update_dataset_api_datasets__slug__patch",
         "parameters": [
           {
@@ -2650,9 +2481,9 @@
       },
       "delete": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Delete Dataset",
+        "summary": "Delete a dataset",
         "operationId": "delete_dataset_api_datasets__slug__delete",
         "parameters": [
           {
@@ -2685,9 +2516,9 @@
     "/api/datasets/{slug}/mapping": {
       "put": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Update Dataset Mapping",
+        "summary": "Change a dataset's mapping",
         "operationId": "update_dataset_mapping_api_datasets__slug__mapping_put",
         "parameters": [
           {
@@ -2737,9 +2568,9 @@
     "/api/datasets/{slug}/preview": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Dataset Preview",
+        "summary": "Preview a dataset's rows",
         "operationId": "dataset_preview_api_datasets__slug__preview_get",
         "parameters": [
           {
@@ -2779,9 +2610,9 @@
     "/api/datasets/{slug}/query": {
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Dataset Query",
+        "summary": "Run SQL over a dataset's sources",
         "operationId": "dataset_query_api_datasets__slug__query_post",
         "parameters": [
           {
@@ -2831,9 +2662,9 @@
     "/api/datasets/{slug}/versions": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "List Dataset Versions",
+        "summary": "List a dataset's versions",
         "operationId": "list_dataset_versions_api_datasets__slug__versions_get",
         "parameters": [
           {
@@ -2875,9 +2706,9 @@
       },
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Save Dataset Version",
+        "summary": "Save a dataset version",
         "operationId": "save_dataset_version_api_datasets__slug__versions_post",
         "parameters": [
           {
@@ -2917,9 +2748,9 @@
     "/api/dataset-versions/{dataset_version_id}/diff/{other_id}": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Diff Dataset Versions",
+        "summary": "Compare two dataset versions",
         "operationId": "diff_dataset_versions_api_dataset_versions__dataset_version_id__diff__other_id__get",
         "parameters": [
           {
@@ -2968,9 +2799,9 @@
     "/api/datasets/{slug}/checks/{check}/dismissal": {
       "put": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Dismiss Check",
+        "summary": "Dismiss a data check",
         "operationId": "dismiss_check_api_datasets__slug__checks__check__dismissal_put",
         "parameters": [
           {
@@ -3028,9 +2859,9 @@
       },
       "delete": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Restore Check",
+        "summary": "Restore a dismissed data check",
         "operationId": "restore_check_api_datasets__slug__checks__check__dismissal_delete",
         "parameters": [
           {
@@ -3080,9 +2911,9 @@
     "/api/settings/data": {
       "get": {
         "tags": [
-          "data"
+          "Settings"
         ],
-        "summary": "Read Data Settings",
+        "summary": "Read data settings",
         "operationId": "read_data_settings_api_settings_data_get",
         "responses": {
           "200": {
@@ -3099,9 +2930,9 @@
       },
       "put": {
         "tags": [
-          "data"
+          "Settings"
         ],
-        "summary": "Update Data Settings",
+        "summary": "Change data settings",
         "operationId": "update_data_settings_api_settings_data_put",
         "requestBody": {
           "content": {
@@ -3140,9 +2971,9 @@
     "/api/dataset-folders": {
       "get": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Read Folders",
+        "summary": "List dataset folders",
         "operationId": "read_folders_api_dataset_folders_get",
         "responses": {
           "200": {
@@ -3163,9 +2994,9 @@
       },
       "post": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Add Folder",
+        "summary": "Add a dataset folder",
         "operationId": "add_folder_api_dataset_folders_post",
         "requestBody": {
           "content": {
@@ -3204,9 +3035,9 @@
     "/api/dataset-folders/{folder_id}": {
       "patch": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Rename",
+        "summary": "Rename a dataset folder",
         "operationId": "rename_api_dataset_folders__folder_id__patch",
         "parameters": [
           {
@@ -3254,9 +3085,9 @@
       },
       "delete": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Remove",
+        "summary": "Remove a dataset folder",
         "operationId": "remove_api_dataset_folders__folder_id__delete",
         "parameters": [
           {
@@ -3289,9 +3120,9 @@
     "/api/dataset-folders/{folder_id}/parent": {
       "put": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Move",
+        "summary": "Move a dataset folder",
         "operationId": "move_api_dataset_folders__folder_id__parent_put",
         "parameters": [
           {
@@ -3341,9 +3172,9 @@
     "/api/datasets/{slug}/folder": {
       "put": {
         "tags": [
-          "data"
+          "Data"
         ],
-        "summary": "Place Dataset",
+        "summary": "Move a dataset into a folder",
         "operationId": "place_dataset_api_datasets__slug__folder_put",
         "parameters": [
           {
@@ -3393,9 +3224,9 @@
     "/api/connections": {
       "get": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Read Connections",
+        "summary": "List connections",
         "operationId": "read_connections_api_connections_get",
         "responses": {
           "200": {
@@ -3416,9 +3247,9 @@
       },
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Add Connection",
+        "summary": "Add a connection",
         "operationId": "add_connection_api_connections_post",
         "requestBody": {
           "content": {
@@ -3457,9 +3288,9 @@
     "/api/connections/{connection_id}": {
       "put": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Change Connection",
+        "summary": "Change a connection",
         "operationId": "change_connection_api_connections__connection_id__put",
         "parameters": [
           {
@@ -3507,9 +3338,9 @@
       },
       "delete": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Remove Connection",
+        "summary": "Remove a connection",
         "operationId": "remove_connection_api_connections__connection_id__delete",
         "parameters": [
           {
@@ -3542,9 +3373,9 @@
     "/api/connections/test": {
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Test Connection",
+        "summary": "Test connection settings",
         "operationId": "test_connection_api_connections_test_post",
         "requestBody": {
           "content": {
@@ -3583,9 +3414,9 @@
     "/api/connections/{connection_id}/test": {
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Test Saved Connection",
+        "summary": "Test a saved connection",
         "operationId": "test_saved_connection_api_connections__connection_id__test_post",
         "parameters": [
           {
@@ -3625,9 +3456,9 @@
     "/api/connections/{connection_id}/tables": {
       "get": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Connection Tables",
+        "summary": "List a connection's tables",
         "operationId": "connection_tables_api_connections__connection_id__tables_get",
         "parameters": [
           {
@@ -3667,9 +3498,9 @@
     "/api/extensions": {
       "get": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Read Extensions",
+        "summary": "List DuckDB extensions",
         "operationId": "read_extensions_api_extensions_get",
         "responses": {
           "200": {
@@ -3688,9 +3519,9 @@
     "/api/sources/s3": {
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Add S3 Source",
+        "summary": "Add an S3 source",
         "operationId": "add_s3_source_api_sources_s3_post",
         "requestBody": {
           "content": {
@@ -3749,9 +3580,9 @@
     "/api/sources/database": {
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Add Database Source",
+        "summary": "Add a database source",
         "operationId": "add_database_source_api_sources_database_post",
         "requestBody": {
           "content": {
@@ -3810,9 +3641,9 @@
     "/api/sources/iceberg": {
       "post": {
         "tags": [
-          "connections"
+          "Data"
         ],
-        "summary": "Add Iceberg Source",
+        "summary": "Add an Iceberg source",
         "operationId": "add_iceberg_source_api_sources_iceberg_post",
         "requestBody": {
           "content": {
@@ -3868,38 +3699,13 @@
         }
       }
     },
-    "/api/all-models": {
-      "get": {
-        "tags": [
-          "base models"
-        ],
-        "summary": "List All Models",
-        "operationId": "list_all_models_api_all_models_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/ModelRow"
-                  },
-                  "type": "array",
-                  "title": "Response List All Models Api All Models Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/base-models/inspect": {
+    "/api/models/inspect": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Inspect",
-        "operationId": "inspect_api_base_models_inspect_post",
+        "summary": "Check a folder or bucket before importing a base model",
+        "operationId": "inspect_api_models_inspect_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3934,13 +3740,13 @@
         }
       }
     },
-    "/api/base-models/import": {
+    "/api/models/import": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Import Model",
-        "operationId": "import_model_api_base_models_import_post",
+        "summary": "Import a base model from a folder or bucket",
+        "operationId": "import_model_api_models_import_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -3975,183 +3781,21 @@
         }
       }
     },
-    "/api/base-models/{key}": {
-      "get": {
-        "tags": [
-          "base models"
-        ],
-        "summary": "Read Base",
-        "operationId": "read_base_api_base_models__key__get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "base models"
-        ],
-        "summary": "Update Base",
-        "operationId": "update_base_api_base_models__key__patch",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ModelUpdate"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "base models"
-        ],
-        "summary": "Delete Base Model",
-        "operationId": "delete_base_model_api_base_models__key__delete",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "cascade",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Cascade"
-            }
-          },
-          {
-            "name": "undeploy",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Undeploy"
-            }
-          },
-          {
-            "name": "cancel_jobs",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean",
-              "default": false,
-              "title": "Cancel Jobs"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ModelRow"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/base-models/{key}/verify": {
+    "/api/models/{name}/verify": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Verify Base",
-        "operationId": "verify_base_api_base_models__key__verify_post",
+        "summary": "Verify a base model's files",
+        "operationId": "verify_base_api_models__name__verify_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4179,21 +3823,21 @@
         }
       }
     },
-    "/api/base-models/{key}/repair": {
+    "/api/models/{name}/repair": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Repair Base",
-        "operationId": "repair_base_api_base_models__key__repair_post",
+        "summary": "Download a base model's damaged files again",
+        "operationId": "repair_base_api_models__name__repair_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4221,21 +3865,21 @@
         }
       }
     },
-    "/api/base-models/{key}/reimport": {
+    "/api/models/{name}/reimport": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Reimport Base",
-        "operationId": "reimport_base_api_base_models__key__reimport_post",
+        "summary": "Import a base model's files again from another location",
+        "operationId": "reimport_base_api_models__name__reimport_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4273,21 +3917,21 @@
         }
       }
     },
-    "/api/base-models/{key}/relocate": {
+    "/api/models/{name}/relocate": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Relocate Base",
-        "operationId": "relocate_base_api_base_models__key__relocate_post",
+        "summary": "Point a base model at files that moved",
+        "operationId": "relocate_base_api_models__name__relocate_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4325,21 +3969,21 @@
         }
       }
     },
-    "/api/base-models/{key}/recheck": {
+    "/api/models/{name}/recheck": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Recheck Base",
-        "operationId": "recheck_base_api_base_models__key__recheck_post",
+        "summary": "Clear a base model's start-up failure",
+        "operationId": "recheck_base_api_models__name__recheck_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4367,21 +4011,21 @@
         }
       }
     },
-    "/api/base-models/{key}/retry": {
+    "/api/models/{name}/retry": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Retry Base",
-        "operationId": "retry_base_api_base_models__key__retry_post",
+        "summary": "Retry a base model's failed download or import",
+        "operationId": "retry_base_api_models__name__retry_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4409,73 +4053,21 @@
         }
       }
     },
-    "/api/base-models/{key}/deploy": {
+    "/api/models/{name}/test": {
       "post": {
         "tags": [
-          "base models"
+          "Models"
         ],
-        "summary": "Deploy Base",
-        "operationId": "deploy_base_api_base_models__key__deploy_post",
+        "summary": "Send a prompt to a base model",
+        "operationId": "test_base_api_models__name__test_post",
         "parameters": [
           {
-            "name": "key",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Key"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeployRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseModelDetail"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/base-models/{key}/test": {
-      "post": {
-        "tags": [
-          "base models"
-        ],
-        "summary": "Test Base",
-        "operationId": "test_base_api_base_models__key__test_post",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
+              "title": "Name"
             }
           }
         ],
@@ -4513,12 +4105,275 @@
         }
       }
     },
+    "/api/models/{name}": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Read a model",
+        "description": "Custom and base models share one namespace of API names, so a name finds either kind.",
+        "operationId": "read_model_api_models__name__get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BaseModelDetail"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "custom": "#/components/schemas/ModelDetail",
+                      "base": "#/components/schemas/BaseModelDetail"
+                    }
+                  },
+                  "title": "Response Read Model Api Models  Name  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Rename, describe or tag a model",
+        "description": "Base models need the Admin role. Custom and base models share one namespace of API names, so a name finds either kind.",
+        "operationId": "update_model_api_models__name__patch",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BaseModelDetail"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "custom": "#/components/schemas/ModelDetail",
+                      "base": "#/components/schemas/BaseModelDetail"
+                    }
+                  },
+                  "title": "Response Update Model Api Models  Name  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Delete a model",
+        "description": "Base models need the Admin role. Deleting runs in the background; the row shows its progress. With undeploy, a deployed model is stopped first; with cancel_jobs, its running jobs are cancelled; with cascade, a base model's custom models are deleted with it.",
+        "operationId": "delete_model_api_models__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "undeploy",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Undeploy"
+            }
+          },
+          {
+            "name": "cancel_jobs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cancel Jobs"
+            }
+          },
+          {
+            "name": "cascade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Cascade"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelRow"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{name}/deploy": {
+      "post": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Deploy or undeploy a model",
+        "description": "Deploying serves the model on /v1 under its API name. Undeploying answers 202 while it stops.",
+        "operationId": "deploy_model_api_models__name__deploy_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ModelDetail"
+                    },
+                    {
+                      "$ref": "#/components/schemas/BaseModelDetail"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "custom": "#/components/schemas/ModelDetail",
+                      "base": "#/components/schemas/BaseModelDetail"
+                    }
+                  },
+                  "title": "Response Deploy Model Api Models  Name  Deploy Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/catalog": {
       "get": {
         "tags": [
-          "catalog"
+          "Models"
         ],
-        "summary": "Catalogue",
+        "summary": "List the model catalogue",
         "operationId": "catalogue_api_catalog_get",
         "parameters": [
           {
@@ -4565,9 +4420,9 @@
     "/api/catalog/{catalog_id}/download": {
       "post": {
         "tags": [
-          "catalog"
+          "Models"
         ],
-        "summary": "Download",
+        "summary": "Download a catalogue model",
         "operationId": "download_api_catalog__catalog_id__download_post",
         "parameters": [
           {
@@ -4617,9 +4472,9 @@
     "/api/catalog/hub": {
       "post": {
         "tags": [
-          "catalog"
+          "Models"
         ],
-        "summary": "Add From Hub",
+        "summary": "Add a Hugging Face model to the catalogue",
         "operationId": "add_from_hub_api_catalog_hub_post",
         "requestBody": {
           "content": {
@@ -4658,9 +4513,9 @@
     "/api/catalog/{catalog_id}": {
       "delete": {
         "tags": [
-          "catalog"
+          "Models"
         ],
-        "summary": "Remove From Catalogue",
+        "summary": "Remove a model from the catalogue",
         "operationId": "remove_from_catalogue_api_catalog__catalog_id__delete",
         "parameters": [
           {
@@ -4693,9 +4548,9 @@
     "/api/catalog/sync": {
       "post": {
         "tags": [
-          "catalog"
+          "Models"
         ],
-        "summary": "Sync",
+        "summary": "Sync the catalogue",
         "operationId": "sync_api_catalog_sync_post",
         "responses": {
           "202": {
@@ -4714,9 +4569,9 @@
     "/api/catalog/settings": {
       "get": {
         "tags": [
-          "catalog"
+          "Settings"
         ],
-        "summary": "Read Settings",
+        "summary": "Read catalogue settings",
         "operationId": "read_settings_api_catalog_settings_get",
         "responses": {
           "200": {
@@ -4733,9 +4588,9 @@
       },
       "put": {
         "tags": [
-          "catalog"
+          "Settings"
         ],
-        "summary": "Update Settings",
+        "summary": "Change catalogue settings",
         "operationId": "update_settings_api_catalog_settings_put",
         "requestBody": {
           "content": {
@@ -4774,9 +4629,9 @@
     "/api/compute/pools": {
       "get": {
         "tags": [
-          "compute"
+          "Infrastructure"
         ],
-        "summary": "List Pools",
+        "summary": "List compute pools",
         "operationId": "list_pools_api_compute_pools_get",
         "responses": {
           "200": {
@@ -4799,9 +4654,9 @@
     "/api/compute/prices": {
       "get": {
         "tags": [
-          "compute"
+          "Infrastructure"
         ],
-        "summary": "Read Prices",
+        "summary": "Read device prices",
         "operationId": "read_prices_api_compute_prices_get",
         "responses": {
           "200": {
@@ -4818,9 +4673,9 @@
       },
       "put": {
         "tags": [
-          "compute"
+          "Infrastructure"
         ],
-        "summary": "Update Prices",
+        "summary": "Change device prices",
         "operationId": "update_prices_api_compute_prices_put",
         "requestBody": {
           "content": {
@@ -4859,9 +4714,9 @@
     "/api/policies": {
       "get": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Policies",
+        "summary": "List policies",
         "operationId": "policies_api_policies_get",
         "responses": {
           "200": {
@@ -4884,9 +4739,9 @@
     "/api/policies/{name}": {
       "put": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Change Policy",
+        "summary": "Change a policy",
         "operationId": "change_policy_api_policies__name__put",
         "parameters": [
           {
@@ -4940,9 +4795,9 @@
     "/api/settings/encryption": {
       "get": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Encryption Status",
+        "summary": "Read encryption status",
         "operationId": "encryption_status_api_settings_encryption_get",
         "responses": {
           "200": {
@@ -4959,9 +4814,9 @@
       },
       "put": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Change Encryption",
+        "summary": "Change encryption settings",
         "operationId": "change_encryption_api_settings_encryption_put",
         "requestBody": {
           "content": {
@@ -5000,9 +4855,9 @@
     "/api/settings/encryption/test": {
       "post": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Test Encryption",
+        "summary": "Test an encryption key",
         "operationId": "test_encryption_api_settings_encryption_test_post",
         "requestBody": {
           "content": {
@@ -5041,9 +4896,9 @@
     "/api/settings/encryption/tasks": {
       "post": {
         "tags": [
-          "security"
+          "Settings"
         ],
-        "summary": "Start Task",
+        "summary": "Start a re-encryption task",
         "operationId": "start_task_api_settings_encryption_tasks_post",
         "requestBody": {
           "content": {
@@ -5082,9 +4937,9 @@
     "/api/audit": {
       "get": {
         "tags": [
-          "audit"
+          "Audit"
         ],
-        "summary": "List Events",
+        "summary": "List audit events",
         "operationId": "list_events_api_audit_get",
         "parameters": [
           {
@@ -5239,9 +5094,9 @@
     "/api/audit/facets": {
       "get": {
         "tags": [
-          "audit"
+          "Audit"
         ],
-        "summary": "Facets",
+        "summary": "Count audit events by filter",
         "operationId": "facets_api_audit_facets_get",
         "responses": {
           "200": {
@@ -5260,9 +5115,9 @@
     "/api/audit/export": {
       "get": {
         "tags": [
-          "audit"
+          "Audit"
         ],
-        "summary": "Export",
+        "summary": "Export the audit log",
         "operationId": "export_api_audit_export_get",
         "parameters": [
           {
@@ -5385,9 +5240,9 @@
     "/api/audit/chain": {
       "get": {
         "tags": [
-          "audit"
+          "Audit"
         ],
-        "summary": "Chain",
+        "summary": "Check the audit hash chain",
         "operationId": "chain_api_audit_chain_get",
         "responses": {
           "200": {
@@ -5406,9 +5261,9 @@
     "/api/audit/{event_id}": {
       "get": {
         "tags": [
-          "audit"
+          "Audit"
         ],
-        "summary": "Event",
+        "summary": "Read an audit event",
         "operationId": "event_api_audit__event_id__get",
         "parameters": [
           {
@@ -5445,21 +5300,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions": {
+    "/api/models/{name}/versions": {
       "get": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "List Versions",
-        "operationId": "list_versions_api_models__slug__versions_get",
+        "summary": "List a custom model's versions",
+        "operationId": "list_versions_api_models__name__versions_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -5473,7 +5328,7 @@
                   "items": {
                     "$ref": "#/components/schemas/VersionInfo"
                   },
-                  "title": "Response List Versions Api Models  Slug  Versions Get"
+                  "title": "Response List Versions Api Models  Name  Versions Get"
                 }
               }
             }
@@ -5492,18 +5347,18 @@
       },
       "post": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "Add Version",
-        "operationId": "add_version_api_models__slug__versions_post",
+        "summary": "Add a version: prompt-only or trained",
+        "operationId": "add_version_api_models__name__versions_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -5541,21 +5396,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/files": {
+    "/api/models/{name}/versions/{number}/files": {
       "get": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "Version Files",
-        "operationId": "version_files_api_models__slug__versions__number__files_get",
+        "summary": "List a version's files",
+        "operationId": "version_files_api_models__name__versions__number__files_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -5592,21 +5447,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/answers": {
+    "/api/models/{name}/versions/{number}/answers": {
       "get": {
         "tags": [
-          "versions"
+          "Evaluations"
         ],
-        "summary": "Version Answers",
-        "operationId": "version_answers_api_models__slug__versions__number__answers_get",
+        "summary": "List the answers a version was scored on",
+        "operationId": "version_answers_api_models__name__versions__number__answers_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -5659,21 +5514,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}": {
+    "/api/models/{name}/versions/{number}": {
       "delete": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "Delete Version",
-        "operationId": "delete_version_api_models__slug__versions__number__delete",
+        "summary": "Delete a version",
+        "operationId": "delete_version_api_models__name__versions__number__delete",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -5723,21 +5578,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/promote": {
+    "/api/models/{name}/versions/{number}/promote": {
       "post": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "Promote Version",
-        "operationId": "promote_version_api_models__slug__versions__number__promote_post",
+        "summary": "Make a version live",
+        "operationId": "promote_version_api_models__name__versions__number__promote_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -5774,21 +5629,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/test": {
+    "/api/models/{name}/versions/{number}/test": {
       "post": {
         "tags": [
-          "versions"
+          "Versions"
         ],
-        "summary": "Test Version",
-        "operationId": "test_version_api_models__slug__versions__number__test_post",
+        "summary": "Send a prompt to a version",
+        "operationId": "test_version_api_models__name__versions__number__test_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -5838,9 +5693,9 @@
     "/api/presets": {
       "get": {
         "tags": [
-          "presets"
+          "Models"
         ],
-        "summary": "List Presets",
+        "summary": "List model presets",
         "operationId": "list_presets_api_presets_get",
         "responses": {
           "200": {
@@ -5859,9 +5714,9 @@
     "/api/settings/judge": {
       "get": {
         "tags": [
-          "presets"
+          "Settings"
         ],
-        "summary": "Read Judge",
+        "summary": "Read the default judge",
         "operationId": "read_judge_api_settings_judge_get",
         "responses": {
           "200": {
@@ -5878,9 +5733,9 @@
       },
       "put": {
         "tags": [
-          "presets"
+          "Settings"
         ],
-        "summary": "Update Judge",
+        "summary": "Change the default judge",
         "operationId": "update_judge_api_settings_judge_put",
         "requestBody": {
           "content": {
@@ -5919,9 +5774,9 @@
     "/api/settings/safety": {
       "get": {
         "tags": [
-          "safety"
+          "Settings"
         ],
-        "summary": "Read Safety",
+        "summary": "Read the default safety model",
         "operationId": "read_safety_api_settings_safety_get",
         "responses": {
           "200": {
@@ -5938,9 +5793,9 @@
       },
       "put": {
         "tags": [
-          "safety"
+          "Settings"
         ],
-        "summary": "Update Safety",
+        "summary": "Change the default safety model",
         "operationId": "update_safety_api_settings_safety_put",
         "requestBody": {
           "content": {
@@ -5976,21 +5831,21 @@
         }
       }
     },
-    "/api/models/{slug}/safety": {
+    "/api/models/{name}/safety": {
       "put": {
         "tags": [
-          "safety"
+          "Models"
         ],
-        "summary": "Update Model Safety",
-        "operationId": "update_model_safety_api_models__slug__safety_put",
+        "summary": "Change a custom model's safety model",
+        "operationId": "update_model_safety_api_models__name__safety_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -6031,9 +5886,9 @@
     "/api/playground/models": {
       "get": {
         "tags": [
-          "playground"
+          "Playground"
         ],
-        "summary": "List Targets",
+        "summary": "List models the Playground can call",
         "operationId": "list_targets_api_playground_models_get",
         "responses": {
           "200": {
@@ -6052,7 +5907,7 @@
     "/api/playground/chat/completions": {
       "post": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "Chat in the Playground",
         "description": "The Playground's chat: the same body, answer and stream as POST /v1/chat/completions, with the signed-in person instead of an API key. It also reaches installed bases that are not deployed. Calls are not request logs; a safety block is audited with the person as actor.",
@@ -6159,9 +6014,9 @@
     "/api/playground/presets": {
       "get": {
         "tags": [
-          "playground"
+          "Playground"
         ],
-        "summary": "List Presets",
+        "summary": "List Playground presets",
         "operationId": "list_presets_api_playground_presets_get",
         "responses": {
           "200": {
@@ -6182,9 +6037,9 @@
       },
       "post": {
         "tags": [
-          "playground"
+          "Playground"
         ],
-        "summary": "Create Preset",
+        "summary": "Save a Playground preset",
         "operationId": "create_preset_api_playground_presets_post",
         "requestBody": {
           "content": {
@@ -6223,9 +6078,9 @@
     "/api/playground/presets/{preset_id}": {
       "put": {
         "tags": [
-          "playground"
+          "Playground"
         ],
-        "summary": "Update Preset",
+        "summary": "Change a Playground preset",
         "operationId": "update_preset_api_playground_presets__preset_id__put",
         "parameters": [
           {
@@ -6273,9 +6128,9 @@
       },
       "delete": {
         "tags": [
-          "playground"
+          "Playground"
         ],
-        "summary": "Delete Preset",
+        "summary": "Delete a Playground preset",
         "operationId": "delete_preset_api_playground_presets__preset_id__delete",
         "parameters": [
           {
@@ -6308,7 +6163,7 @@
     "/api/playground/sessions": {
       "get": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "List my Playground chats",
         "description": "Playground chats are saved for the signed-in person only, encrypted at rest, when the model keeps request inputs and answers. They are deleted with the request logs (Log retention).",
@@ -6332,7 +6187,7 @@
       },
       "post": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "Save a Playground chat",
         "operationId": "create_chat_api_playground_sessions_post",
@@ -6373,7 +6228,7 @@
     "/api/playground/sessions/{chat_id}": {
       "get": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "Open a Playground chat",
         "operationId": "read_chat_api_playground_sessions__chat_id__get",
@@ -6413,7 +6268,7 @@
       },
       "put": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "Update or rename a Playground chat",
         "operationId": "update_chat_api_playground_sessions__chat_id__put",
@@ -6463,7 +6318,7 @@
       },
       "delete": {
         "tags": [
-          "playground"
+          "Playground"
         ],
         "summary": "Delete a Playground chat",
         "operationId": "delete_chat_api_playground_sessions__chat_id__delete",
@@ -6495,21 +6350,21 @@
         }
       }
     },
-    "/api/models/{slug}/training-plan": {
+    "/api/models/{name}/training-plan": {
       "get": {
         "tags": [
-          "training"
+          "Training and jobs"
         ],
-        "summary": "Get Training Plan",
-        "operationId": "get_training_plan_api_models__slug__training_plan_get",
+        "summary": "Plan a training run",
+        "operationId": "get_training_plan_api_models__name__training_plan_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -6788,21 +6643,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/card": {
+    "/api/models/{name}/versions/{number}/card": {
       "get": {
         "tags": [
-          "model cards"
+          "Versions"
         ],
-        "summary": "Read Card",
-        "operationId": "read_card_api_models__slug__versions__number__card_get",
+        "summary": "Read a version's model card",
+        "operationId": "read_card_api_models__name__versions__number__card_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -6840,18 +6695,18 @@
       },
       "put": {
         "tags": [
-          "model cards"
+          "Versions"
         ],
-        "summary": "Edit Card",
-        "operationId": "edit_card_api_models__slug__versions__number__card_put",
+        "summary": "Edit a version's model card",
+        "operationId": "edit_card_api_models__name__versions__number__card_put",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -6898,21 +6753,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/card.json": {
+    "/api/models/{name}/versions/{number}/card.json": {
       "get": {
         "tags": [
-          "model cards"
+          "Versions"
         ],
-        "summary": "Card Json",
-        "operationId": "card_json_api_models__slug__versions__number__card_json_get",
+        "summary": "Download a version's model card as JSON",
+        "operationId": "card_json_api_models__name__versions__number__card_json_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -6942,21 +6797,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/card.md": {
+    "/api/models/{name}/versions/{number}/card.md": {
       "get": {
         "tags": [
-          "model cards"
+          "Versions"
         ],
-        "summary": "Card Markdown",
-        "operationId": "card_markdown_api_models__slug__versions__number__card_md_get",
+        "summary": "Download a version's model card as Markdown",
+        "operationId": "card_markdown_api_models__name__versions__number__card_md_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -6986,21 +6841,21 @@
         }
       }
     },
-    "/api/models/{slug}/versions/{number}/aibom.json": {
+    "/api/models/{name}/versions/{number}/aibom.json": {
       "get": {
         "tags": [
-          "model cards"
+          "Versions"
         ],
-        "summary": "Aibom Json",
-        "operationId": "aibom_json_api_models__slug__versions__number__aibom_json_get",
+        "summary": "Download a version's AI bill of materials",
+        "operationId": "aibom_json_api_models__name__versions__number__aibom_json_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           },
           {
@@ -7033,9 +6888,9 @@
     "/api/feedback": {
       "get": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "List Feedback",
+        "summary": "List feedback",
         "operationId": "list_feedback_api_feedback_get",
         "parameters": [
           {
@@ -7161,9 +7016,9 @@
     "/api/feedback/facets": {
       "get": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Feedback Facets",
+        "summary": "Count feedback by filter",
         "operationId": "feedback_facets_api_feedback_facets_get",
         "parameters": [
           {
@@ -7262,9 +7117,9 @@
     "/api/feedback/{feedback_id}": {
       "get": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Read Feedback",
+        "summary": "Read feedback",
         "operationId": "read_feedback_api_feedback__feedback_id__get",
         "parameters": [
           {
@@ -7304,9 +7159,9 @@
     "/api/feedback/{feedback_id}/review": {
       "post": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Review Feedback",
+        "summary": "Accept or reject feedback",
         "operationId": "review_feedback_api_feedback__feedback_id__review_post",
         "parameters": [
           {
@@ -7356,9 +7211,9 @@
     "/api/feedback/{feedback_id}/assign": {
       "post": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Assign Feedback",
+        "summary": "Assign feedback to me",
         "operationId": "assign_feedback_api_feedback__feedback_id__assign_post",
         "parameters": [
           {
@@ -7405,21 +7260,21 @@
         }
       }
     },
-    "/api/models/{slug}/feedback": {
+    "/api/models/{name}/feedback": {
       "post": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Playground Feedback",
-        "operationId": "playground_feedback_api_models__slug__feedback_post",
+        "summary": "Rate an answer from the Playground",
+        "operationId": "playground_feedback_api_models__name__feedback_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -7457,21 +7312,21 @@
         }
       }
     },
-    "/api/models/{slug}/feedback/summary": {
+    "/api/models/{name}/feedback/summary": {
       "get": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
-        "summary": "Feedback Summary",
-        "operationId": "feedback_summary_api_models__slug__feedback_summary_get",
+        "summary": "Count a model's feedback since its last version",
+        "operationId": "feedback_summary_api_models__name__feedback_summary_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -7499,22 +7354,22 @@
         }
       }
     },
-    "/api/models/{slug}/test-examples": {
+    "/api/models/{name}/test-examples": {
       "post": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
         "summary": "Save a test example",
         "description": "Adds a conversation and its expected answer to the model's accepted feedback, held out for scoring: it joins the held-out rows of the dataset version the next model version starts from, so that version is scored on it. Audited as feedback.example.",
-        "operationId": "save_test_example_api_models__slug__test_examples_post",
+        "operationId": "save_test_example_api_models__name__test_examples_post",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -7553,18 +7408,18 @@
       },
       "get": {
         "tags": [
-          "feedback"
+          "Feedback"
         ],
         "summary": "List test examples",
-        "operationId": "list_test_examples_api_models__slug__test_examples_get",
+        "operationId": "list_test_examples_api_models__name__test_examples_get",
         "parameters": [
           {
-            "name": "slug",
+            "name": "name",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Slug"
+              "title": "Name"
             }
           }
         ],
@@ -7578,7 +7433,7 @@
                   "items": {
                     "$ref": "#/components/schemas/FeedbackInfo"
                   },
-                  "title": "Response List Test Examples Api Models  Slug  Test Examples Get"
+                  "title": "Response List Test Examples Api Models  Name  Test Examples Get"
                 }
               }
             }
@@ -7599,9 +7454,9 @@
     "/api/keys": {
       "get": {
         "tags": [
-          "keys"
+          "Keys"
         ],
-        "summary": "List Keys",
+        "summary": "List API keys",
         "operationId": "list_keys_api_keys_get",
         "responses": {
           "200": {
@@ -7622,9 +7477,9 @@
       },
       "post": {
         "tags": [
-          "keys"
+          "Keys"
         ],
-        "summary": "Add Key",
+        "summary": "Create an API key",
         "operationId": "add_key_api_keys_post",
         "requestBody": {
           "content": {
@@ -7663,9 +7518,9 @@
     "/api/keys/{key_id}/models": {
       "put": {
         "tags": [
-          "keys"
+          "Keys"
         ],
-        "summary": "Update Models",
+        "summary": "Change the models a key covers",
         "operationId": "update_models_api_keys__key_id__models_put",
         "parameters": [
           {
@@ -7715,9 +7570,9 @@
     "/api/keys/{key_id}": {
       "delete": {
         "tags": [
-          "keys"
+          "Keys"
         ],
-        "summary": "Revoke",
+        "summary": "Revoke an API key",
         "operationId": "revoke_api_keys__key_id__delete",
         "parameters": [
           {
@@ -7750,9 +7605,9 @@
     "/api/jobs": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "List Jobs",
+        "summary": "List jobs",
         "operationId": "list_jobs_api_jobs_get",
         "parameters": [
           {
@@ -7964,9 +7819,9 @@
     "/api/jobs/facets": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Job Facets",
+        "summary": "Count jobs by filter",
         "operationId": "job_facets_api_jobs_facets_get",
         "parameters": [
           {
@@ -8137,9 +7992,9 @@
     "/api/jobs/{job_id}": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Read Job",
+        "summary": "Read a job",
         "operationId": "read_job_api_jobs__job_id__get",
         "parameters": [
           {
@@ -8177,9 +8032,9 @@
       },
       "delete": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Delete Job",
+        "summary": "Delete a job",
         "operationId": "delete_job_api_jobs__job_id__delete",
         "parameters": [
           {
@@ -8232,7 +8087,7 @@
     "/api/jobs/{job_id}/events": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
         "summary": "Stream Events",
         "operationId": "stream_events_api_jobs__job_id__events_get",
@@ -8277,9 +8132,9 @@
     "/api/jobs/cancel": {
       "post": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Cancel Jobs",
+        "summary": "Cancel jobs",
         "operationId": "cancel_jobs_api_jobs_cancel_post",
         "requestBody": {
           "content": {
@@ -8322,9 +8177,9 @@
     "/api/jobs/retry": {
       "post": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Retry Jobs",
+        "summary": "Retry jobs",
         "operationId": "retry_jobs_api_jobs_retry_post",
         "requestBody": {
           "content": {
@@ -8367,9 +8222,9 @@
     "/api/jobs/{job_id}/cancel": {
       "post": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Cancel Job",
+        "summary": "Cancel a job",
         "operationId": "cancel_job_api_jobs__job_id__cancel_post",
         "parameters": [
           {
@@ -8409,9 +8264,9 @@
     "/api/jobs/{job_id}/retry": {
       "post": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Retry Job",
+        "summary": "Retry a job",
         "operationId": "retry_job_api_jobs__job_id__retry_post",
         "parameters": [
           {
@@ -8451,9 +8306,9 @@
     "/api/jobs/delete": {
       "post": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Delete Jobs",
+        "summary": "Delete jobs",
         "operationId": "delete_jobs_api_jobs_delete_post",
         "requestBody": {
           "content": {
@@ -8496,9 +8351,9 @@
     "/api/artifacts/{artifact_id}": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Download",
+        "summary": "Download a job artifact",
         "operationId": "download_api_artifacts__artifact_id__get",
         "parameters": [
           {
@@ -8531,9 +8386,9 @@
     "/api/jobs/{job_id}/metrics": {
       "get": {
         "tags": [
-          "jobs"
+          "Training and jobs"
         ],
-        "summary": "Job Metrics",
+        "summary": "Read a job's training metrics",
         "operationId": "job_metrics_api_jobs__job_id__metrics_get",
         "parameters": [
           {
@@ -8573,9 +8428,9 @@
     "/api/requests/overview": {
       "get": {
         "tags": [
-          "requests"
+          "Monitoring"
         ],
-        "summary": "Request Overview",
+        "summary": "Chart requests across models",
         "operationId": "request_overview_api_requests_overview_get",
         "parameters": [
           {
@@ -8671,9 +8526,9 @@
     "/api/requests": {
       "get": {
         "tags": [
-          "requests"
+          "Monitoring"
         ],
-        "summary": "List Requests",
+        "summary": "List requests",
         "operationId": "list_requests_api_requests_get",
         "parameters": [
           {
@@ -8874,9 +8729,9 @@
     "/api/requests/facets": {
       "get": {
         "tags": [
-          "requests"
+          "Monitoring"
         ],
-        "summary": "Request Facets",
+        "summary": "Count requests by filter",
         "operationId": "request_facets_api_requests_facets_get",
         "parameters": [
           {
@@ -9033,9 +8888,9 @@
     "/api/requests/summary": {
       "get": {
         "tags": [
-          "requests"
+          "Monitoring"
         ],
-        "summary": "Request Summary",
+        "summary": "Summarise requests",
         "operationId": "request_summary_api_requests_summary_get",
         "parameters": [
           {
@@ -9192,9 +9047,9 @@
     "/api/requests/{request_id}": {
       "get": {
         "tags": [
-          "requests"
+          "Monitoring"
         ],
-        "summary": "Read Request",
+        "summary": "Read a request",
         "operationId": "read_request_api_requests__request_id__get",
         "parameters": [
           {
@@ -9234,9 +9089,9 @@
     "/api/reserved-names/{name}": {
       "get": {
         "tags": [
-          "models"
+          "Models"
         ],
-        "summary": "Read Reserved",
+        "summary": "Read a reserved API name",
         "description": "An API name kept after its model was deleted, so it never reaches another model.",
         "operationId": "read_reserved_api_reserved_names__name__get",
         "parameters": [
@@ -9277,9 +9132,9 @@
     "/api/openapi/v1.json": {
       "get": {
         "tags": [
-          "reference"
+          "Reference"
         ],
-        "summary": "OpenAPI document for /v1",
+        "summary": "OpenAPI document for the OpenAI-compatible API",
         "operationId": "gateway_reference_api_openapi_v1_json_get",
         "responses": {
           "200": {
@@ -9300,9 +9155,9 @@
     "/api/openapi/api.json": {
       "get": {
         "tags": [
-          "reference"
+          "Reference"
         ],
-        "summary": "OpenAPI document for /api",
+        "summary": "OpenAPI document for the Management API",
         "operationId": "management_reference_api_openapi_api_json_get",
         "responses": {
           "200": {
@@ -9323,9 +9178,9 @@
     "/api/system/install": {
       "get": {
         "tags": [
-          "system"
+          "Infrastructure"
         ],
-        "summary": "Install",
+        "summary": "Read install facts",
         "operationId": "install_api_system_install_get",
         "responses": {
           "200": {
@@ -9344,9 +9199,9 @@
     "/api/system/diagnostics": {
       "get": {
         "tags": [
-          "system"
+          "Infrastructure"
         ],
-        "summary": "Diagnostics",
+        "summary": "Download diagnostics",
         "operationId": "diagnostics_api_system_diagnostics_get",
         "responses": {
           "200": {
@@ -9361,9 +9216,9 @@
     "/api/system": {
       "get": {
         "tags": [
-          "system"
+          "Infrastructure"
         ],
-        "summary": "System",
+        "summary": "Read the version and features",
         "operationId": "system_api_system_get",
         "responses": {
           "200": {
@@ -9382,9 +9237,9 @@
     "/api/settings/storage": {
       "get": {
         "tags": [
-          "system"
+          "Settings"
         ],
-        "summary": "Read Storage",
+        "summary": "Read storage settings",
         "operationId": "read_storage_api_settings_storage_get",
         "responses": {
           "200": {
@@ -9401,9 +9256,9 @@
       },
       "put": {
         "tags": [
-          "system"
+          "Settings"
         ],
-        "summary": "Update Storage",
+        "summary": "Change storage settings",
         "operationId": "update_storage_api_settings_storage_put",
         "requestBody": {
           "content": {
@@ -9442,9 +9297,9 @@
     "/api/settings/storage/test": {
       "post": {
         "tags": [
-          "system"
+          "Settings"
         ],
-        "summary": "Test Storage",
+        "summary": "Test storage settings",
         "operationId": "test_storage_api_settings_storage_test_post",
         "requestBody": {
           "content": {
@@ -9483,9 +9338,9 @@
     "/api/system/infrastructure": {
       "get": {
         "tags": [
-          "system"
+          "Infrastructure"
         ],
-        "summary": "Infrastructure",
+        "summary": "List servers, devices and engines",
         "operationId": "infrastructure_api_system_infrastructure_get",
         "responses": {
           "200": {
@@ -9504,9 +9359,9 @@
     "/api/settings": {
       "get": {
         "tags": [
-          "system"
+          "Settings"
         ],
-        "summary": "Install Settings",
+        "summary": "Read install settings",
         "operationId": "install_settings_api_settings_get",
         "responses": {
           "200": {
@@ -9858,1200 +9713,6 @@
             "apiKey": []
           }
         ]
-      }
-    },
-    "/internal/worker/register": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Register Worker",
-        "operationId": "register_worker_internal_worker_register_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/WorkerBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/claim": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Claim",
-        "operationId": "claim_internal_worker_claim_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/jobs/{job_id}/heartbeat": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Heartbeat",
-        "operationId": "heartbeat_internal_worker_jobs__job_id__heartbeat_post",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HeartbeatResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/jobs/{job_id}/events": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Events",
-        "operationId": "events_internal_worker_jobs__job_id__events_post",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EventsBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/jobs/{job_id}/complete": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Complete",
-        "operationId": "complete_internal_worker_jobs__job_id__complete_post",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/jobs/{job_id}/fail": {
-      "post": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Fail",
-        "operationId": "fail_internal_worker_jobs__job_id__fail_post",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Job Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FailBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/artifacts/{artifact_id}": {
-      "put": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Upload Artifact",
-        "operationId": "upload_artifact_internal_worker_artifacts__artifact_id__put",
-        "parameters": [
-          {
-            "name": "artifact_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Artifact Id"
-            }
-          },
-          {
-            "name": "x-artifact-kind",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "X-Artifact-Kind"
-            }
-          },
-          {
-            "name": "x-artifact-packing",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "X-Artifact-Packing"
-            }
-          },
-          {
-            "name": "x-artifact-name",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "X-Artifact-Name"
-            }
-          },
-          {
-            "name": "x-artifact-replace",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "X-Artifact-Replace"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StoredArtifact"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Download Artifact",
-        "operationId": "download_artifact_internal_worker_artifacts__artifact_id__get",
-        "parameters": [
-          {
-            "name": "artifact_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Artifact Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/bases/{base_model_id}/stored": {
-      "get": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Stored",
-        "operationId": "stored_internal_worker_bases__base_model_id__stored_get",
-        "parameters": [
-          {
-            "name": "base_model_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Base Model Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StoredFiles"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/bases": {
-      "get": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Bases",
-        "operationId": "bases_internal_worker_bases_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiveBases"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/bases/{key}": {
-      "get": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Base Weights",
-        "operationId": "base_weights_internal_worker_bases__key__get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseWeights"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/worker/bases/{key}/files/{path}": {
-      "get": {
-        "tags": [
-          "worker"
-        ],
-        "summary": "Base File",
-        "operationId": "base_file_internal_worker_bases__key__files__path__get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/engines": {
-      "post": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Register Engine",
-        "operationId": "register_engine_internal_gateway_engines_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EngineBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/gateways": {
-      "post": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Report Gateway",
-        "operationId": "report_gateway_internal_gateway_gateways_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GatewayBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/bases": {
-      "get": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Bases",
-        "operationId": "bases_internal_gateway_bases_get",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LiveBases"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/bases/{key}": {
-      "get": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Base Weights",
-        "operationId": "base_weights_internal_gateway_bases__key__get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BaseWeights"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/bases/{key}/files/{path}": {
-      "get": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Base File",
-        "operationId": "base_file_internal_gateway_bases__key__files__path__get",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Key"
-            }
-          },
-          {
-            "name": "path",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Path"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/config": {
-      "get": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Config",
-        "operationId": "config_internal_gateway_config_get",
-        "parameters": [
-          {
-            "name": "version",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Version"
-            }
-          },
-          {
-            "name": "wait",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "number",
-              "default": 0.0,
-              "title": "Wait"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/logs": {
-      "post": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Logs",
-        "operationId": "logs_internal_gateway_logs_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LogsBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/feedback": {
-      "post": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Feedback",
-        "operationId": "feedback_internal_gateway_feedback_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FeedbackBody"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FeedbackStored"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/internal/gateway/artifacts/{artifact_id}": {
-      "get": {
-        "tags": [
-          "gateway"
-        ],
-        "summary": "Artifact",
-        "operationId": "artifact_internal_gateway_artifacts__artifact_id__get",
-        "parameters": [
-          {
-            "name": "artifact_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Artifact Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "",
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/healthz": {
-      "get": {
-        "tags": [
-          "ops"
-        ],
-        "summary": "Healthz",
-        "operationId": "healthz_healthz_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Healthz Healthz Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/readyz": {
-      "get": {
-        "tags": [
-          "ops"
-        ],
-        "summary": "Readyz",
-        "operationId": "readyz_readyz_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "type": "object",
-                  "title": "Response Readyz Readyz Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/metrics": {
-      "get": {
-        "tags": [
-          "ops"
-        ],
-        "summary": "Metrics",
-        "operationId": "metrics_metrics_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
       }
     }
   },
@@ -12014,67 +10675,8 @@
         ],
         "title": "BaseChoice"
       },
-      "BaseFile": {
-        "properties": {
-          "path": {
-            "type": "string",
-            "title": "Path"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          },
-          "sha256": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sha256"
-          },
-          "url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Url"
-          },
-          "key": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Key"
-          }
-        },
-        "type": "object",
-        "required": [
-          "path",
-          "size"
-        ],
-        "title": "BaseFile"
-      },
       "BaseModelDetail": {
         "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "base",
-              "custom"
-            ],
-            "title": "Kind"
-          },
           "key": {
             "type": "string",
             "title": "Key"
@@ -12254,6 +10856,10 @@
             "title": "Versions",
             "default": []
           },
+          "active_jobs": {
+            "type": "integer",
+            "title": "Active Jobs"
+          },
           "key_count": {
             "type": "integer",
             "title": "Key Count",
@@ -12354,6 +10960,11 @@
             ],
             "title": "Variant Label",
             "description": "A base's format, such as BF16, FP8 or GGUF Q8_0."
+          },
+          "kind": {
+            "type": "string",
+            "const": "base",
+            "title": "Kind"
           },
           "source": {
             "type": "string",
@@ -12546,7 +11157,6 @@
         },
         "type": "object",
         "required": [
-          "kind",
           "key",
           "name",
           "description",
@@ -12561,6 +11171,8 @@
           "current_version",
           "ready_version",
           "needed_bytes",
+          "active_jobs",
+          "kind",
           "source",
           "repo",
           "latest_revision",
@@ -12664,44 +11276,6 @@
           "installed"
         ],
         "title": "BaseTargetInfo"
-      },
-      "BaseWeights": {
-        "properties": {
-          "spec": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Spec"
-          },
-          "store": {
-            "type": "string",
-            "title": "Store",
-            "default": "folder"
-          },
-          "content_hash": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Content Hash"
-          },
-          "files": {
-            "items": {
-              "$ref": "#/components/schemas/BaseFile"
-            },
-            "type": "array",
-            "title": "Files"
-          }
-        },
-        "type": "object",
-        "required": [
-          "spec",
-          "files"
-        ],
-        "title": "BaseWeights"
       },
       "Body_upload_source_api_sources_post": {
         "properties": {
@@ -15279,23 +13853,6 @@
         ],
         "title": "CheckInfo"
       },
-      "ClaimRequest": {
-        "properties": {
-          "worker": {
-            "$ref": "#/components/schemas/WorkerBody"
-          },
-          "wait": {
-            "type": "number",
-            "title": "Wait",
-            "default": 0.0
-          }
-        },
-        "type": "object",
-        "required": [
-          "worker"
-        ],
-        "title": "ClaimRequest"
-      },
       "ColumnInfo": {
         "properties": {
           "name": {
@@ -15365,42 +13922,6 @@
           "max"
         ],
         "title": "ColumnStats"
-      },
-      "CompleteBody": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "result": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Result"
-          },
-          "outputs": {
-            "additionalProperties": {
-              "type": "string"
-            },
-            "type": "object",
-            "title": "Outputs"
-          },
-          "log": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Log"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "title": "CompleteBody"
       },
       "CompletionChoice": {
         "properties": {
@@ -17570,82 +16091,6 @@
         ],
         "title": "EncryptionUpdate"
       },
-      "EngineBody": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "host": {
-            "type": "string",
-            "title": "Host"
-          },
-          "url": {
-            "type": "string",
-            "title": "Url"
-          },
-          "base_model": {
-            "type": "string",
-            "title": "Base Model"
-          },
-          "engine": {
-            "type": "string",
-            "title": "Engine"
-          },
-          "state": {
-            "type": "string",
-            "title": "State"
-          },
-          "pool": {
-            "type": "string",
-            "title": "Pool",
-            "default": "local"
-          },
-          "hardware": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Hardware",
-            "default": {}
-          },
-          "managed": {
-            "type": "boolean",
-            "title": "Managed",
-            "default": false
-          },
-          "error": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error"
-          },
-          "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "host",
-          "url",
-          "base_model",
-          "engine",
-          "state"
-        ],
-        "title": "EngineBody"
-      },
       "ErrorDetail": {
         "properties": {
           "detail": {
@@ -17851,94 +16296,6 @@
         ],
         "title": "EvalPoint"
       },
-      "EventBody": {
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "event",
-              "log"
-            ],
-            "title": "Kind"
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "default": ""
-          },
-          "data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data"
-          },
-          "level": {
-            "type": "string",
-            "enum": [
-              "debug",
-              "info",
-              "warning",
-              "error"
-            ],
-            "title": "Level",
-            "default": "info"
-          },
-          "name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Name"
-          },
-          "at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "kind"
-        ],
-        "title": "EventBody"
-      },
-      "EventsBody": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "events": {
-            "items": {
-              "$ref": "#/components/schemas/EventBody"
-            },
-            "type": "array",
-            "title": "Events"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "title": "EventsBody"
-      },
       "ExampleAnswer": {
         "properties": {
           "messages": {
@@ -18099,151 +16456,6 @@
           "extensions"
         ],
         "title": "ExtensionsInfo"
-      },
-      "FailBody": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          },
-          "error": {
-            "type": "string",
-            "title": "Error"
-          },
-          "retryable": {
-            "type": "boolean",
-            "title": "Retryable",
-            "default": true
-          },
-          "log": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Log"
-          },
-          "code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Code"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token",
-          "error"
-        ],
-        "title": "FailBody"
-      },
-      "FeedbackBody": {
-        "properties": {
-          "model_id": {
-            "type": "integer",
-            "title": "Model Id"
-          },
-          "origin": {
-            "type": "string",
-            "title": "Origin"
-          },
-          "rating": {
-            "type": "string",
-            "title": "Rating"
-          },
-          "response_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response Id"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version"
-          },
-          "key_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Key Id"
-          },
-          "input": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input"
-          },
-          "output": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output"
-          },
-          "correction": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Correction"
-          },
-          "comment": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Comment"
-          }
-        },
-        "type": "object",
-        "required": [
-          "model_id",
-          "origin",
-          "rating"
-        ],
-        "title": "FeedbackBody"
       },
       "FeedbackDetail": {
         "properties": {
@@ -18863,19 +17075,6 @@
         ],
         "title": "FeedbackRequest"
       },
-      "FeedbackStored": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id"
-        ],
-        "title": "FeedbackStored"
-      },
       "FeedbackSummary": {
         "properties": {
           "version": {
@@ -19129,45 +17328,6 @@
           "name"
         ],
         "title": "FunctionSpec"
-      },
-      "GatewayBody": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "host": {
-            "type": "string",
-            "title": "Host"
-          },
-          "version": {
-            "type": "string",
-            "title": "Version"
-          },
-          "routes": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Routes",
-            "default": []
-          },
-          "bases": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Bases",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "host",
-          "version"
-        ],
-        "title": "GatewayBody"
       },
       "GpuInfo": {
         "properties": {
@@ -19475,24 +17635,6 @@
           "label"
         ],
         "title": "HealthAction"
-      },
-      "HeartbeatResponse": {
-        "properties": {
-          "cancel": {
-            "type": "boolean",
-            "title": "Cancel"
-          },
-          "lease_expires_at": {
-            "type": "string",
-            "title": "Lease Expires At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "cancel",
-          "lease_expires_at"
-        ],
-        "title": "HeartbeatResponse"
       },
       "HubAddRequest": {
         "properties": {
@@ -21915,29 +20057,6 @@
         ],
         "title": "LabelShiftInfo"
       },
-      "LiveBases": {
-        "properties": {
-          "bases": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
-            },
-            "type": "object",
-            "title": "Bases"
-          }
-        },
-        "type": "object",
-        "required": [
-          "bases"
-        ],
-        "title": "LiveBases"
-      },
       "LoadedModel": {
         "properties": {
           "base_model": {
@@ -21990,153 +20109,6 @@
         ],
         "title": "LocationRequest"
       },
-      "LogBody": {
-        "properties": {
-          "at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "At"
-          },
-          "key_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Key Id"
-          },
-          "model_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Model Id"
-          },
-          "model": {
-            "type": "string",
-            "title": "Model"
-          },
-          "version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Version"
-          },
-          "status": {
-            "type": "integer",
-            "title": "Status"
-          },
-          "latency_ms": {
-            "type": "number",
-            "title": "Latency Ms"
-          },
-          "contract": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Contract"
-          },
-          "prompt_tokens": {
-            "type": "integer",
-            "title": "Prompt Tokens",
-            "default": 0
-          },
-          "completion_tokens": {
-            "type": "integer",
-            "title": "Completion Tokens",
-            "default": 0
-          },
-          "response_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Response Id"
-          },
-          "input": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Input"
-          },
-          "output": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Output"
-          },
-          "finish_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Finish Reason"
-          },
-          "safety": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Safety"
-          },
-          "kind": {
-            "type": "string",
-            "title": "Kind",
-            "default": "chat"
-          }
-        },
-        "type": "object",
-        "required": [
-          "at",
-          "key_id",
-          "model_id",
-          "model",
-          "version",
-          "status",
-          "latency_ms"
-        ],
-        "title": "LogBody"
-      },
       "LoggedRequest": {
         "properties": {
           "at": {
@@ -22172,22 +20144,6 @@
           "key_name"
         ],
         "title": "LoggedRequest"
-      },
-      "LogsBody": {
-        "properties": {
-          "entries": {
-            "items": {
-              "$ref": "#/components/schemas/LogBody"
-            },
-            "type": "array",
-            "title": "Entries"
-          }
-        },
-        "type": "object",
-        "required": [
-          "entries"
-        ],
-        "title": "LogsBody"
       },
       "MachinePlanInfo": {
         "properties": {
@@ -23000,6 +20956,11 @@
               }
             ]
           },
+          "kind": {
+            "type": "string",
+            "const": "custom",
+            "title": "Kind"
+          },
           "source": {
             "anyOf": [
               {
@@ -23146,6 +21107,7 @@
           "current_score",
           "versions",
           "active_jobs",
+          "kind",
           "source",
           "mapping",
           "dataset_version",
@@ -23391,14 +21353,6 @@
       },
       "ModelRow": {
         "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "base",
-              "custom"
-            ],
-            "title": "Kind"
-          },
           "key": {
             "type": "string",
             "title": "Key"
@@ -23578,6 +21532,10 @@
             "title": "Versions",
             "default": []
           },
+          "active_jobs": {
+            "type": "integer",
+            "title": "Active Jobs"
+          },
           "key_count": {
             "type": "integer",
             "title": "Key Count",
@@ -23678,11 +21636,18 @@
             ],
             "title": "Variant Label",
             "description": "A base's format, such as BF16, FP8 or GGUF Q8_0."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "base",
+              "custom"
+            ],
+            "title": "Kind"
           }
         },
         "type": "object",
         "required": [
-          "kind",
           "key",
           "name",
           "description",
@@ -23696,7 +21661,9 @@
           "update_available",
           "current_version",
           "ready_version",
-          "needed_bytes"
+          "needed_bytes",
+          "active_jobs",
+          "kind"
         ],
         "title": "ModelRow"
       },
@@ -23846,94 +21813,6 @@
           "action"
         ],
         "title": "ModelStatus"
-      },
-      "ModelSummary": {
-        "properties": {
-          "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "preset": {
-            "type": "string",
-            "title": "Preset"
-          },
-          "base_model": {
-            "type": "string",
-            "title": "Base Model"
-          },
-          "current_version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Version"
-          },
-          "deployed": {
-            "type": "boolean",
-            "title": "Deployed",
-            "default": false
-          },
-          "main_metric": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Main Metric"
-          },
-          "current_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Score"
-          },
-          "versions": {
-            "type": "integer",
-            "title": "Versions"
-          },
-          "active_jobs": {
-            "type": "integer",
-            "title": "Active Jobs"
-          },
-          "avatar": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelAvatar"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "slug",
-          "name",
-          "preset",
-          "base_model",
-          "current_version",
-          "current_score",
-          "versions",
-          "active_jobs"
-        ],
-        "title": "ModelSummary"
       },
       "ModelTraffic": {
         "properties": {
@@ -26979,6 +24858,11 @@
               }
             ]
           },
+          "kind": {
+            "type": "string",
+            "const": "custom",
+            "title": "Kind"
+          },
           "source": {
             "anyOf": [
               {
@@ -27140,6 +25024,7 @@
           "current_score",
           "versions",
           "active_jobs",
+          "kind",
           "source",
           "mapping",
           "dataset_version",
@@ -28493,41 +26378,6 @@
         ],
         "title": "StoreInfo"
       },
-      "StoredArtifact": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "size": {
-            "type": "integer",
-            "title": "Size"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "size"
-        ],
-        "title": "StoredArtifact"
-      },
-      "StoredFiles": {
-        "properties": {
-          "files": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Files"
-          }
-        },
-        "type": "object",
-        "required": [
-          "files"
-        ],
-        "title": "StoredFiles"
-      },
       "SystemInfo": {
         "properties": {
           "device": {
@@ -29130,19 +26980,6 @@
           "value"
         ],
         "title": "ThresholdInfo"
-      },
-      "TokenBody": {
-        "properties": {
-          "token": {
-            "type": "string",
-            "title": "Token"
-          }
-        },
-        "type": "object",
-        "required": [
-          "token"
-        ],
-        "title": "TokenBody"
       },
       "TokenUsage": {
         "properties": {
@@ -31575,47 +29412,6 @@
           "completion_tokens"
         ],
         "title": "VersionTestResult"
-      },
-      "WorkerBody": {
-        "properties": {
-          "id": {
-            "type": "string",
-            "title": "Id"
-          },
-          "host": {
-            "type": "string",
-            "title": "Host"
-          },
-          "kinds": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Kinds"
-          },
-          "gpus": {
-            "type": "integer",
-            "title": "Gpus",
-            "default": 1
-          },
-          "pool": {
-            "type": "string",
-            "title": "Pool",
-            "default": "local"
-          },
-          "hardware": {
-            "additionalProperties": true,
-            "type": "object",
-            "title": "Hardware"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "host",
-          "kinds"
-        ],
-        "title": "WorkerBody"
       }
     },
     "securitySchemes": {

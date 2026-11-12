@@ -128,8 +128,8 @@ export function useContractChange(detail: ModelDetail, onSaved: (saved: ModelDet
     const save = useMutation({
         mutationFn: ({ contract, breaking }: { contract: ContractInfo; breaking: boolean }) =>
             unwrap(
-                api.PUT("/api/models/{slug}/contract", {
-                    params: { path: { slug } },
+                api.PUT("/api/models/{name}/contract", {
+                    params: { path: { name: slug } },
                     body: { contract, breaking },
                 }),
             ),
@@ -138,8 +138,8 @@ export function useContractChange(detail: ModelDetail, onSaved: (saved: ModelDet
     const check = useMutation({
         mutationFn: (contract: ContractInfo) =>
             unwrap(
-                api.POST("/api/models/{slug}/contract/check", {
-                    params: { path: { slug } },
+                api.POST("/api/models/{name}/contract/check", {
+                    params: { path: { name: slug } },
                     body: contract,
                 }),
             ),
@@ -299,8 +299,8 @@ function GradersEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => 
     const save = useMutation({
         mutationFn: (graders: GraderConfig[]) =>
             unwrap(
-                api.PUT("/api/models/{slug}/graders", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/graders", {
+                    params: { path: { name: detail.slug } },
                     body: { graders },
                 }),
             ),
@@ -395,8 +395,8 @@ function JudgeEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => vo
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.PUT("/api/models/{slug}/judge", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/judge", {
+                    params: { path: { name: detail.slug } },
                     body: { model: value === INSTALL_JUDGE ? null : value },
                 }),
             ),
@@ -452,8 +452,8 @@ function RuleEditor({
     const save = useMutation({
         mutationFn: () =>
             unwrap(
-                api.PUT("/api/models/{slug}/promotion", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/promotion", {
+                    params: { path: { name: detail.slug } },
                     body: rule,
                 }),
             ),

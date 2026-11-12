@@ -128,8 +128,8 @@ export function ModelSafety({ detail }: { detail: ModelDetail }) {
     const change = useMutation({
         mutationFn: (body: { mode: Mode; model: string | null; answers: boolean }) =>
             unwrap(
-                api.PUT("/api/models/{slug}/safety", {
-                    params: { path: { slug: detail.slug } },
+                api.PUT("/api/models/{name}/safety", {
+                    params: { path: { name: detail.slug } },
                     body,
                 }),
             ),

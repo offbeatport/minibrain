@@ -105,7 +105,11 @@ export function useFeedbackSummary(slug: string) {
     return useQuery({
         queryKey: feedbackKeys.summary(slug),
         queryFn: () =>
-            unwrap(api.GET("/api/models/{slug}/feedback/summary", { params: { path: { slug } } })),
+            unwrap(
+                api.GET("/api/models/{name}/feedback/summary", {
+                    params: { path: { name: slug } },
+                }),
+            ),
         enabled: Boolean(slug),
     });
 }
@@ -147,7 +151,9 @@ export function useSendFeedback(slug: string) {
     const refresh = useRefreshFeedback();
     return useMutation({
         mutationFn: (body: PlaygroundFeedback) =>
-            unwrap(api.POST("/api/models/{slug}/feedback", { params: { path: { slug } }, body })),
+            unwrap(
+                api.POST("/api/models/{name}/feedback", { params: { path: { name: slug } }, body }),
+            ),
         onSuccess: refresh,
     });
 }
@@ -156,7 +162,9 @@ export function useTestExamples(slug: string) {
     return useQuery({
         queryKey: feedbackKeys.examples(slug),
         queryFn: () =>
-            unwrap(api.GET("/api/models/{slug}/test-examples", { params: { path: { slug } } })),
+            unwrap(
+                api.GET("/api/models/{name}/test-examples", { params: { path: { name: slug } } }),
+            ),
         enabled: Boolean(slug),
     });
 }
@@ -167,7 +175,10 @@ export function useSaveTestExample(slug: string) {
     return useMutation({
         mutationFn: (body: SaveExampleBody) =>
             unwrap(
-                api.POST("/api/models/{slug}/test-examples", { params: { path: { slug } }, body }),
+                api.POST("/api/models/{name}/test-examples", {
+                    params: { path: { name: slug } },
+                    body,
+                }),
             ),
         onSuccess: () => {
             refresh();

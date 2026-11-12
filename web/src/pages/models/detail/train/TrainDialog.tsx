@@ -69,7 +69,7 @@ import {
 
 function fetchPlan(slug: string, query: PlanQuery) {
     return unwrap(
-        api.GET("/api/models/{slug}/training-plan", { params: { path: { slug }, query } }),
+        api.GET("/api/models/{name}/training-plan", { params: { path: { name: slug }, query } }),
     );
 }
 
@@ -191,8 +191,8 @@ function Body({
     const create = useMutation({
         mutationFn: (force: boolean) =>
             unwrap(
-                api.POST("/api/models/{slug}/versions", {
-                    params: { path: { slug: row.key } },
+                api.POST("/api/models/{name}/versions", {
+                    params: { path: { name: row.key } },
                     body: { kind: "lora", ...query, breaking: force },
                 }),
             ),

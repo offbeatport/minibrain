@@ -22,8 +22,8 @@ export function ChangeAvatarDialog({
     const save = useMutation({
         mutationFn: (choice: AvatarChoice) =>
             unwrap(
-                api.PUT("/api/models/{slug}/avatar", {
-                    params: { path: { slug: row.key } },
+                api.PUT("/api/models/{name}/avatar", {
+                    params: { path: { name: row.key } },
                     body: avatarBody(choice),
                 }),
             ),

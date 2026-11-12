@@ -33,8 +33,8 @@ export function LabelProposalNotice({ detail }: { detail: ModelDetail }) {
         }
         try {
             const version = await unwrap(
-                api.POST("/api/models/{slug}/versions", {
-                    params: { path: { slug } },
+                api.POST("/api/models/{name}/versions", {
+                    params: { path: { name: slug } },
                     body: { kind: "prompt" },
                 }),
             );
@@ -65,8 +65,8 @@ export function LabelProposalNotice({ detail }: { detail: ModelDetail }) {
     const dismiss = useMutation({
         mutationFn: (datasetVersionId: number) =>
             unwrap(
-                api.PUT("/api/models/{slug}/label-proposal/dismissal", {
-                    params: { path: { slug } },
+                api.PUT("/api/models/{name}/label-proposal/dismissal", {
+                    params: { path: { name: slug } },
                     body: { dataset_version_id: datasetVersionId },
                 }),
             ),

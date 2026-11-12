@@ -13,17 +13,17 @@ function Editor({ detail }: { detail: ModelDetail }) {
     const toast = useToast();
     const router = useRouter();
     const [text, setText] = useState(detail.instructions);
-    const path = { params: { path: { slug: detail.slug } } };
+    const path = { params: { path: { name: detail.slug } } };
     const save = useMutation({
         mutationFn: async () => {
             await unwrap(
-                api.PUT("/api/models/{slug}/instructions", {
+                api.PUT("/api/models/{name}/instructions", {
                     ...path,
                     body: { instructions: text },
                 }),
             );
             return unwrap(
-                api.POST("/api/models/{slug}/versions", { ...path, body: { kind: "prompt" } }),
+                api.POST("/api/models/{name}/versions", { ...path, body: { kind: "prompt" } }),
             );
         },
         onSuccess: async (version) => {

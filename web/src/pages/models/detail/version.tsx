@@ -71,9 +71,9 @@ export function useAnswers(slug: string, number: number, against: number | null,
         queryKey: [...keys.answers(slug, number), against],
         queryFn: () =>
             unwrap(
-                api.GET("/api/models/{slug}/versions/{number}/answers", {
+                api.GET("/api/models/{name}/versions/{number}/answers", {
                     params: {
-                        path: { slug, number },
+                        path: { name: slug, number },
                         query: against === null ? {} : { against },
                     },
                 }),
@@ -666,9 +666,9 @@ function VersionMenu({
             destructive: true,
             run: async () => {
                 await unwrap(
-                    api.DELETE("/api/models/{slug}/versions/{number}", {
+                    api.DELETE("/api/models/{name}/versions/{number}", {
                         params: {
-                            path: { slug: row.key, number: version.number },
+                            path: { name: row.key, number: version.number },
                             query: { cancel_jobs: true },
                         },
                     }),
