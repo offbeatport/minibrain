@@ -6572,10 +6572,24 @@ export interface components {
         };
         /** KeyCreate */
         KeyCreate: {
+            /**
+             * All Models
+             * @description Every model, including ones added later. Admins only.
+             * @default false
+             */
+            all_models?: boolean;
+            /**
+             * Models
+             * @description The models the key calls, unless all_models.
+             */
+            models?: components["schemas"]["ModelRef"][];
             /** Name */
             name: string;
-            /** Models */
-            models: components["schemas"]["ModelRef"][];
+            /**
+             * Expires In Days
+             * @description Days until the key expires; the install's policy when left out.
+             */
+            expires_in_days?: number | null;
         };
         /** KeyCreated */
         KeyCreated: {
@@ -6590,12 +6604,21 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Created By */
+            created_by: string | null;
             /** Last Used At */
             last_used_at: string | null;
             /** Expires At */
             expires_at: string | null;
+            /** All Models */
+            all_models: boolean;
             /** Models */
             models: components["schemas"]["KeyModel"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "expired" | "no_access";
             /** Secret */
             secret: string;
         };
@@ -6612,12 +6635,21 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /** Created By */
+            created_by: string | null;
             /** Last Used At */
             last_used_at: string | null;
             /** Expires At */
             expires_at: string | null;
+            /** All Models */
+            all_models: boolean;
             /** Models */
             models: components["schemas"]["KeyModel"][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "expired" | "no_access";
         };
         /** KeyModel */
         KeyModel: {
@@ -6633,8 +6665,17 @@ export interface components {
         };
         /** KeyScopeUpdate */
         KeyScopeUpdate: {
-            /** Models */
-            models: components["schemas"]["ModelRef"][];
+            /**
+             * All Models
+             * @description Every model, including ones added later. Admins only.
+             * @default false
+             */
+            all_models?: boolean;
+            /**
+             * Models
+             * @description The models the key calls, unless all_models.
+             */
+            models?: components["schemas"]["ModelRef"][];
         };
         /** LabelCount */
         LabelCount: {

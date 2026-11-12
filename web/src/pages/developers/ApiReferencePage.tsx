@@ -3,6 +3,7 @@ import "@scalar/api-reference-react/style.css";
 import "./scalar.css";
 import { useQuery } from "@tanstack/react-query";
 import { useRouterState } from "@tanstack/react-router";
+import { KeyRound } from "lucide-react";
 import { Button, Link, TabNav, type TabNavItem, getTheme, onThemeChange } from "obp-ui";
 import { type ComponentProps, useMemo, useSyncExternalStore } from "react";
 import { usePerson } from "~/api/authQueries";
@@ -11,7 +12,7 @@ import { useAllModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page } from "~/components/Section";
 import { ROLE_LABELS, useCan } from "~/lib/access";
-import { API_REFERENCE_PATH, MANAGEMENT_REFERENCE_PATH } from "~/lib/modelLinks";
+import { API_KEYS_PATH, API_REFERENCE_PATH, MANAGEMENT_REFERENCE_PATH } from "~/lib/modelLinks";
 import {
     type ApiDocument,
     CSRF_PLACEHOLDER,
@@ -157,7 +158,10 @@ export function ApiReferencePage() {
                     kind === "gateway" &&
                     can.build && (
                         <Button variant="outline" asChild>
-                            <Link href="/models">Create a key</Link>
+                            <Link href={API_KEYS_PATH}>
+                                <KeyRound aria-hidden="true" />
+                                API keys
+                            </Link>
                         </Button>
                     )
                 }

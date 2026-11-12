@@ -22,6 +22,7 @@ from minibrain.api.schemas import (
     JudgeInfo,
     KeyInfo,
     KeyModel,
+    KeyStatus,
     LabelProposal,
     LabelScoreInfo,
     MappingInfo,
@@ -66,6 +67,7 @@ from minibrain.registry.models import (
     TeardownStep,
     Version,
     VersionStatus,
+    now,
 )
 from minibrain.registry.prices import DevicePrices, eval_cost
 from minibrain.registry.service import find_version, latest_dataset_version
@@ -513,13 +515,25 @@ def key_models(session: Session, key: ApiKey) -> list[KeyModel]:
     return found
 
 
+def key_status(key: ApiKey, models: list[KeyModel]) -> KeyStatus:
+    if key.expires_at is not None and key.expires_at <= now():
+        return "expired"
+    if not key.all_models and not models:
+        return "no_access"
+    return "active"
+
+
 def key_info(session: Session, key: ApiKey) -> KeyInfo:
+    models = key_models(session, key)
     return KeyInfo(
         id=key.id,
         name=key.name,
         prefix=key.prefix,
         created_at=key.created_at,
+        created_by=key.created_by,
         last_used_at=key.last_used_at,
         expires_at=key.expires_at,
-        models=key_models(session, key),
+        all_models=key.all_models,
+        models=models,
+        status=key_status(key, models),
     )

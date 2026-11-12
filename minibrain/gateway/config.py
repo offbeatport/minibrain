@@ -64,16 +64,26 @@ class Grant:
     key_id: int
     owners: tuple[str, ...]
     expires_at: str | None = None
+    all_models: bool = False
 
     def expired(self, moment: datetime) -> bool:
         return self.expires_at is not None and datetime.fromisoformat(self.expires_at) <= moment
 
     def covers(self, route: "Route") -> bool:
-        return route.owner in self.owners
+        return self.all_models or route.owner in self.owners
+
+    def reachable(self, models: dict[str, list[str]]) -> list[str]:
+        owners = sorted(models) if self.all_models else self.owners
+        return [name for owner in owners for name in models.get(owner, [])]
 
     @staticmethod
     def from_dict(data: dict[str, Any]) -> "Grant":
-        return Grant(key_id=data["key_id"], owners=tuple(data["owners"]), expires_at=data.get("expires_at"))
+        return Grant(
+            key_id=data["key_id"],
+            owners=tuple(data["owners"]),
+            expires_at=data.get("expires_at"),
+            all_models=bool(data.get("all_models", False)),
+        )
 
 
 def owner_of(model_id: int | None, base_model_id: str | None) -> str:
@@ -229,6 +239,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
             key_id=key.id,
             owners=tuple(owner_of(scope.model_id, scope.base_model_id) for scope in key.scopes),
             expires_at=key.expires_at.isoformat() if key.expires_at else None,
+            all_models=key.all_models,
         )
         for key in session.scalars(select(ApiKey))
     }

@@ -55,7 +55,7 @@ API_KEY = HTTPBearer(
     auto_error=False,
     scheme_name="apiKey",
     bearerFormat="mb_...",
-    description="A minibrain API key, created on Deployments. It covers one or more models.",
+    description="A minibrain API key, created on the API keys page. It covers one or more models, or all models.",
 )
 
 FeedbackSink = Callable[[Submission], int]
@@ -159,7 +159,7 @@ def note_call(
     responses=KEY_ERRORS,
 )
 def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
-    names = [name for owner in grant.owners for name in config.models.get(owner, [])]
+    names = grant.reachable(config.models)
     return ModelList(data=[ModelInfo(id=name, created=0, owned_by="minibrain") for name in names])
 
 

@@ -32,6 +32,7 @@ from minibrain.models.registry import base_publisher, files_present
 from minibrain.registry.compute import engines_by_base, replica_host
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    ApiKey,
     BaseModel,
     BaseModelStatus,
     CatalogModel,
@@ -581,8 +582,10 @@ def all_rows(
         ).all()
     )
     slugs = dict(session.execute(select(Model.slug, Model.id)).all())
+    every = session.scalar(select(func.count()).select_from(ApiKey).where(ApiKey.all_models.is_(True))) or 0
     counts = {
-        row_id(row): custom_keys.get(slugs.get(row.key), 0) if row.kind == "custom" else base_keys.get(row.key, 0)
+        row_id(row): every
+        + (custom_keys.get(slugs.get(row.key), 0) if row.kind == "custom" else base_keys.get(row.key, 0))
         for row in rows
     }
     rows = [row.model_copy(update=facts.get(row_id(row), {}) | {"key_count": counts[row_id(row)]}) for row in rows]

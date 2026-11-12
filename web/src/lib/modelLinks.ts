@@ -1,5 +1,6 @@
 export const TRAINING_PATH = "/training";
 export const JOBS_PATH = "/jobs";
+export const API_KEYS_PATH = "/api-keys";
 const TRAIN_KIND = "train";
 
 export function trainingHref(slug: string): string {

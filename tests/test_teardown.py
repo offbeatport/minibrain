@@ -308,7 +308,7 @@ def test_cascade_deletes_the_base_and_every_model_built_on_it(harness: Harness) 
     assert not folder.exists() and teardowns(harness) == []
     assert not any(store_for(harness.settings).has(item) for item in adapters)
     with harness.sessions() as session:
-        assert session.query(ApiKey).count() == 0
+        assert [key.scopes for key in session.query(ApiKey)] == [[]]
     started_events = {event.target: event.detail for event in events(harness, "model.delete")}
     assert started_events[BASE]["cascade"] == [foo, wef] and started_events[foo]["with_base"] == "Tiny"
     finished = {event.target: event.detail for event in events(harness, "model.delete_finished")}

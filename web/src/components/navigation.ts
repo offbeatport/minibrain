@@ -9,6 +9,7 @@ import {
     HardDrive,
     Home,
     Info,
+    KeyRound,
     ListChecks,
     Play,
     ScrollText,
@@ -52,6 +53,7 @@ export const SECTIONS: NavSection[] = [
             { label: "Monitoring", path: "/monitor", icon: Activity },
             { label: "Jobs", path: "/jobs", icon: ListChecks, role: "builder" },
             { label: "Infrastructure", path: "/infrastructure", icon: Server, role: "admin" },
+            { label: "API keys", path: "/api-keys", icon: KeyRound, role: "builder" },
         ],
     },
 ];

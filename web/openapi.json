@@ -21491,25 +21491,44 @@
       },
       "KeyCreate": {
         "properties": {
-          "name": {
-            "type": "string",
-            "maxLength": 60,
-            "minLength": 1,
-            "title": "Name"
+          "all_models": {
+            "type": "boolean",
+            "title": "All Models",
+            "description": "Every model, including ones added later. Admins only.",
+            "default": false
           },
           "models": {
             "items": {
               "$ref": "#/components/schemas/ModelRef"
             },
             "type": "array",
-            "minItems": 1,
-            "title": "Models"
+            "title": "Models",
+            "description": "The models the key calls, unless all_models."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "expires_in_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires In Days",
+            "description": "Days until the key expires; the install's policy when left out."
           }
         },
         "type": "object",
         "required": [
-          "name",
-          "models"
+          "name"
         ],
         "title": "KeyCreate"
       },
@@ -21531,6 +21550,17 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
           },
           "last_used_at": {
             "anyOf": [
@@ -21556,12 +21586,25 @@
             ],
             "title": "Expires At"
           },
+          "all_models": {
+            "type": "boolean",
+            "title": "All Models"
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/KeyModel"
             },
             "type": "array",
             "title": "Models"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "no_access"
+            ],
+            "title": "Status"
           },
           "secret": {
             "type": "string",
@@ -21574,9 +21617,12 @@
           "name",
           "prefix",
           "created_at",
+          "created_by",
           "last_used_at",
           "expires_at",
+          "all_models",
           "models",
+          "status",
           "secret"
         ],
         "title": "KeyCreated"
@@ -21600,6 +21646,17 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
           "last_used_at": {
             "anyOf": [
               {
@@ -21624,12 +21681,25 @@
             ],
             "title": "Expires At"
           },
+          "all_models": {
+            "type": "boolean",
+            "title": "All Models"
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/KeyModel"
             },
             "type": "array",
             "title": "Models"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "expired",
+              "no_access"
+            ],
+            "title": "Status"
           }
         },
         "type": "object",
@@ -21638,9 +21708,12 @@
           "name",
           "prefix",
           "created_at",
+          "created_by",
           "last_used_at",
           "expires_at",
-          "models"
+          "all_models",
+          "models",
+          "status"
         ],
         "title": "KeyInfo"
       },
@@ -21673,19 +21746,22 @@
       },
       "KeyScopeUpdate": {
         "properties": {
+          "all_models": {
+            "type": "boolean",
+            "title": "All Models",
+            "description": "Every model, including ones added later. Admins only.",
+            "default": false
+          },
           "models": {
             "items": {
               "$ref": "#/components/schemas/ModelRef"
             },
             "type": "array",
-            "minItems": 1,
-            "title": "Models"
+            "title": "Models",
+            "description": "The models the key calls, unless all_models."
           }
         },
         "type": "object",
-        "required": [
-          "models"
-        ],
         "title": "KeyScopeUpdate"
       },
       "LabelCount": {

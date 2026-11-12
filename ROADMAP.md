@@ -995,8 +995,16 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
 - `POST /v1/feedback` (see Feedback loop).
 - `model: "support-triage"` → current version; `"support-triage@3"` → pinned. The gateway maps it to SGLang's
   `<base>:<adapter>` name.
-- API keys cover one or more models; a call to a model the key does not cover gets 403. Keys are managed on
-  each model's API tab. Audit log: who created, changed or revoked which key, when.
+- API keys cover one or more models, or all models (`api_keys.all_models`, every custom and base model, including
+  ones added later and `name@N`); a call to a model the key does not cover gets 403, and an unknown or deleted name
+  404 whatever the key. One check, `Grant.covers`, decides for every `/v1` route. Only admins create or widen a key to
+  all models. A key whose models were all deleted stays, with "No access"; it never widens to all models.
+- Keys are managed on the API keys page (Operate › API keys, `/api-keys`): name, scope, created by, created, last
+  used, expires and status, with search, a scope filter, Edit scope and Revoke. Builders see and manage the keys they
+  created; admins see and revoke every key. Create key takes a name, the scope (picked models, or all models for
+  admins) and an optional expiry within the `key_expiry_days` policy; the secret is shown once with Connect snippets.
+  A model's API keys tab is the same list filtered to the keys that reach it, all-model keys included. Audit log: who
+  created, changed or revoked which key, when, and its scope (`scope: all` or `models`).
 - Request metadata is logged for every `/v1` call: time, endpoint, model, version, key, status, latency, tokens,
   finish reason and response id, never content. Monitoring, cost and the Requests tab depend on it, so it cannot be turned
   off; log retention deletes it.
@@ -1079,7 +1087,7 @@ keys, and `/v1` stays key-only.
 
 - obp-ui, operator-console style.
 - Sidebar (2026-11-11): Home · Explore (Models, Discover, Playground) · Create (Data, Training, Evaluations,
-  Feedback) · Operate (Monitoring, Jobs, Infrastructure) · Settings, with the user menu (Settings, API reference,
+  Feedback) · Operate (Monitoring, Jobs, Infrastructure, API keys) · Settings, with the user menu (Settings, API reference,
   Theme, Sign out) below. It follows the role: Viewers see Home, Models, Playground, Monitoring and Settings; Builders
   add the rest; Admins add Infrastructure and the admin settings. Sidebar links are plain paths; no page carries a
   model into another. Deployments and Pipelines left it: a model's endpoint and keys are on its API tab, and
@@ -1137,7 +1145,7 @@ keys, and `/v1` stays key-only.
   id.
 - API reference: two `TabNav` pages, OpenAI-compatible API (`/developers`) and Management API
   (`/developers/management`), each a Scalar reference themed from the obp-ui tokens (Cobalt, light and dark, the
-  kit's sans and mono). Create a key (Builders) links to Models, where each model's API tab makes keys; the user
+  kit's sans and mono). API keys (Builders) links to the API keys page; the user
   menu and a model's API tab link to it, and the copy-paste harness configs stay where they are.
 - Playground (built 2026-11-06): the chat on the left, a settings panel on the right (a drawer below 1024px, hidden on
   request) with Model (any version of your models, the live name, or any installed base, deployed or not;

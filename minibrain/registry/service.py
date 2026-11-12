@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import timedelta
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from minibrain.registry.models import (
@@ -212,39 +212,52 @@ def scopes_of(models: Sequence[Model] = (), model_ids: Sequence[str] = ()) -> li
     ]
 
 
-def create_key(
-    session: Session, name: str, models: Sequence[Model] = (), model_ids: Sequence[str] = ()
-) -> tuple[ApiKey, str]:
+def key_expiry_limit(session: Session) -> int:
     from minibrain.policy import load
 
+    return int(load(session)["key_expiry_days"])
+
+
+def create_key(
+    session: Session,
+    name: str,
+    models: Sequence[Model] = (),
+    model_ids: Sequence[str] = (),
+    all_models: bool = False,
+    days: int | None = None,
+) -> tuple[ApiKey, str]:
     raw = KEY_PREFIX + secrets.token_urlsafe(32)
-    days = int(load(session)["key_expiry_days"])
+    lasts = days or key_expiry_limit(session)
     key = ApiKey(
         name=name.strip(),
         prefix=raw[:10],
         digest=key_digest(raw),
-        expires_at=now() + timedelta(days=days) if days else None,
-        scopes=scopes_of(models, model_ids),
+        expires_at=now() + timedelta(days=lasts) if lasts else None,
+        all_models=all_models,
+        scopes=[] if all_models else scopes_of(models, model_ids),
     )
     session.add(key)
     session.commit()
     return key, raw
 
 
-def set_scopes(session: Session, key: ApiKey, models: Sequence[Model] = (), model_ids: Sequence[str] = ()) -> None:
+def set_scopes(
+    session: Session,
+    key: ApiKey,
+    models: Sequence[Model] = (),
+    model_ids: Sequence[str] = (),
+    all_models: bool = False,
+) -> None:
     key.scopes.clear()
     session.flush()
-    key.scopes.extend(scopes_of(models, model_ids))
+    key.all_models = all_models
+    key.scopes.extend([] if all_models else scopes_of(models, model_ids))
     session.commit()
 
 
 def covers(key: ApiKey, model: Model | None = None, base_model_id: str | None = None) -> bool:
+    if key.all_models:
+        return True
     if model is not None:
         return any(scope.model_id == model.id for scope in key.scopes)
     return any(scope.base_model_id == base_model_id for scope in key.scopes)
-
-
-def drop_orphan_keys(session: Session) -> None:
-    session.flush()
-    session.execute(delete(ApiKey).where(~ApiKey.scopes.any()), execution_options={"synchronize_session": False})
-    session.expire_all()

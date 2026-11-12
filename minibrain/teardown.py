@@ -38,7 +38,7 @@ from minibrain.registry.models import (
     VersionStatus,
     now,
 )
-from minibrain.registry.service import ConflictError, adapter_name, drop_orphan_keys, reserve_name
+from minibrain.registry.service import ConflictError, adapter_name, reserve_name
 from minibrain.serve.engines import DRAIN_TIMEOUT, drain_engine
 from minibrain.settings import Settings
 from minibrain.tasks.service import serving_base
@@ -728,7 +728,6 @@ class Teardowns:
         drop(session, teardown)
         session.delete(model)
         session.flush()
-        drop_orphan_keys(session)
         removed["dataset_versions"] = cleanup(session, self.settings)
         removed["artifacts"] = drop_artifacts(session, self.settings, adapters)
         self.finish(session, record, removed=removed, history=kept)
@@ -756,7 +755,6 @@ class Teardowns:
         session.flush()
         objects += sweep_weights(session, store)
         removed |= {"bucket_objects": objects} if objects else {}
-        drop_orphan_keys(session)
         self.finish(session, record, removed=removed, history=kept)
 
     def fail(self, session: Session, teardown: Teardown, error: str) -> None:

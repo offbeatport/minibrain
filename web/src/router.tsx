@@ -11,11 +11,13 @@ import { NeedsRole } from "./components/NeedsRole";
 import { redirectTo } from "./components/Redirect";
 import { Shell } from "./components/Shell";
 import {
+    API_KEYS_PATH,
     API_REFERENCE_PATH,
     JOBS_PATH,
     MANAGEMENT_REFERENCE_PATH,
     modelPageHref,
 } from "./lib/modelLinks";
+import { ApiKeysPage } from "./pages/ApiKeysPage";
 import { DataPage } from "./pages/DataPage";
 import { EvaluationsPage } from "./pages/EvaluationsPage";
 import { FeedbackPage } from "./pages/FeedbackPage";
@@ -164,6 +166,7 @@ const routeTree = rootRoute.addChildren([
     ),
     globalPage("/infrastructure", InfrastructurePage),
     globalPage("/infrastructure/$section", InfrastructurePage),
+    globalPage(API_KEYS_PATH, guarded("builder", ApiKeysPage)),
     globalPage("/monitor", MonitorPage),
     globalPage(
         "/monitor/jobs",

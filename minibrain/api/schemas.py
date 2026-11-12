@@ -1129,13 +1129,27 @@ class KeyModel(ModelRef):
     name: str
 
 
-class KeyCreate(BaseModel):
-    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
-    models: list[ModelRef] = Field(min_length=1)
-
-
 class KeyScopeUpdate(BaseModel):
-    models: list[ModelRef] = Field(min_length=1)
+    all_models: bool = Field(default=False, description="Every model, including ones added later. Admins only.")
+    models: list[ModelRef] = Field(default_factory=list, description="The models the key calls, unless all_models.")
+
+    @model_validator(mode="after")
+    def one_scope(self) -> "KeyScopeUpdate":
+        if self.all_models and self.models:
+            raise ValueError("pick models or all models, not both")
+        if not self.all_models and not self.models:
+            raise ValueError("pick at least one model, or all models")
+        return self
+
+
+class KeyCreate(KeyScopeUpdate):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=60)]
+    expires_in_days: int | None = Field(
+        default=None, ge=1, le=3650, description="Days until the key expires; the install's policy when left out."
+    )
+
+
+KeyStatus = Literal["active", "expired", "no_access"]
 
 
 class KeyInfo(BaseModel):
@@ -1143,9 +1157,12 @@ class KeyInfo(BaseModel):
     name: str
     prefix: str
     created_at: datetime
+    created_by: str | None
     last_used_at: datetime | None
     expires_at: datetime | None
+    all_models: bool
     models: list[KeyModel]
+    status: KeyStatus
 
 
 class KeyCreated(KeyInfo):

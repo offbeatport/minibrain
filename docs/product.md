@@ -356,7 +356,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   API: POST /v1/chat/completions · Roadmap: API and access
 - **API keys** · shipped · engineer, admin
   Issue named keys scoped to models, with expiry and an audit trail.
-  UI: Models › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
+  UI: API keys, Models › model › API keys · API: GET /api/keys, POST /api/keys, PUT /api/keys/{key_id}/models, DELETE /api/keys/{key_id} · Policy: key_expiry_days
+- **All-model API keys** · shipped · admin
+  Let one key call every model, including ones added later.
+  UI: API keys · API: POST /api/keys, PUT /api/keys/{key_id}/models
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
   UI: Models › model › Connect

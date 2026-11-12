@@ -422,6 +422,7 @@ class ApiKey(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     expires_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
     created_by: Mapped[str | None] = mapped_column(default=None)
+    all_models: Mapped[bool] = mapped_column(default=False, server_default=false())
 
     scopes: Mapped[list["KeyScope"]] = relationship(
         back_populates="key", cascade="all, delete-orphan", order_by="KeyScope.id"
