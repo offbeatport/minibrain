@@ -452,7 +452,8 @@ export function PlaygroundPage() {
                             }
                             composer={
                                 <ChatComposer
-                                    variant="form"
+                                    variant="dock"
+                                    sendOn="mod-enter"
                                     placeholder="Type a message"
                                     busy={busy}
                                     disabled={!target}
