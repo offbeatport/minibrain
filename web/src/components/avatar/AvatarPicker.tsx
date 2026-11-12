@@ -123,14 +123,18 @@ export function PickerDialog({
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-5xl" onKeyDown={onKeyDown}>
+            <DialogContent
+                className="flex flex-col sm:h-[min(52rem,calc(100dvh-2rem))] sm:max-w-5xl"
+                onKeyDown={onKeyDown}
+            >
                 <DialogHeader>
                     <DialogTitle>Choose an avatar</DialogTitle>
                     <DialogDescription>
-                        For {displayName}. Pick a style, then a shape, then a colour.
+                        Give {displayName} a face your team can spot at a glance in lists, pickers
+                        and logs.
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex min-w-0 flex-col gap-6 lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:gap-y-4">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:content-start lg:gap-x-6 lg:gap-y-4">
                     <div className="min-w-0 lg:col-start-1 lg:row-start-1">
                         <HeroStage shown={shown} previewing={previewing} name={displayName} />
                     </div>

@@ -22,7 +22,7 @@ export function newIdentity(taken: NameTaken): Identity {
 
 function shuffleLabel(locks: Locks): string {
     if (locks.name !== null && locks.avatar !== null) {
-        return "Both are yours now. Undo one to shuffle again";
+        return "Undo the name to shuffle again";
     }
     if (locks.name !== null) {
         return "Shuffle the avatar";
@@ -134,12 +134,6 @@ export function NameAvatarField({
             setLocks((held) => ({ ...held, name: null }));
         }
     };
-    const undoAvatar = () => {
-        if (locks.avatar !== null) {
-            onChange({ ...value, avatar: locks.avatar });
-            setLocks((held) => ({ ...held, avatar: null }));
-        }
-    };
     const label = shuffleLabel(locks);
     return (
         <div data-testid="name-row" className="flex flex-col gap-label">
@@ -212,9 +206,6 @@ export function NameAvatarField({
                 )}
                 {locks.name !== null && (
                     <LockNote what="Name" previous={locks.name} onUndo={undoName} />
-                )}
-                {locks.avatar !== null && (
-                    <LockNote what="Avatar" previous="the last one" onUndo={undoAvatar} />
                 )}
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
