@@ -3,7 +3,7 @@ import { Button, CheckboxSelect, SearchInput } from "obp-ui";
 import type { KeyInfo } from "~/api/client";
 import { useKeys } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine, Page } from "~/components/Section";
 import { KeysTable, useKeyManager } from "~/components/keys/KeysTable";
 import { useCan } from "~/lib/access";
 import { splitList, useListSearch } from "~/lib/listSearch";
@@ -131,16 +131,7 @@ export function ApiKeysPage() {
                     </Button>
                 }
             />
-            <PanelSections>
-                <PanelSection
-                    icon={KeyRound}
-                    title={can.admin ? "All keys" : "Your keys"}
-                    description="Revoke a key or edit its scope from its ⋯ menu. A key whose models were all deleted has no access."
-                    bare
-                >
-                    <KeyList manager={manager} />
-                </PanelSection>
-            </PanelSections>
+            <KeyList manager={manager} />
             {manager.dialogs}
         </Page>
     );
