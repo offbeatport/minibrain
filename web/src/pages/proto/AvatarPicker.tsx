@@ -9,30 +9,33 @@ import {
     DialogHeader,
     DialogTitle,
     Kbd,
-    cn,
 } from "obp-ui";
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useState } from "react";
 import "./avatarPicker.css";
 import {
     CandidateGrid,
     ColourRow,
     ContextStrip,
+    CustomLetters,
     HeroStage,
-    LettersField,
     RecentStrip,
     StylePicker,
 } from "./AvatarPickerParts";
 import { type AvatarChoice, AvatarTile, defaultLetters, sameChoice } from "./avatarDicebear";
 import {
+    CUSTOM_LETTERS,
+    GRID_SIZE,
     type Session,
     choose,
     deal,
     describe,
     draftOf,
     finalChoice,
-    mixColours,
+    pickStyle,
     recolour,
     remember,
+    selectCustomLetters,
+    shapeChoices,
     startSession,
     surprise,
     withLetters,
@@ -46,8 +49,23 @@ export function isTyping(target: EventTarget | null): boolean {
     );
 }
 
-function plainKey(event: globalThis.KeyboardEvent): boolean {
-    return !event.metaKey && !event.ctrlKey && !event.altKey && !isTyping(event.target);
+function editsText(target: EventTarget): boolean {
+    return (
+        isTyping(target) &&
+        !(target instanceof HTMLInputElement && ["radio", "checkbox"].includes(target.type))
+    );
+}
+
+function modified(event: KeyboardEvent): boolean {
+    return event.metaKey || event.ctrlKey || event.altKey || event.shiftKey;
+}
+
+function activates(target: EventTarget): boolean {
+    return (
+        target instanceof HTMLButtonElement ||
+        target instanceof HTMLAnchorElement ||
+        target instanceof HTMLTextAreaElement
+    );
 }
 
 export function PickerDialog({
@@ -66,7 +84,7 @@ export function PickerDialog({
     const [session, setSession] = useState(() => startSession(value));
     const [peek, setPeek] = useState<AvatarChoice | null>(null);
     const displayName = name.trim() || "Untitled model";
-    const style = styleById(session.tab);
+    const style = styleById(session.style);
     const draft = draftOf(session);
     const shown = peek ?? draft;
     const previewing = peek !== null && !sameChoice(peek, draft);
@@ -75,26 +93,25 @@ export function PickerDialog({
         setSession(change);
     };
     const pick = (choice: AvatarChoice) => update((previous) => choose(previous, choice));
+    const fallback = defaultLetters(displayName);
     const use = (choice: AvatarChoice) => {
         const picked = finalChoice(choice);
         remember(picked);
         onUse(picked);
         onOpenChange(false);
     };
-    useEffect(() => {
-        if (!open) {
+    const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.defaultPrevented || modified(event)) {
             return;
         }
-        const onKey = (event: globalThis.KeyboardEvent) => {
-            if (event.key.toLowerCase() === "r" && plainKey(event)) {
-                event.preventDefault();
-                setPeek(null);
-                setSession(deal);
-            }
-        };
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, [open]);
+        if (event.key.toLowerCase() === "r" && !editsText(event.target)) {
+            event.preventDefault();
+            update(deal);
+        } else if (event.key === "Enter" && !activates(event.target)) {
+            event.preventDefault();
+            use(draft);
+        }
+    };
     return (
         <Dialog
             open={open}
@@ -106,11 +123,11 @@ export function PickerDialog({
                 onOpenChange(next);
             }}
         >
-            <DialogContent className="sm:max-w-5xl">
+            <DialogContent className="sm:max-w-5xl" onKeyDown={onKeyDown}>
                 <DialogHeader>
                     <DialogTitle>Choose an avatar</DialogTitle>
                     <DialogDescription>
-                        For {displayName}. Hover to preview, click to pick.
+                        For {displayName}. Pick a style, then a shape, then a colour.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-6 lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:gap-y-4">
@@ -119,59 +136,63 @@ export function PickerDialog({
                     </div>
                     <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                         <StylePicker
-                            value={session.tab}
+                            value={session.style}
                             name={displayName}
-                            onChange={(tab) => update((previous) => ({ ...previous, tab }))}
+                            action={
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => update(surprise)}
+                                >
+                                    Surprise me
+                                </Button>
+                            }
+                            onChange={(next) => update((previous) => pickStyle(previous, next))}
                         />
                         <CandidateGrid
-                            label={style.seeded ? `${style.name} options` : `${style.name} colours`}
-                            items={session.batches[session.tab]}
+                            detail={
+                                style.seeded
+                                    ? `${style.name}, ${GRID_SIZE} options`
+                                    : "Letters from the name, or your own"
+                            }
+                            action={
+                                style.seeded && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => update(deal)}
+                                    >
+                                        <Dices aria-hidden="true" />
+                                        Shuffle
+                                        <Kbd className="hidden sm:inline-flex">R</Kbd>
+                                    </Button>
+                                )
+                            }
+                            items={shapeChoices(session)}
                             selected={draft}
                             name={displayName}
                             dealt={session.deal}
                             onPeek={setPeek}
                             onSelect={pick}
                             onUse={use}
+                        >
+                            {!style.seeded && (
+                                <CustomLetters
+                                    letters={session.letters}
+                                    fallback={fallback}
+                                    selected={session.shapes.initials === CUSTOM_LETTERS}
+                                    onChange={(letters) =>
+                                        update((previous) => withLetters(previous, letters))
+                                    }
+                                    onSelect={() => update(selectCustomLetters)}
+                                />
+                            )}
+                        </CandidateGrid>
+                        <ColourRow
+                            tone={draft.tone}
+                            onPeek={(tone) => setPeek(tone ? { ...draft, tone } : null)}
+                            onPick={(tone) => update((previous) => recolour(previous, tone))}
                         />
-                        <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => update(deal)}
-                                disabled={!style.seeded}
-                                className={cn(!style.seeded && "invisible max-sm:hidden")}
-                                aria-hidden={!style.seeded || undefined}
-                            >
-                                <Dices aria-hidden="true" />
-                                Shuffle
-                                <Kbd className="hidden sm:inline-flex">R</Kbd>
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => update(surprise)}
-                                className="sm:ml-auto"
-                            >
-                                Surprise me
-                            </Button>
-                        </div>
-                        {style.seeded ? (
-                            <ColourRow
-                                tone={draft.tone}
-                                pinned={session.pin !== null}
-                                onPeek={(tone) => setPeek(tone ? { ...draft, tone } : null)}
-                                onPick={(tone) => update((previous) => recolour(previous, tone))}
-                                onMix={() => update(mixColours)}
-                            />
-                        ) : (
-                            <LettersField
-                                letters={session.letters}
-                                fallback={defaultLetters(displayName)}
-                                onChange={(letters) =>
-                                    update((previous) => withLetters(previous, letters))
-                                }
-                            />
-                        )}
                         <RecentStrip
                             items={session.recent}
                             selected={draft}

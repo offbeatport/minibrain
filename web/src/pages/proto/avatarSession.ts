@@ -1,27 +1,32 @@
 import {
     type AvatarChoice,
+    ONE_LETTER,
     TONE_LABELS,
-    candidateChoices,
+    TWO_LETTERS,
     lettersOf,
+    randomSeeds,
     randomTone,
     sameChoice,
 } from "./avatarDicebear";
 import { AVATAR_STYLES, type AvatarStyleId, styleById } from "./avatarStyles";
-import { TONE_KEYS, type ToneName } from "./modelIcons";
+import type { ToneName } from "./modelIcons";
 
 export const GRID_SIZE = 12;
 export const RECENT_LIMIT = 6;
+export const CUSTOM_LETTERS = "custom";
+
+const INITIALS_SHAPES = [TWO_LETTERS, ONE_LETTER];
 
 let remembered: AvatarChoice[] = [];
 
 type ByStyle<T> = Record<AvatarStyleId, T>;
 
 export type Session = {
-    tab: AvatarStyleId;
-    pin: ToneName | null;
+    style: AvatarStyleId;
+    tone: ToneName;
+    shapes: ByStyle<string>;
+    options: ByStyle<string[]>;
     letters: string;
-    batches: ByStyle<AvatarChoice[]>;
-    selected: ByStyle<AvatarChoice>;
     deal: number;
     recent: AvatarChoice[];
 };
@@ -40,137 +45,124 @@ function randomIndex(count: number): number {
     return crypto.getRandomValues(new Uint32Array(1))[0] % count;
 }
 
-export function startSession(value: AvatarChoice): Session {
-    const letters = value.letters ?? "";
-    const batches = byStyle((id) => {
-        const batch = candidateChoices(id, GRID_SIZE, null, letters || undefined);
-        if (!styleById(id).seeded) {
-            return batch;
-        }
-        const [first, ...rest] = batch;
-        return [id === value.style ? value : { ...first, tone: value.tone }, ...rest];
-    });
-    const selected = byStyle((id) =>
-        id === value.style
-            ? value
-            : styleById(id).seeded
-              ? batches[id][0]
-              : { style: id, seed: "initials", tone: value.tone, letters: letters || undefined },
-    );
-    return {
-        tab: value.style,
-        pin: null,
-        letters,
-        batches,
-        selected,
-        deal: 0,
-        recent: withRecent(remembered, value),
-    };
+function freshOptions(style: AvatarStyleId): string[] {
+    return styleById(style).seeded ? randomSeeds(GRID_SIZE) : INITIALS_SHAPES;
+}
+
+function shapeOf(choice: AvatarChoice): string {
+    if (styleById(choice.style).seeded || choice.seed === ONE_LETTER) {
+        return choice.seed;
+    }
+    return choice.letters ? CUSTOM_LETTERS : TWO_LETTERS;
+}
+
+function withShape(options: string[], shape: string): string[] {
+    return options.includes(shape) ? options : [shape, ...options.slice(0, GRID_SIZE - 1)];
+}
+
+function choiceOf(
+    style: AvatarStyleId,
+    shape: string,
+    tone: ToneName,
+    letters: string,
+): AvatarChoice {
+    return shape === CUSTOM_LETTERS
+        ? { style, seed: TWO_LETTERS, tone, letters }
+        : { style, seed: shape, tone };
 }
 
 export function draftOf(session: Session): AvatarChoice {
-    return session.selected[session.tab];
+    return choiceOf(session.style, session.shapes[session.style], session.tone, session.letters);
+}
+
+export function shapeChoices(session: Session): AvatarChoice[] {
+    return session.options[session.style].map((seed) => ({
+        style: session.style,
+        seed,
+        tone: session.tone,
+    }));
+}
+
+export function startSession(value: AvatarChoice): Session {
+    const seeded = styleById(value.style).seeded;
+    const shape = shapeOf(value);
+    const options = byStyle(freshOptions);
+    if (seeded) {
+        options[value.style] = withShape(options[value.style], shape);
+    }
+    const session: Session = {
+        style: value.style,
+        tone: value.tone,
+        shapes: byStyle((id) => (id === value.style ? shape : options[id][0])),
+        options,
+        letters: seeded ? "" : (value.letters ?? ""),
+        deal: 0,
+        recent: [],
+    };
+    return { ...session, recent: withRecent(remembered, draftOf(session)) };
+}
+
+export function pickStyle(session: Session, style: AvatarStyleId): Session {
+    return { ...session, style };
 }
 
 export function recolour(session: Session, tone: ToneName): Session {
-    return {
-        ...session,
-        pin: tone,
-        batches: byStyle((id) =>
-            styleById(id).seeded
-                ? session.batches[id].map((choice) => ({ ...choice, tone }))
-                : session.batches[id],
-        ),
-        selected: byStyle((id) => ({ ...session.selected[id], tone })),
-    };
-}
-
-export function mixColours(session: Session): Session {
-    return {
-        ...session,
-        pin: null,
-        batches: byStyle((id) =>
-            styleById(id).seeded
-                ? session.batches[id].map((choice, index) =>
-                      choice.seed === session.selected[id].seed
-                          ? choice
-                          : { ...choice, tone: TONE_KEYS[(index * 3) % TONE_KEYS.length] },
-                  )
-                : session.batches[id],
-        ),
-    };
+    return { ...session, tone };
 }
 
 export function withLetters(session: Session, letters: string): Session {
-    const value = letters || undefined;
     return {
         ...session,
         letters,
-        batches: {
-            ...session.batches,
-            initials: session.batches.initials.map((choice) => ({ ...choice, letters: value })),
-        },
-        selected: {
-            ...session.selected,
-            initials: { ...session.selected.initials, letters: value },
-        },
+        shapes: { ...session.shapes, initials: letters ? CUSTOM_LETTERS : TWO_LETTERS },
     };
 }
 
+export function selectCustomLetters(session: Session): Session {
+    return session.letters ? withLetters(session, session.letters) : session;
+}
+
 export function deal(session: Session): Session {
-    const tab = session.tab;
-    if (!styleById(tab).seeded) {
+    if (!styleById(session.style).seeded) {
         return session;
     }
     return {
         ...session,
-        recent: withRecent(session.recent, session.selected[tab]),
-        batches: { ...session.batches, [tab]: candidateChoices(tab, GRID_SIZE, session.pin) },
+        recent: withRecent(session.recent, draftOf(session)),
+        options: { ...session.options, [session.style]: randomSeeds(GRID_SIZE) },
         deal: session.deal + 1,
     };
 }
 
 export function choose(session: Session, choice: AvatarChoice): Session {
-    if (!styleById(choice.style).seeded) {
-        const letters = choice.letters ?? "";
-        return recolour(withLetters({ ...session, tab: choice.style }, letters), choice.tone);
-    }
-    const batch = session.batches[choice.style];
-    const shown = batch.some((item) => sameChoice(item, choice));
+    const shape = shapeOf(choice);
+    const seeded = styleById(choice.style).seeded;
     return {
         ...session,
-        tab: choice.style,
-        batches: shown
-            ? session.batches
-            : { ...session.batches, [choice.style]: [choice, ...batch.slice(0, GRID_SIZE - 1)] },
-        selected: { ...session.selected, [choice.style]: choice },
+        style: choice.style,
+        tone: choice.tone,
+        shapes: { ...session.shapes, [choice.style]: shape },
+        options: seeded
+            ? {
+                  ...session.options,
+                  [choice.style]: withShape(session.options[choice.style], shape),
+              }
+            : session.options,
+        letters: shape === CUSTOM_LETTERS ? (choice.letters ?? "") : session.letters,
     };
 }
 
 export function surprise(session: Session): Session {
-    const current = draftOf(session);
-    const others = AVATAR_STYLES.filter((style) => style.id !== current.style);
+    const others = AVATAR_STYLES.filter((style) => style.id !== session.style);
     const style = others[randomIndex(others.length)].id;
-    const tone = randomTone(current.tone);
-    const recent = withRecent(session.recent, current);
-    if (!styleById(style).seeded) {
-        return {
-            ...session,
-            tab: style,
-            recent,
-            selected: { ...session.selected, [style]: { ...session.selected[style], tone } },
-            deal: session.deal + 1,
-        };
-    }
-    const [first, ...rest] = candidateChoices(style, GRID_SIZE, null);
-    const picked = { ...first, tone };
+    const options = freshOptions(style);
     return {
         ...session,
-        tab: style,
-        pin: null,
-        recent,
-        batches: { ...session.batches, [style]: [picked, ...rest] },
-        selected: { ...session.selected, [style]: picked },
+        style,
+        tone: randomTone(session.tone),
+        options: { ...session.options, [style]: options },
+        shapes: { ...session.shapes, [style]: options[randomIndex(options.length)] },
+        recent: withRecent(session.recent, draftOf(session)),
         deal: session.deal + 1,
     };
 }

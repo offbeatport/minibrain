@@ -140,6 +140,28 @@ export function ContextStrip({ choice, name }: { choice: AvatarChoice; name: str
     );
 }
 
+export function StepHeader({
+    id,
+    label,
+    detail,
+    action,
+}: {
+    id: string;
+    label: string;
+    detail?: ReactNode;
+    action?: ReactNode;
+}) {
+    return (
+        <div className="flex h-8 min-w-0 items-center gap-2">
+            <span id={id} className="font-medium">
+                {label}
+            </span>
+            {detail && <span className="truncate text-sm text-muted-foreground">{detail}</span>}
+            {action && <div className="ml-auto flex shrink-0 items-center gap-2">{action}</div>}
+        </div>
+    );
+}
+
 function moveIndex(key: string, index: number, count: number, columns: number): number | null {
     const moves: Record<string, number> = {
         ArrowRight: index + 1,
@@ -154,7 +176,8 @@ function moveIndex(key: string, index: number, count: number, columns: number): 
 }
 
 export function CandidateGrid({
-    label,
+    detail,
+    action,
     items,
     selected,
     name,
@@ -162,8 +185,10 @@ export function CandidateGrid({
     onPeek,
     onSelect,
     onUse,
+    children,
 }: {
-    label: string;
+    detail: string;
+    action?: ReactNode;
     items: AvatarChoice[];
     selected: AvatarChoice;
     name: string;
@@ -171,8 +196,10 @@ export function CandidateGrid({
     onPeek: Peek;
     onSelect: (choice: AvatarChoice) => void;
     onUse: (choice: AvatarChoice) => void;
+    children?: ReactNode;
 }) {
     const grid = useRef<HTMLDivElement>(null);
+    const heading = useId();
     const [focused, setFocused] = useState(-1);
     const current = items.findIndex((item) => sameChoice(item, selected));
     const roving = focused >= 0 && focused < items.length ? focused : Math.max(current, 0);
@@ -196,8 +223,8 @@ export function CandidateGrid({
         host.querySelectorAll<HTMLElement>("[data-candidate]")[next]?.focus();
     };
     return (
-        <fieldset className="min-w-0">
-            <legend className="sr-only">{label}</legend>
+        <section aria-labelledby={heading} className="flex min-w-0 flex-col gap-label">
+            <StepHeader id={heading} label="Shape" detail={detail} action={action} />
             <div
                 ref={grid}
                 key={dealt}
@@ -208,7 +235,7 @@ export function CandidateGrid({
                     const checked = index === current;
                     const text = describe(item, name);
                     return (
-                        <Tooltip key={choiceKey(item)} delayDuration={TIP_DELAY}>
+                        <Tooltip key={item.seed} delayDuration={TIP_DELAY}>
                             <TooltipTrigger asChild>
                                 <button
                                     type="button"
@@ -239,42 +266,25 @@ export function CandidateGrid({
                         </Tooltip>
                     );
                 })}
+                {children}
             </div>
-        </fieldset>
+        </section>
     );
 }
 
 export function ColourRow({
     tone,
-    pinned,
     onPeek,
     onPick,
-    onMix,
 }: {
     tone: ToneName;
-    pinned: boolean;
     onPeek: (tone: ToneName | null) => void;
     onPick: (tone: ToneName) => void;
-    onMix: () => void;
 }) {
     const group = useId();
     return (
         <div className="flex min-w-0 flex-col gap-label">
-            <div className="flex h-5 items-center gap-2">
-                <span id={`${group}-label`} className="font-medium">
-                    Colour
-                </span>
-                <span className="text-sm text-muted-foreground">{TONE_LABELS[tone]}</span>
-                {pinned && (
-                    <button
-                        type="button"
-                        onClick={onMix}
-                        className="ml-auto rounded-sm text-sm text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        Mix colours
-                    </button>
-                )}
-            </div>
+            <StepHeader id={`${group}-label`} label="Colour" detail={TONE_LABELS[tone]} />
             <div
                 role="radiogroup"
                 aria-labelledby={`${group}-label`}
@@ -331,59 +341,62 @@ function lettersProblem(raw: string): string | null {
     return null;
 }
 
-export function LettersField({
+export function CustomLetters({
     letters,
     fallback,
+    selected,
     onChange,
+    onSelect,
 }: {
     letters: string;
     fallback: string;
+    selected: boolean;
     onChange: (letters: string) => void;
+    onSelect: () => void;
 }) {
     const [problem, setProblem] = useState<string | null>(null);
     const hint = useId();
     const message =
-        problem ??
-        (letters
-            ? `Clear it to use ${fallback} from the name.`
-            : `One or two. Blank uses ${fallback}.`);
+        problem ?? (letters ? `Clear it to go back to ${fallback}.` : "One or two letters.");
     return (
-        <div className="flex min-w-0 flex-col gap-label">
-            <Label htmlFor="avatar-letters" className="h-5">
-                Letters
-            </Label>
-            <div className="flex min-w-0 items-center gap-3">
-                <Input
-                    id="avatar-letters"
-                    value={letters}
-                    placeholder={fallback}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-describedby={hint}
-                    aria-invalid={problem !== null || undefined}
-                    onChange={(event) => {
-                        const raw = event.target.value;
-                        setProblem(lettersProblem(raw));
-                        onChange(
-                            Array.from(raw.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase())
-                                .slice(0, LETTERS_LIMIT)
-                                .join(""),
-                        );
-                    }}
-                    onBlur={() => setProblem(null)}
-                    className="w-16 shrink-0 text-center font-medium uppercase"
-                />
+        <div
+            className={cn(
+                "relative col-span-4 flex min-w-0 items-center gap-3 rounded-lg border p-3",
+                selected && "border-primary",
+            )}
+        >
+            <Input
+                id="avatar-letters"
+                value={letters}
+                placeholder={fallback}
+                autoComplete="off"
+                spellCheck={false}
+                aria-describedby={hint}
+                aria-invalid={problem !== null || undefined}
+                onFocus={onSelect}
+                onChange={(event) => {
+                    const raw = event.target.value;
+                    setProblem(lettersProblem(raw));
+                    onChange(
+                        Array.from(raw.replace(/[^\p{L}\p{N}]/gu, "").toUpperCase())
+                            .slice(0, LETTERS_LIMIT)
+                            .join(""),
+                    );
+                }}
+                onBlur={() => setProblem(null)}
+                className="w-16 shrink-0 text-center font-medium uppercase"
+            />
+            <span className="flex min-w-0 flex-col">
+                <Label htmlFor="avatar-letters">Custom letters</Label>
                 <span
                     id={hint}
                     aria-live="polite"
-                    className={cn(
-                        "min-w-0 text-sm",
-                        problem ? "text-foreground" : "text-muted-foreground",
-                    )}
+                    className={cn("text-sm", problem ? "text-foreground" : "text-muted-foreground")}
                 >
                     {message}
                 </span>
-            </div>
+            </span>
+            {selected && <SelectedTick />}
         </div>
     );
 }
@@ -465,44 +478,52 @@ const STYLE_SAMPLES: Record<AvatarStyleId, AvatarChoice> = {
 export function StylePicker({
     value,
     name,
+    action,
     onChange,
 }: {
     value: AvatarStyleId;
     name: string;
+    action: ReactNode;
     onChange: (style: AvatarStyleId) => void;
 }) {
     const group = useId();
     return (
-        <fieldset className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <legend className="sr-only">Style</legend>
-            {AVATAR_STYLES.map((item) => {
-                const checked = item.id === value;
-                return (
-                    <label
-                        key={item.id}
-                        className={cn(
-                            "relative flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border bg-background p-2.5 hover:bg-secondary has-focus-visible:ring-2 has-focus-visible:ring-ring",
-                            checked && "border-primary hover:bg-background",
-                        )}
-                    >
-                        <input
-                            type="radio"
-                            name={group}
-                            value={item.id}
-                            checked={checked}
-                            onChange={() => onChange(item.id)}
-                            className="sr-only"
-                        />
-                        <AvatarTile choice={STYLE_SAMPLES[item.id]} name={name} size="md" />
-                        <span className="min-w-0 truncate font-medium">{item.name}</span>
-                        {checked && (
-                            <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                                <Check aria-hidden="true" className="size-3" strokeWidth={3} />
-                            </span>
-                        )}
-                    </label>
-                );
-            })}
-        </fieldset>
+        <div className="flex min-w-0 flex-col gap-label">
+            <StepHeader id={`${group}-label`} label="Style" action={action} />
+            <div
+                role="radiogroup"
+                aria-labelledby={`${group}-label`}
+                className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+            >
+                {AVATAR_STYLES.map((item) => {
+                    const checked = item.id === value;
+                    return (
+                        <label
+                            key={item.id}
+                            className={cn(
+                                "relative flex min-w-0 cursor-pointer items-center gap-3 rounded-lg border bg-background p-2.5 hover:bg-secondary has-focus-visible:ring-2 has-focus-visible:ring-ring",
+                                checked && "border-primary hover:bg-background",
+                            )}
+                        >
+                            <input
+                                type="radio"
+                                name={group}
+                                value={item.id}
+                                checked={checked}
+                                onChange={() => onChange(item.id)}
+                                className="sr-only"
+                            />
+                            <AvatarTile choice={STYLE_SAMPLES[item.id]} name={name} size="md" />
+                            <span className="min-w-0 truncate font-medium">{item.name}</span>
+                            {checked && (
+                                <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                                    <Check aria-hidden="true" className="size-3" strokeWidth={3} />
+                                </span>
+                            )}
+                        </label>
+                    );
+                })}
+            </div>
+        </div>
     );
 }
