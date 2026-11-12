@@ -13,7 +13,6 @@ import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
-import { bytes } from "~/lib/time";
 import { PathResult, type SourcePlan } from "./BaseSource";
 import { type BaseOption, addedKey, gigabytes } from "./baseOptions";
 import { runnable } from "./runsHere";
@@ -74,17 +73,13 @@ export function DiskLine({
     if (!need) {
         return null;
     }
-    const large = need.size >= 1024 ** 3;
-    const size = large ? `${gigabytes(need.size)} GB` : bytes(need.size);
-    const share = large ? gigabytes(need.size) : bytes(need.size);
     if (need.free === null) {
         return null;
     }
-    const free = gigabytes(need.free);
     if (need.size > need.free) {
         return (
             <StatusText tone="destructive" className="whitespace-normal">
-                {`Not enough disk space: a ${size} ${need.verb}, and only ${free} GB is free. Free up space on the model files disk first.`}
+                {`Not enough disk space, short by ${gigabytes(need.size - need.free)} GB. Free up space on the model files disk first.`}
             </StatusText>
         );
     }
@@ -94,7 +89,7 @@ export function DiskLine({
     }
     return (
         <StatusText tone="warning" className="whitespace-normal tabular-nums">
-            {`${size} ${need.verb}, uses ${share} of ${free} GB free; only ${gigabytes(left)} GB left after it`}
+            {`Low on disk space: only ${gigabytes(left)} GB left after this ${need.verb}`}
         </StatusText>
     );
 }
@@ -206,7 +201,7 @@ export function ComputeHelp({
     return (
         <div className="flex flex-col gap-2.5">
             <p className="text-muted-foreground">
-                {`Too big for ${catalog.hardware.machine}. Add it now and run it on a machine that fits, or pick a smaller one.`}
+                Add it now and run it on a machine that fits, or pick a smaller one.
             </p>
             <div className="flex flex-wrap items-center gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)}>

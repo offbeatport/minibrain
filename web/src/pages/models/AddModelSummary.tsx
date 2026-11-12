@@ -1,7 +1,23 @@
 import { ExternalLink } from "lucide-react";
-import { Button, Checkbox, InfoTip, Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
+import {
+    Button,
+    Checkbox,
+    InfoTip,
+    Label,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "obp-ui";
 import type { ReactNode } from "react";
-import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
+import type {
+    CatalogEntry,
+    CatalogResponse,
+    CatalogVariantInfo,
+    FitInfo,
+    TrainFitInfo,
+} from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
@@ -10,132 +26,105 @@ import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
 import { type BaseOption, logoPublisher, trainableVariant } from "./baseOptions";
-import { FormatHelp, fileType, formatName, formatUse, scheme, trainable } from "./formats";
-import { trainMemory } from "./runsHere";
+import { FormatHelp, formatName, formatUse, scheme, trainable } from "./formats";
 
 function Block({
     title,
     info,
     children,
 }: {
-    title?: string;
+    title: string;
     info?: ReactNode;
     children: ReactNode;
 }) {
     return (
-        <div className="flex flex-col gap-3 px-panel py-4">
-            {title && (
-                <span className="flex items-center gap-1.5 font-medium">
-                    {title}
-                    {info}
-                </span>
-            )}
+        <div className="flex flex-col gap-2.5 px-panel py-4">
+            <span className="flex items-center gap-1.5 font-medium">
+                {title}
+                {info}
+            </span>
             {children}
         </div>
     );
 }
 
-function FormatCard({ variant, control }: { variant: CatalogVariantInfo; control?: ReactNode }) {
-    return (
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <span className="flex items-baseline justify-between gap-3">
-                <span className="flex items-center gap-2 font-medium">
-                    {control}
-                    {formatName(variant)}
-                </span>
-                <span className="text-sm tabular-nums">{bytes(variant.size_bytes)}</span>
-            </span>
-            <span className="text-sm text-muted-foreground">
-                {[
-                    fileType(variant),
-                    formatUse(variant),
-                    `${bytes(variant.fit.needed_bytes)} to run`,
-                    trainMemory(variant) === null
-                        ? null
-                        : `${bytes(trainMemory(variant))} to train`,
-                ]
-                    .filter(Boolean)
-                    .join(" · ")}
-            </span>
-        </span>
-    );
-}
-
-const CARD = "flex rounded-lg border px-3 py-2.5 leading-snug";
-
-const TRAIN_TONES = { fits: "success", insufficient: "destructive" } as const;
-
-function TrainLine({ variant }: { variant: CatalogVariantInfo | null }) {
-    const fit = variant?.train_fit;
-    if (!fit || fit.qlora_bytes === null) {
-        return null;
-    }
-    const level = fit.level === "fits" || fit.level === "insufficient" ? fit.level : null;
-    return (
-        <div className="flex flex-col gap-1">
-            <div className="flex items-baseline justify-between gap-3">
-                <span className="inline-flex items-center gap-1.5 font-medium">
-                    Memory to train (QLoRA)
-                    <InfoTip label="Memory to train">{fit.basis}</InfoTip>
-                </span>
-                <span className="tabular-nums">{bytes(fit.qlora_bytes)}</span>
-            </div>
-            {level && (
-                <StatusText tone={TRAIN_TONES[level]}>
-                    {level === "fits" ? "Trains on your compute" : "Too large to train"}
-                </StatusText>
-            )}
-        </div>
-    );
+function variantLabel(variant: CatalogVariantInfo): string {
+    const name = variant.format === "gguf" ? `GGUF ${scheme(variant)}` : scheme(variant);
+    return [name, bytes(variant.size_bytes), formatUse(variant)].join(" · ");
 }
 
 function Formats({
     plan,
     variant,
+    servesOnly,
     onVariant,
 }: {
     plan: SourcePlan;
     variant: CatalogVariantInfo | null;
+    servesOnly: boolean;
     onVariant: (variant: string) => void;
 }) {
     if (plan.target.kind === "catalogue" && plan.variant) {
         return (
-            <RadioGroup
-                aria-label="Format"
+            <Select
                 value={plan.variant.id}
-                onValueChange={(value) => onVariant(String(value))}
-                className="gap-2"
+                onValueChange={(value) => value && onVariant(String(value))}
             >
-                {plan.target.entry.variants.map((choice) => {
-                    const id = `format-${choice.id}`;
-                    return (
-                        <Label
-                            key={choice.id}
-                            htmlFor={id}
-                            className={cn(
-                                CARD,
-                                "cursor-pointer font-normal hover:bg-secondary",
-                                "has-[[data-checked]]:border-primary has-[[data-checked]]:bg-accent",
-                            )}
-                        >
-                            <FormatCard
-                                variant={choice}
-                                control={<RadioGroupItem value={choice.id} id={id} />}
-                            />
-                        </Label>
-                    );
-                })}
-            </RadioGroup>
+                <SelectTrigger aria-label="Format" className="w-full tabular-nums">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {plan.target.entry.variants.map((choice) => (
+                        <SelectItem key={choice.id} value={choice.id} className="tabular-nums">
+                            {variantLabel(choice)}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
         );
     }
     if (variant) {
-        return (
-            <div className={CARD}>
-                <FormatCard variant={variant} />
-            </div>
-        );
+        return <span className="tabular-nums">{variantLabel(variant)}</span>;
     }
-    return <span className="text-muted-foreground">As installed</span>;
+    return (
+        <span className="text-muted-foreground">
+            {servesOnly ? "Quantized · Serve only" : "Unknown"}
+        </span>
+    );
+}
+
+function Requirement({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="contents">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="text-right tabular-nums">{children}</dd>
+        </div>
+    );
+}
+
+function Requirements({
+    fit,
+    trainFit,
+    servesOnly,
+    storage,
+}: {
+    fit: FitInfo | null;
+    trainFit: TrainFitInfo | null;
+    servesOnly: boolean;
+    storage: number | null;
+}) {
+    const train = servesOnly
+        ? "Can't be trained"
+        : trainFit?.qlora_bytes
+          ? `${bytes(trainFit.qlora_bytes)} (QLoRA)`
+          : "Unknown";
+    return (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+            <Requirement label="Run">{fit ? bytes(fit.needed_bytes) : "Unknown"}</Requirement>
+            <Requirement label="Train">{train}</Requirement>
+            <Requirement label="Storage">{storage ? bytes(storage) : "Unknown"}</Requirement>
+        </dl>
+    );
 }
 
 function installed(entry: CatalogEntry, variant: CatalogVariantInfo): boolean {
@@ -284,8 +273,20 @@ export function AddModelSummary({
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
     const entry = plan.target.kind === "catalogue" ? plan.target.entry : (option?.entry ?? null);
+    const found = option ? undefined : plan.found;
     const onDisk = need ? null : (variant?.size_bytes ?? option?.size ?? null);
+    const local = option?.kind === "local";
+    const fit = local ? null : (variant?.fit ?? found?.fit ?? null);
+    const trainFit = local ? null : (variant?.train_fit ?? found?.train_fit ?? null);
+    const servesOnly = variant
+        ? !trainable(variant)
+        : Boolean(found?.quantized) || trainFit?.level === "unsupported";
+    const storage = need?.size ?? onDisk ?? (found?.size_bytes || null);
     const facts = [option?.publisher, option?.params, option?.entry?.license_name].filter(Boolean);
+    const pool = catalog?.pools.find((item) => item.name === catalog.pool)?.label ?? null;
+    const compute = catalog
+        ? { memoryLabel: catalog.hardware.memory_label, machine: catalog.hardware.machine, pool }
+        : null;
     return (
         <section
             aria-label="Summary"
@@ -312,7 +313,12 @@ export function AddModelSummary({
                     </InfoTip>
                 }
             >
-                <Formats plan={plan} variant={variant} onVariant={onVariant} />
+                <Formats
+                    plan={plan}
+                    variant={variant}
+                    servesOnly={servesOnly}
+                    onVariant={onVariant}
+                />
                 {variant && !trainable(variant) && (
                     <ServeOnlyNotice
                         entry={entry}
@@ -322,21 +328,16 @@ export function AddModelSummary({
                     />
                 )}
             </Block>
-            <Block>
-                <DiskGauge
-                    need={need}
-                    free={free}
-                    total={catalog?.store_total_bytes}
-                    onDisk={onDisk}
-                    store={{
-                        kind: catalog?.store_kind ?? "folder",
-                        label: catalog?.store_label ?? "Main server disk",
-                        stagingFree: catalog?.staging_free_bytes,
-                    }}
+            <Block title="System requirements">
+                <Requirements
+                    fit={fit}
+                    trainFit={trainFit}
+                    servesOnly={servesOnly}
+                    storage={storage}
                 />
-                <MemoryGauge variant={variant} memoryLabel={catalog?.hardware.memory_label} />
-                <TrainLine variant={variant} />
-                <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
+            </Block>
+            <Block title="Memory on your compute">
+                <MemoryGauge fit={fit} trainFit={servesOnly ? null : trainFit} compute={compute} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp
                         option={{ ...option, variant }}
@@ -344,6 +345,20 @@ export function AddModelSummary({
                         onPickAnother={onPickAnother}
                     />
                 )}
+            </Block>
+            <Block title="Storage on your compute">
+                <DiskGauge
+                    need={need}
+                    free={free}
+                    total={catalog?.store_total_bytes}
+                    onDisk={storage}
+                    store={{
+                        kind: catalog?.store_kind ?? "folder",
+                        label: catalog?.store_label ?? "Main server disk",
+                        stagingFree: catalog?.staging_free_bytes,
+                    }}
+                />
+                <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
             </Block>
         </section>
     );

@@ -21,7 +21,6 @@ import {
     type BaseOption,
     baseOptionFor,
     catalogueOption,
-    chatHint,
     recommend,
     servesOnly,
 } from "./baseOptions";
@@ -263,12 +262,7 @@ export function AddModelPage() {
             >
                 <Card className="gap-field p-panel">
                     <div className="flex flex-col gap-3">
-                        <Field
-                            id="base-model"
-                            label="Model"
-                            error={shown.model}
-                            hint={chatHint(option)}
-                        >
+                        <Field id="base-model" label="Model" error={shown.model}>
                             <BasePicker
                                 value={{
                                     option,

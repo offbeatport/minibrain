@@ -354,8 +354,6 @@ type PickerValue = { option: BaseOption | null; importText: string | null };
 function Trigger({ value }: { value: PickerValue }) {
     const { option, importText } = value;
     const state = option ? (installState(option) ?? DOWNLOAD) : null;
-    const facts = option ? factsOf(option) : [];
-    const description = option ? descriptionOf(option) : null;
     return (
         <DialogTrigger asChild>
             <button
@@ -384,15 +382,6 @@ function Trigger({ value }: { value: PickerValue }) {
                                 )}
                                 <ServeOnly option={option} className="shrink-0" />
                             </span>
-                            <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
-                                {facts.length > 0 && (
-                                    <span className="truncate">{facts.join(" · ")}</span>
-                                )}
-                                <Resources option={option} />
-                            </span>
-                            {description && (
-                                <span className="line-clamp-2 text-foreground">{description}</span>
-                            )}
                         </>
                     ) : importText ? (
                         <>

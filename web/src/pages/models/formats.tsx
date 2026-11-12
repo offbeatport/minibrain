@@ -45,10 +45,6 @@ export function formatUse(variant: Weights): string {
     return trainable(variant) ? "Trainable" : "Serve only";
 }
 
-export function fileType(variant: Weights): string {
-    return variant.format === "gguf" ? "GGUF" : "Safetensors";
-}
-
 export function schemes(entry: CatalogEntry): string[] {
     return [...new Set(entry.variants.map(scheme))];
 }
