@@ -244,10 +244,7 @@ export function AddModelPage() {
                 <ChevronLeft className="size-4" />
                 Models
             </Link>
-            <PageHeader
-                title="Add model"
-                caption="Add your custom model."
-            />
+            <PageHeader title="Add model" />
             <form
                 onSubmit={submit}
                 onKeyDown={shortcut}
