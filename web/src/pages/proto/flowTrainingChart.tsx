@@ -115,7 +115,7 @@ function ScoreChart({ model }: { model: FlowModel }) {
                         label: `Rule ${Math.round(model.rule[0] * 100)}%`,
                     },
                 ]}
-                markers={live ? [{ at: finishedAt(live), label: `v${live.number} live` }] : []}
+                markers={live ? [{ at: finishedAt(live), label: `v${live.number} deployed` }] : []}
                 xFormat={(value) => DATE.format(new Date(value))}
                 readoutTitle={(value) => {
                     const version = byStep.get(value);
@@ -172,7 +172,7 @@ function LossChart({ model }: { model: FlowModel }) {
             label: running
                 ? `v${curve.version.number} running`
                 : curve.version.number === model.live
-                  ? `v${curve.version.number} live`
+                  ? `v${curve.version.number} deployed`
                   : `v${curve.version.number}`,
             color: curve.color,
             width: running ? 3 : 1.5,

@@ -54,9 +54,9 @@ function commandsOf(state: FlowState, go: (href: string) => void): Command[] {
                 {
                     id: `live:${model.slug}`,
                     group: "Actions" as const,
-                    label: `Make v${candidate.number} live`,
-                    detail: `${model.name} · beats live ${points(scoreDelta(model, candidate) ?? 0)}`,
-                    text: `make v${candidate.number} live make live v${candidate.number} ${model.name} ${model.slug}`,
+                    label: `Deploy v${candidate.number}`,
+                    detail: `${model.name} · beats deployed ${points(scoreDelta(model, candidate) ?? 0)}`,
+                    text: `deploy v${candidate.number} make live v${candidate.number} ${model.name} ${model.slug}`,
                     run: () =>
                         openIntent({
                             kind: "make-live",

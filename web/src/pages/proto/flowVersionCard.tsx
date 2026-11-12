@@ -75,11 +75,11 @@ function references(model: FlowModel, version: FlowVersion): Reference[] {
     const zero = findVersion(model, 0);
     const found: Reference[] = [];
     if (live?.scores && live.number !== version.number) {
-        found.push({ version: live, label: `live v${live.number}` });
+        found.push({ version: live, label: `deployed v${live.number}` });
     }
     const before = live?.number === version.number ? previousLive(model) : undefined;
     if (before?.scores && before.number !== 0) {
-        found.push({ version: before, label: `previous live v${before.number}` });
+        found.push({ version: before, label: `previously deployed v${before.number}` });
     }
     if (zero?.scores && zero.number !== version.number) {
         found.push({ version: zero, label: "baseline v0" });
@@ -202,7 +202,7 @@ export function VersionMenu({ model, version }: { model: FlowModel; version: Flo
                                     {versionName(item)}
                                     {model.live === item.number && (
                                         <span className="ml-auto text-sm text-muted-foreground">
-                                            Live
+                                            Deployed
                                         </span>
                                     )}
                                 </DropdownMenuItem>
@@ -254,7 +254,7 @@ export function VersionMenu({ model, version }: { model: FlowModel; version: Flo
                                 onSelect={remove}
                             >
                                 <Trash2 />
-                                {isLive ? "Delete version (live)" : "Delete version"}
+                                {isLive ? "Delete version (deployed)" : "Delete version"}
                             </DropdownMenuItem>
                         </>
                     )}
@@ -423,7 +423,7 @@ function Progress({ model, version }: { model: FlowModel; version: FlowVersion }
         <PanelSection
             icon={Hourglass}
             title="Progress"
-            description={`Scored against ${liveVersion(model) ? `live v${model.live} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
+            description={`Scored against ${liveVersion(model) ? `deployed v${model.live} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
         >
             <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -478,7 +478,7 @@ function MadeFrom({ model, version }: { model: FlowModel; version: FlowVersion }
         [
             "Data",
             <span key="data" className="tabular-nums">
-                {`${dataset ? `${dataset.slug} ` : ""}v${version.data.number} · ${count(version.data.rows)} rows${since !== null && since !== 0 ? `, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since live` : ""}`}
+                {`${dataset ? `${dataset.slug} ` : ""}v${version.data.number} · ${count(version.data.rows)} rows${since !== null && since !== 0 ? `, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since deployed` : ""}`}
             </span>,
         ],
         [

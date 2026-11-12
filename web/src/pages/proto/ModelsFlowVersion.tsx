@@ -308,11 +308,11 @@ function ModelCard({ model, version }: { model: FlowModel; version: FlowVersion 
                                   : "Below rule",
                         ],
                         [
-                            "Live",
+                            "Deployed",
                             live?.number === version.number
-                                ? `Live since ${relativeTime(createdAt(version))}`
+                                ? `Deployed since ${relativeTime(createdAt(version))}`
                                 : version.wasLive
-                                  ? "Was live"
+                                  ? "Was deployed"
                                   : "Never",
                         ],
                     ]}
@@ -390,7 +390,7 @@ export function ModelsFlowVersionPage() {
                     <VersionStatusDot key="status" model={model} version={version} />,
                     delta !== null ? (
                         <span key="delta">
-                            <Delta value={delta} suffix="vs live" />
+                            <Delta value={delta} suffix="vs deployed" />
                         </span>
                     ) : null,
                 ]}

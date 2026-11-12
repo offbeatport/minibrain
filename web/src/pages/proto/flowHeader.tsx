@@ -1,9 +1,9 @@
-import { Badge } from "obp-ui";
+import { Badge, Link } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPhase, useCompute, useNow } from "./flowCompute";
 import { ModelHeaderActions } from "./flowModelActions";
-import { type FlowModel, liveVersion, pct, useFlowState } from "./modelsFlowData";
+import { type FlowModel, useFlowState } from "./modelsFlowData";
 import { ModelAvatar } from "./modelsFlowParts";
 
 export type Fact = ReactElement | null | false;
@@ -58,17 +58,6 @@ export function CompactHeader({
     );
 }
 
-function liveText(model: FlowModel): string | null {
-    const live = liveVersion(model);
-    if (!live) {
-        return null;
-    }
-    if (model.canary) {
-        return `v${live.number} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%`;
-    }
-    return `v${live.number} live ${pct(live.scores?.[0])}`;
-}
-
 function trimmed(text: string): string {
     return text.replace(/\.$/, "");
 }
@@ -92,10 +81,20 @@ export function ModelHeader({ model }: { model: FlowModel }) {
                 <Badge key="kind" variant="outline">
                     {custom ? "Custom" : "Base"}
                 </Badge>,
-                <StatusText key="phase" tone={phase.tone}>
-                    {phase.text}
-                </StatusText>,
-                custom && liveVersion(model) ? <span key="live">{liveText(model)}</span> : null,
+                <span key="phase" className="flex min-w-0 items-center gap-2">
+                    <StatusText tone={phase.tone}>
+                        {phase.href ? (
+                            <Link href={phase.href} className="hover:underline">
+                                {phase.text}
+                            </Link>
+                        ) : (
+                            phase.text
+                        )}
+                    </StatusText>
+                    {phase.reason && (
+                        <span className="text-sm text-muted-foreground">{phase.reason}</span>
+                    )}
+                </span>,
             ]}
             subtitle={subtitle}
             actions={<ModelHeaderActions model={model} />}

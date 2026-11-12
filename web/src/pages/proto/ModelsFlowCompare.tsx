@@ -45,7 +45,7 @@ import { Crumbs, MakeLiveButton } from "./modelsFlowParts";
 
 function columnName(model: FlowModel, version: FlowVersion): string {
     if (liveVersion(model)?.number === version.number) {
-        return `v${version.number} · live`;
+        return `v${version.number} · deployed`;
     }
     return versionName(version);
 }

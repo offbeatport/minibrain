@@ -1,5 +1,9 @@
+import { useRouter } from "@tanstack/react-router";
 import {
     Button,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     Dialog,
     DialogClose,
     DialogContent,
@@ -27,8 +31,9 @@ import {
     type Slot,
     USE_LABELS,
     automaticPool,
-    deploy,
+    deployedPlacements,
     loadSeconds,
+    placementOf,
     poolFits,
     round,
     serveOf,
@@ -36,13 +41,83 @@ import {
     useCompute,
     useNow,
 } from "./flowCompute";
+import { startDeploy, startVersionDeploy } from "./flowRollout";
 import {
+    DEFAULT_CONTEXT,
     type FlowModel,
+    type FlowVersion,
+    LONG_CONTEXT,
+    findVersion,
+    jobHref,
     liveVersion,
-    markVisited,
+    newestFirst,
+    pct,
+    points,
     useFlowState,
     variantKey,
 } from "./modelsFlowData";
+
+export type DeployMode = "deploy" | "change" | "version";
+
+export function direction(model: FlowModel, version: FlowVersion): string {
+    const live = model.deployed ? liveVersion(model) : undefined;
+    if (!live || live.number === version.number) {
+        return "";
+    }
+    const delta =
+        live.scores && version.scores ? ` (${points(version.scores[0] - live.scores[0])})` : "";
+    if (version.number < live.number) {
+        return `v${version.number} replaces v${live.number}${delta}.`;
+    }
+    return live.scores && version.scores
+        ? `v${version.number} scores ${points(version.scores[0] - live.scores[0])} over deployed v${live.number}.`
+        : `v${version.number} replaces deployed v${live.number}.`;
+}
+
+function deployable(model: FlowModel): FlowVersion[] {
+    return newestFirst(model).filter((version) => version.status === "ready");
+}
+
+export function defaultVersion(model: FlowModel, mode: DeployMode): number {
+    const ready = deployable(model);
+    if (mode === "change" && model.live !== null) {
+        return model.live;
+    }
+    const passing = ready
+        .filter(
+            (version) =>
+                version.kind === "trained" &&
+                version.passed &&
+                (mode !== "version" || version.number !== model.live),
+        )
+        .sort((a, b) => (b.scores?.[0] ?? 0) - (a.scores?.[0] ?? 0));
+    return passing[0]?.number ?? 0;
+}
+
+function versionOption(model: FlowModel, version: FlowVersion): string {
+    const parts = [
+        version.kind === "prompt" ? `v${version.number} · Baseline` : `v${version.number}`,
+        version.kind === "prompt" ? "prompt only" : pct(version.scores?.[0]),
+        model.deployed && version.number === model.live ? "deployed" : null,
+        version.passed === false ? "below rule" : null,
+    ];
+    return parts.filter(Boolean).join(" · ");
+}
+
+function samePlacements(model: FlowModel, slots: Slot[]): boolean {
+    const current = deployedPlacements(model.slug);
+    return (
+        model.deployed &&
+        current.length === slots.length &&
+        slots.every((slot) =>
+            current.some(
+                (placement) =>
+                    placement.machine === slot.machine.id &&
+                    placement.gpu === (slot.gpu?.index ?? null),
+            ),
+        )
+    );
+}
 
 const AUTOMATIC = "automatic";
 
@@ -54,12 +129,17 @@ function initialTarget(model: FlowModel): string {
     return variantKey(model.slug, idle?.id ?? "bf16");
 }
 
-function adapterText(model: FlowModel | undefined): string {
-    if (!model || model.kind === "base") {
+function adapterText(model: FlowModel | undefined, number: number | null): string {
+    if (!model || model.kind === "base" || number === null) {
         return "";
     }
-    const live = liveVersion(model);
-    return live ? `the ${model.name} v${live.number} adapter` : "";
+    const version = findVersion(model, number);
+    if (!version) {
+        return "";
+    }
+    return version.kind === "prompt"
+        ? `v${number} instructions (prompt only)`
+        : `the ${model.name} v${number} adapter`;
 }
 
 function joined(names: string[]): string {
@@ -69,8 +149,13 @@ function joined(names: string[]): string {
     return `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
 }
 
-export function deploySummary(model: FlowModel, serve: Serve, slots: Slot[]): string {
-    const adapter = adapterText(model);
+export function deploySummary(
+    model: FlowModel,
+    serve: Serve,
+    slots: Slot[],
+    version: number | null = model.live,
+): string {
+    const adapter = adapterText(model, version);
     const loading = slots.filter((slot) => !slot.loaded);
     const already = slots.filter((slot) => slot.loaded);
     const seconds = loadSeconds(serve, loading.length === 0);
@@ -82,7 +167,7 @@ export function deploySummary(model: FlowModel, serve: Serve, slots: Slot[]): st
                 ? ""
                 : adapter
                   ? ` with ${adapter}`
-                  : " with no adapter yet: it serves the base until a version is live";
+                  : " with no adapter yet: it serves the base until a version is deployed";
         parts.push(`Loads ${serve.label} on ${where}${tail}`);
     }
     if (already.length > 0) {
@@ -123,15 +208,20 @@ function PoolOption({ fit, value }: { fit: PoolFit; value: string }) {
     );
 }
 
-function DeployForm({
+export function DeployForm({
     model,
-    changing,
+    mode,
+    version: initial,
+    source,
     onClose,
 }: {
     model: FlowModel;
-    changing: boolean;
+    mode: DeployMode;
+    version?: number;
+    source?: "inbox";
     onClose: () => void;
 }) {
+    const changing = mode !== "deploy";
     const state = useFlowState();
     const compute = useCompute(state.mode);
     const now = useNow(5000);
@@ -140,6 +230,12 @@ function DeployForm({
     const [choice, setChoice] = useState(AUTOMATIC);
     const [picking, setPicking] = useState(false);
     const [replicas, setReplicas] = useState(1);
+    const [context, setContext] = useState(DEFAULT_CONTEXT);
+    const [advanced, setAdvanced] = useState(false);
+    const custom = model.kind === "custom" && deployable(model).length > 0;
+    const [number, setNumber] = useState(() => initial ?? defaultVersion(model, mode));
+    const router = useRouter();
+    const picked = custom ? findVersion(model, number) : undefined;
     const serve = serveOf(target, state);
     const fits = poolFits(target, state, compute, now);
     const automatic = automaticPool(fits);
@@ -149,32 +245,80 @@ function DeployForm({
     const slots = chosen?.fitting.slice(0, count) ?? [];
     const serving = fits.filter((fit) => fit.pool.use !== "jobs");
     const jobsOnly = fits.filter((fit) => fit.pool.use === "jobs");
+    const swap = custom && number !== model.live && samePlacements(model, slots);
     const submit = () => {
         if (!chosen || slots.length === 0) {
             return;
         }
-        deploy(target, chosen.pool.name, slots);
-        markVisited("infra-deploy");
+        const id = swap
+            ? startVersionDeploy(model, number, source)
+            : startDeploy({
+                  model,
+                  target,
+                  pool: chosen.pool.name,
+                  slots: slots.map((slot) => ({
+                      placement: placementOf(slot),
+                      loaded: slot.loaded,
+                  })),
+                  context,
+                  change: changing,
+                  version: custom ? number : null,
+              });
+        const name = custom ? `${model.name} v${number}` : model.name;
         toast({
-            title: changing ? `Moving ${model.name}` : `Deploying ${model.name}`,
-            description: `Watch it load on ${joined(slots.map(slotName))} in Infrastructure.`,
+            title: mode === "change" && !swap ? `Moving ${name}` : `Deploying ${name}`,
+            description: swap
+                ? `Deploy job #${id} swaps the adapter on ${joined(slots.map(slotName))}.`
+                : `Deploy job #${id} loads it on ${joined(slots.map(slotName))}.`,
+            action: { label: "View rollout", onClick: () => router.history.push(jobHref(id)) },
         });
         onClose();
     };
+    const title =
+        mode === "change"
+            ? `Change where ${model.name} runs`
+            : mode === "version"
+              ? `Deploy another version of ${model.name}`
+              : `Deploy ${model.name}`;
     if (!serve) {
         return null;
     }
     return (
         <>
             <DialogHeader>
-                <DialogTitle>
-                    {changing ? `Change where ${model.name} runs` : `Deploy ${model.name}`}
-                </DialogTitle>
+                <DialogTitle>{title}</DialogTitle>
                 <DialogDescription>
                     {`An engine in a pool loads ${serve.label} and keeps it loaded. Calls to ${model.slug} on /v1 route to it.`}
                 </DialogDescription>
             </DialogHeader>
             <FieldGroup>
+                {custom && (
+                    <Field
+                        id="deploy-version"
+                        label="Version"
+                        hint={
+                            picked && direction(model, picked)
+                                ? direction(model, picked)
+                                : "The version that answers calls to its API name."
+                        }
+                    >
+                        <Select
+                            value={String(number)}
+                            onValueChange={(value) => setNumber(Number(value))}
+                        >
+                            <SelectTrigger id="deploy-version" className="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {deployable(model).map((item) => (
+                                    <SelectItem key={item.number} value={String(item.number)}>
+                                        {versionOption(model, item)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                )}
                 {model.kind === "base" && model.variants.length > 1 && (
                     <Field id="deploy-format" label="Format">
                         <Select value={target} onValueChange={(value) => setTarget(String(value))}>
@@ -271,16 +415,62 @@ function DeployForm({
                 </Field>
                 {chosen && slots.length > 0 && (
                     <p className="rounded-md border bg-muted px-3 py-2 tabular-nums">
-                        {deploySummary(model, serve, slots)}
+                        {swap
+                            ? `Same base, already loaded on ${joined(slots.map(slotName))}: fetches the v${number} adapter, attaches it, routes ${model.slug} to it and detaches v${model.live} · ~3 s`
+                            : deploySummary(model, serve, slots, custom ? number : null)}
                     </p>
+                )}
+                {!serve.cpu && (
+                    <Collapsible open={advanced} onOpenChange={setAdvanced}>
+                        <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                            <CollapsibleTrigger>Advanced</CollapsibleTrigger>
+                            <span className="text-sm text-muted-foreground tabular-nums">
+                                {`Context ${context.toLocaleString("en-US")} tokens`}
+                            </span>
+                        </div>
+                        <CollapsibleContent className="pt-4">
+                            <Field
+                                id="deploy-context"
+                                label="Context length"
+                                hint="The longest prompt plus answer each request may use. Longer contexts reserve more GPU memory for the KV cache, which the pool estimate above does not count."
+                            >
+                                <Select
+                                    value={String(context)}
+                                    onValueChange={(value) => setContext(Number(value))}
+                                >
+                                    <SelectTrigger id="deploy-context" className="w-56">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[DEFAULT_CONTEXT, 16384, LONG_CONTEXT].map((value) => (
+                                            <SelectItem key={value} value={String(value)}>
+                                                {`${value.toLocaleString("en-US")} tokens`}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                        </CollapsibleContent>
+                    </Collapsible>
                 )}
             </FieldGroup>
             <DialogFooter>
                 <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button onClick={submit} disabled={!chosen || slots.length === 0}>
-                    {changing ? "Move" : "Deploy"}
+                <Button
+                    onClick={submit}
+                    disabled={
+                        !chosen ||
+                        slots.length === 0 ||
+                        (mode === "version" && number === model.live)
+                    }
+                >
+                    {mode === "change" && !swap && number === model.live
+                        ? "Move"
+                        : custom
+                          ? `Deploy v${number}`
+                          : "Deploy"}
                 </Button>
             </DialogFooter>
         </>
@@ -289,12 +479,12 @@ function DeployForm({
 
 export function DeployDialog({
     model,
-    changing = false,
+    mode = "deploy",
     open,
     onOpenChange,
 }: {
     model: FlowModel;
-    changing?: boolean;
+    mode?: DeployMode;
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
@@ -302,11 +492,7 @@ export function DeployDialog({
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-xl [&>*]:min-w-0">
                 {open && (
-                    <DeployForm
-                        model={model}
-                        changing={changing}
-                        onClose={() => onOpenChange(false)}
-                    />
+                    <DeployForm model={model} mode={mode} onClose={() => onOpenChange(false)} />
                 )}
             </DialogContent>
         </Dialog>

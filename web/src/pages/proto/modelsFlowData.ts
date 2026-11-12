@@ -736,7 +736,55 @@ const DATASETS: Dataset[] = [
 
 export const SAMPLE_FILE = "support-tickets.csv";
 
-export type JobKind = "train" | "score" | "judge" | "download" | "import" | "export";
+export type JobKind =
+    | "train"
+    | "score"
+    | "judge"
+    | "download"
+    | "import"
+    | "export"
+    | "deploy"
+    | "undeploy";
+
+export type RolloutStepKey =
+    | "download"
+    | "load"
+    | "fetch"
+    | "attach"
+    | "route"
+    | "detach"
+    | "stop"
+    | "unload"
+    | "release";
+
+export type StepState = "pending" | "running" | "done" | "failed" | "skipped" | "cancelled";
+
+export type RolloutStep = {
+    key: RolloutStepKey;
+    state: StepState;
+    start: number | null;
+    end: number | null;
+    note?: string;
+};
+
+export type RolloutSlot = { machine: string; gpu: number | null };
+
+export type Rollout = {
+    target: string;
+    pool: string;
+    slots: RolloutSlot[];
+    by: string;
+    context: number;
+    loaded: boolean;
+    cold: RolloutSlot[];
+    change: boolean;
+    from: number | null;
+    steps: RolloutStep[];
+};
+
+export const DEFAULT_CONTEXT = 8192;
+export const LONG_CONTEXT = 32768;
+export const OOM_ERROR = "CUDA out of memory: needs 20 GB, 18 GB free";
 export type JobStatus = "running" | "queued" | "done" | "failed" | "cancelled";
 
 export type Job = {
@@ -752,6 +800,8 @@ export type Job = {
     error?: string;
     device?: string;
     format?: ExportFormat;
+    seconds?: number;
+    rollout?: Rollout;
 };
 
 export type ExportFormat = "adapter" | "merged" | "gguf-q4" | "gguf-q8";
@@ -807,10 +857,192 @@ function transfer(
     };
 }
 
+const SEED_SLOTS: Record<string, RolloutSlot & { pool: string }> = {
+    "gpu-a10-1": { machine: "gpu-a10-1", gpu: 1, pool: "serve" },
+    "gpu-a10-2": { machine: "gpu-a10-2", gpu: 0, pool: "serve" },
+    local: { machine: "local", gpu: 0, pool: "local" },
+    "cpu-1": { machine: "cpu-1", gpu: null, pool: "cpu" },
+};
+
+const SEED_BY: Record<string, string> = {
+    "support-triage": "Dana",
+    guy1: "Dana",
+};
+
+export const STEP_MS: Record<RolloutStepKey, number> = {
+    download: 4000,
+    load: 5000,
+    fetch: 1200,
+    attach: 1500,
+    route: 800,
+    detach: 700,
+    stop: 800,
+    unload: 1200,
+    release: 2500,
+};
+
+const SEED_MS: Record<RolloutStepKey, number> = {
+    download: 41000,
+    load: 6200,
+    fetch: 1300,
+    attach: 1400,
+    route: 600,
+    detach: 500,
+    stop: 700,
+    unload: 1100,
+    release: 2400,
+};
+
+type SeedRollout = {
+    id: number;
+    kind: "deploy" | "undeploy";
+    model: string;
+    target: string;
+    version: number | null;
+    hoursAgo: number;
+    machines: string[];
+    by: string;
+    download?: boolean;
+    loaded?: boolean;
+    failed?: boolean;
+    context?: number;
+    adapter?: boolean;
+    from?: number;
+};
+
+function seededSteps(seed: SeedRollout, start: number): RolloutStep[] {
+    const keys: RolloutStepKey[] =
+        seed.kind === "undeploy"
+            ? ["stop", "unload", "release"]
+            : seed.from !== undefined
+              ? ["fetch", "attach", "route", "detach"]
+              : [
+                    ...(seed.download ? (["download"] as const) : []),
+                    "load",
+                    ...(seed.adapter ? (["attach"] as const) : []),
+                    "route",
+                ];
+    let at = start + 400;
+    let stopped = false;
+    return keys.map((key): RolloutStep => {
+        if (stopped) {
+            return { key, state: "pending", start: null, end: null };
+        }
+        const ms = key === "load" && seed.loaded ? 300 : SEED_MS[key];
+        if (seed.failed && key === "load") {
+            stopped = true;
+            return { key, state: "failed", start: at, end: at + ms * 0.7 };
+        }
+        const step: RolloutStep = { key, state: "done", start: at, end: at + ms };
+        at += ms + 150;
+        return step;
+    });
+}
+
+function slotsOf(seed: SeedRollout): RolloutSlot[] {
+    return seed.machines.map((machine) => {
+        const slot = SEED_SLOTS[machine] ?? SEED_SLOTS.local;
+        return { machine: slot.machine, gpu: slot.gpu };
+    });
+}
+
+function seededRollout(seed: SeedRollout): Job {
+    const start = Date.now() - seed.hoursAgo * 3600000;
+    const steps = seededSteps(seed, start);
+    const end = Math.max(...steps.map((step) => step.end ?? 0));
+    const first = SEED_SLOTS[seed.machines[0]] ?? SEED_SLOTS.local;
+    return {
+        id: seed.id,
+        kind: seed.kind,
+        model: seed.model,
+        version: seed.version,
+        status: seed.failed ? "failed" : "done",
+        progress: seed.failed ? 0.4 : 1,
+        hoursAgo: seed.hoursAgo,
+        minutes: null,
+        seconds: Math.round((end - start) / 100) / 10,
+        error: seed.failed ? OOM_ERROR : undefined,
+        rollout: {
+            target: seed.target,
+            pool: first.pool,
+            slots: slotsOf(seed),
+            by: seed.by,
+            context: seed.context ?? DEFAULT_CONTEXT,
+            loaded: Boolean(seed.loaded),
+            cold: seed.loaded || seed.from !== undefined ? [] : slotsOf(seed),
+            change: false,
+            from: seed.from ?? null,
+            steps,
+        },
+    };
+}
+
+function rolloutSeeds(models: FlowModel[]): SeedRollout[] {
+    const triage = (
+        id: number,
+        version: number,
+        hoursAgo: number,
+        extra: Partial<SeedRollout> = {},
+    ): SeedRollout => ({
+        id,
+        kind: "deploy",
+        model: "support-triage",
+        target: "support-triage",
+        version,
+        hoursAgo,
+        machines: ["gpu-a10-2"],
+        by: "Dana",
+        adapter: true,
+        ...extra,
+    });
+    const seeds: SeedRollout[] = [
+        triage(1250, 1, 32.9 * DAY, { download: true }),
+        triage(1251, 3, 25.9 * DAY, { failed: true, context: LONG_CONTEXT }),
+        triage(1252, 3, 25.85 * DAY),
+        triage(1253, 4, 20.9 * DAY, { loaded: true, from: 3 }),
+    ];
+    let id = 1260;
+    for (const model of models) {
+        if (model.slug === "support-triage") {
+            continue;
+        }
+        if (model.kind === "custom" && model.deployed) {
+            const live = model.versions.find((version) => version.number === model.live);
+            seeds.push({
+                id: id++,
+                kind: "deploy",
+                model: model.slug,
+                target: model.slug,
+                version: model.live,
+                hoursAgo: Math.min(live?.hoursAgo ?? DAY, 40 * DAY) - 0.1,
+                machines: model.replicas,
+                by: SEED_BY[model.slug] ?? "Sam",
+                loaded: true,
+                adapter: live?.kind === "trained",
+            });
+        }
+        for (const item of model.variants.filter((entry) => entry.live)) {
+            seeds.push({
+                id: id++,
+                kind: "deploy",
+                model: model.slug,
+                target: `${model.slug}#${item.id}`,
+                version: null,
+                hoursAgo: 75 * DAY,
+                machines: item.replicas,
+                by: "Sam",
+                download: true,
+            });
+        }
+    }
+    return seeds;
+}
+
 function jobsOf(models: FlowModel[]): Job[] {
     const versionJobs = models.flatMap((model) =>
         model.versions.map((version) => versionJob(model, version)),
     );
+    const rollouts = rolloutSeeds(models).map(seededRollout);
     const others: Job[] = [
         transfer(1201, "download", "qwen3-8b", 36 * DAY, 9),
         transfer(1202, "download", "llama-3.2-1b", 22 * DAY, 4),
@@ -846,7 +1078,7 @@ function jobsOf(models: FlowModel[]): Job[] {
             minutes: null,
         },
     ];
-    return [...versionJobs, ...others].sort((a, b) => a.hoursAgo - b.hoursAgo);
+    return [...versionJobs, ...rollouts, ...others].sort((a, b) => a.hoursAgo - b.hoursAgo);
 }
 
 export type FeedbackRow = {
@@ -1240,6 +1472,41 @@ function jobIn(mode: Mode, id: number, change: (job: Job) => Job) {
         ...world,
         jobs: world.jobs.map((job) => (job.id === id ? change(job) : job)),
     }));
+}
+
+export function newJobId(): number {
+    return nextJob++;
+}
+
+export function addJob(mode: Mode, job: Job) {
+    setWorld(mode, (world) => ({ ...world, jobs: [job, ...world.jobs] }));
+}
+
+export function changeJob(mode: Mode, id: number, change: (job: Job) => Job) {
+    jobIn(mode, id, change);
+}
+
+export function isRollout(job: Job): boolean {
+    return job.kind === "deploy" || job.kind === "undeploy";
+}
+
+function hoursOfJob(job: Job): number {
+    return job.atMs ? (Date.now() - job.atMs) / 3600000 : job.hoursAgo;
+}
+
+export function rolloutsOf(current: FlowState, slug: string): Job[] {
+    return current.jobs
+        .filter((job) => job.model === slug && isRollout(job))
+        .sort((a, b) => hoursOfJob(a) - hoursOfJob(b));
+}
+
+export function lastRollout(current: FlowState, slug: string): Job | undefined {
+    return rolloutsOf(current, slug)[0];
+}
+
+export function failedRollout(current: FlowState, slug: string): Job | undefined {
+    const last = lastRollout(current, slug);
+    return last?.kind === "deploy" && last.status === "failed" ? last : undefined;
 }
 
 export function markVisited(step: string) {
@@ -1979,7 +2246,9 @@ export function cancelJobs(ids: number[]) {
     set((current) => ({
         ...current,
         jobs: current.jobs.map((job) =>
-            ids.includes(job.id) && (job.status === "running" || job.status === "queued")
+            ids.includes(job.id) &&
+            !isRollout(job) &&
+            (job.status === "running" || job.status === "queued")
                 ? { ...job, status: "cancelled" }
                 : job,
         ),
@@ -1990,7 +2259,9 @@ export function retryJobs(ids: number[]) {
     set((current) => ({
         ...current,
         jobs: current.jobs.map((job) =>
-            ids.includes(job.id) && (job.status === "failed" || job.status === "cancelled")
+            ids.includes(job.id) &&
+            !isRollout(job) &&
+            (job.status === "failed" || job.status === "cancelled")
                 ? { ...job, status: "queued", progress: 0 }
                 : job,
         ),
@@ -2140,8 +2411,8 @@ function ship(model: FlowModel): NextStep | null {
         return null;
     }
     return {
-        label: `Make v${candidate.number} live`,
-        detail: `v${candidate.number} scores ${points(scoreDelta(model, candidate) ?? 0)} over live v${model.live} and passed the promotion rule.`,
+        label: `Deploy v${candidate.number}`,
+        detail: `v${candidate.number} scores ${points(scoreDelta(model, candidate) ?? 0)} over deployed v${model.live} and passed the promotion rule.`,
         href: versionHref(model.slug, candidate.number),
         action: "make-live",
         version: candidate.number,
@@ -2191,10 +2462,10 @@ function start(model: FlowModel): NextStep | null {
             action: "train",
         };
     }
-    if (model.live === null) {
+    if (model.live === null && ready.kind === "trained") {
         return {
-            label: `Make v${ready.number} live`,
-            detail: `${model.slug} then answers with v${ready.number}, and the model is deployed.`,
+            label: `Deploy v${ready.number}`,
+            detail: `${model.slug} then answers with v${ready.number} on the API.`,
             href: versionHref(model.slug, ready.number),
             action: "make-live",
             version: ready.number,
@@ -2203,7 +2474,7 @@ function start(model: FlowModel): NextStep | null {
     if (!model.deployed) {
         return {
             label: "Deploy",
-            detail: `${model.slug} answers with live v${model.live} once deployed.`,
+            detail: `Pick a version, pool and replicas so ${model.slug} answers on the API.`,
             href: modelHref(model.slug),
             action: "deploy",
         };
@@ -2288,7 +2559,7 @@ export function ruleChecks(model: FlowModel, version: FlowVersion): RuleCheck[] 
     if (live?.scores && live.number !== version.number) {
         const drop = version.scores[1] - live.scores[1];
         checks.push({
-            label: `${model.metrics[1]} is no more than ${(slack * 100).toFixed(1)} points below live`,
+            label: `${model.metrics[1]} is no more than ${(slack * 100).toFixed(1)} points below the deployed version`,
             value: `${points(drop)} points`,
             met: drop >= -slack,
         });
@@ -2336,10 +2607,10 @@ export function liveSplit(model: FlowModel): string | null {
         return null;
     }
     if (model.canary) {
-        return `Live: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%`;
+        return `Deployed: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%`;
     }
     const live = liveVersion(model);
-    return `Live: v${model.live}${live?.scores ? ` · ${pct(live.scores[0])}` : ""}`;
+    return `Deployed: v${model.live}${live?.scores ? ` · ${pct(live.scores[0])}` : ""}`;
 }
 
 export type StatusKind =
@@ -2375,7 +2646,7 @@ export function statusLine(model: FlowModel): StatusLine {
         const delta = scoreDelta(model, candidate) ?? 0;
         return {
             kind: "candidate",
-            text: `v${candidate.number} beats live ${points(delta)}`,
+            text: `v${candidate.number} beats deployed ${points(delta)}`,
             version: candidate.number,
         };
     }
@@ -2417,7 +2688,7 @@ export function attention(model: FlowModel): string | null {
         : null;
 }
 
-export type InboxAction = "make-live" | "review" | "retry" | "update" | "monitor";
+export type InboxAction = "make-live" | "review" | "retry" | "update" | "monitor" | "rollout";
 
 export type InboxItem = {
     id: string;
@@ -2430,6 +2701,7 @@ export type InboxItem = {
     atMs?: number;
     version?: number;
     variant?: string;
+    job?: number;
 };
 
 function hoursOf(item: { hoursAgo: number; atMs?: number }): number {
@@ -2441,9 +2713,32 @@ export function percent(value: number): string {
     return `${shown < 1 ? shown.toFixed(1) : Math.round(shown)}%`;
 }
 
+function rolloutItem(current: FlowState, model: FlowModel): InboxItem | null {
+    const job = failedRollout(current, model.slug);
+    if (!job) {
+        return null;
+    }
+    const memory = /memory/i.test(job.error ?? "");
+    return {
+        id: `rollout:${job.id}`,
+        model,
+        text: `${model.name}: deploy failed${memory ? ", out of memory" : ""}`,
+        detail: `${job.error ?? "The rollout stopped"}. Nothing was routed to the new deployment.`,
+        action: "rollout",
+        label: "View rollout",
+        hoursAgo: job.hoursAgo,
+        atMs: job.atMs,
+        job: job.id,
+    };
+}
+
 export function inbox(current: FlowState): InboxItem[] {
     const items: InboxItem[] = [];
     for (const model of current.models) {
+        const rollout = rolloutItem(current, model);
+        if (rollout) {
+            items.push(rollout);
+        }
         if (model.kind === "base") {
             for (const item of model.variants.filter((v) => v.update)) {
                 items.push({
@@ -2465,10 +2760,10 @@ export function inbox(current: FlowState): InboxItem[] {
             items.push({
                 id: `live:${model.slug}:${candidate.number}`,
                 model,
-                text: `${model.name} v${candidate.number} beats live (${points(delta)})`,
-                detail: `${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for live v${model.live}, and it passed the promotion rule.`,
+                text: `${model.name} v${candidate.number} beats deployed v${model.live} (${points(delta)})`,
+                detail: `${pct(candidate.scores?.[0])} against ${pct(liveVersion(model)?.scores?.[0])} for deployed v${model.live}, and it passed the promotion rule.`,
                 action: "make-live",
-                label: `Make v${candidate.number} live`,
+                label: `Deploy v${candidate.number}`,
                 hoursAgo: candidate.hoursAgo,
                 atMs: candidate.atMs,
                 version: candidate.number,
@@ -2587,7 +2882,7 @@ export function versionState(model: FlowModel, version: FlowVersion): VersionSta
     const share = liveShare(model, version.number);
     if (share !== null) {
         return {
-            label: share === 100 ? "Live" : `Live · ${share}%`,
+            label: share === 100 ? "Deployed" : `Deployed · ${share}%`,
             tone: "success",
         };
     }

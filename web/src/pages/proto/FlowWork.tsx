@@ -61,6 +61,7 @@ import { relativeTime } from "~/lib/time";
 import { type Served, serveRequest } from "./flowCompute";
 import { ArtifactLine } from "./flowExport";
 import { useCan } from "./flowOverlays";
+import { RolloutJobPage } from "./flowRolloutPage";
 import { BulkJobs, JobStatusText } from "./flowTraining";
 import {
     BASELINE_HINT,
@@ -82,6 +83,7 @@ import {
     exportOption,
     exportSize,
     findVersion,
+    isRollout,
     jobHref,
     jobOfVersion,
     liveVersion,
@@ -386,6 +388,8 @@ const JOB_KINDS: Record<JobKind, string> = {
     download: "Download",
     import: "Import",
     export: "Export",
+    deploy: "Deploy",
+    undeploy: "Undeploy",
 };
 
 function reached(job: Job): number {
@@ -514,7 +518,7 @@ function Outcome({ model, version }: { model: FlowModel; version: FlowVersion })
     }
     const against = [
         live && live.number !== version.number && live.scores
-            ? `${points(score - live.scores[0])} vs live v${live.number}`
+            ? `${points(score - live.scores[0])} vs deployed v${live.number}`
             : null,
         zero?.scores && zero.number !== version.number
             ? `${points(score - zero.scores[0])} vs baseline v0`
@@ -535,7 +539,7 @@ function Outcome({ model, version }: { model: FlowModel; version: FlowVersion })
                 <MakeLiveButton
                     model={model}
                     version={version}
-                    label={`Make v${version.number} live`}
+                    label={`Deploy v${version.number}`}
                 />
             </span>
         </div>
@@ -566,7 +570,7 @@ function Inputs({
             <span key="d" className="tabular-nums">
                 {`${dataset?.slug ?? "data"} v${version.data.number} · ${count(version.data.rows)} rows`}
                 {since !== null && since !== 0 && (
-                    <span className="text-muted-foreground">{`, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since live`}</span>
+                    <span className="text-muted-foreground">{`, ${since > 0 ? "+" : "−"}${count(Math.abs(since))} since deployed`}</span>
                 )}
             </span>,
         ],
@@ -716,6 +720,8 @@ const JOB_VERBS: Record<JobKind, string> = {
     download: "Downloads",
     import: "Imports",
     export: "Exports",
+    deploy: "Deploys",
+    undeploy: "Undeploys",
 };
 
 function JobContext({ job, model }: { job: Job; model: FlowModel | undefined }) {
@@ -791,6 +797,9 @@ export function FlowJobPage() {
                 <p className="text-muted-foreground">No such job.</p>
             </Page>
         );
+    }
+    if (isRollout(job)) {
+        return <RolloutJobPage job={job} />;
     }
     const model = state.models.find((item) => item.slug === job.model);
     const version = model && job.version !== null ? findVersion(model, job.version) : undefined;
@@ -1005,7 +1014,7 @@ export function FlowPlaygroundPage() {
                                     <SelectItem value={item.slug}>
                                         {item.kind === "base"
                                             ? item.slug
-                                            : `${item.slug}${item.live === null ? "" : ` (live v${item.live})`}`}
+                                            : `${item.slug}${item.live === null ? "" : ` (deployed v${item.live})`}`}
                                     </SelectItem>
                                     {[...item.versions]
                                         .filter((version) => version.status === "ready")
@@ -1110,7 +1119,7 @@ const KIND_FILTERS: { key: string; label: string; kinds: JobKind[] }[] = [
     {
         key: "all",
         label: "All",
-        kinds: ["train", "score", "judge", "download", "import", "export"],
+        kinds: ["train", "score", "judge", "download", "import", "export", "deploy", "undeploy"],
     },
     { key: "train", label: "Training", kinds: ["train"] },
     { key: "score", label: "Scoring", kinds: ["score"] },
@@ -1118,7 +1127,16 @@ const KIND_FILTERS: { key: string; label: string; kinds: JobKind[] }[] = [
     { key: "download", label: "Downloads", kinds: ["download"] },
     { key: "import", label: "Imports", kinds: ["import"] },
     { key: "export", label: "Exports", kinds: ["export"] },
+    { key: "deploy", label: "Deploys", kinds: ["deploy"] },
+    { key: "undeploy", label: "Undeploys", kinds: ["undeploy"] },
 ];
+
+function took(job: Job): string {
+    if (job.seconds !== undefined && job.status !== "running") {
+        return `${job.seconds.toFixed(1)} s`;
+    }
+    return job.minutes ? `${job.minutes} min` : "–";
+}
 
 function kindMatches(job: Job, filter: string): boolean {
     return (KIND_FILTERS.find((item) => item.key === filter) ?? KIND_FILTERS[0]).kinds.includes(
@@ -1150,7 +1168,7 @@ export function FlowJobsPage() {
         <Page wide>
             <PageHeader
                 title="Jobs"
-                caption="Every job on this install: training, scoring, judging, downloads and imports."
+                caption="Every job on this install: training, scoring, judging, downloads, imports, exports, deploys and undeploys."
             />
             <PanelSections>
                 <PanelSection
@@ -1275,8 +1293,8 @@ export function FlowJobsPage() {
                                             <TableCell className="text-muted-foreground">
                                                 {relativeTime(createdAt(job))}
                                             </TableCell>
-                                            <TableCell className="pr-4 text-right">
-                                                {job.minutes ? `${job.minutes} min` : "–"}
+                                            <TableCell className="pr-4 text-right tabular-nums">
+                                                {took(job)}
                                             </TableCell>
                                         </TableRow>
                                     ))}

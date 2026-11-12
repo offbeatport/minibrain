@@ -41,6 +41,7 @@ import {
     slotReserve,
     slotTotal,
     slotUsage,
+    targetName,
     useCompute,
     useNow,
     usesJobs,
@@ -49,6 +50,7 @@ import { AddComputeDialog, MachineSheet } from "./flowInfraDialogs";
 import { useCan } from "./flowOverlays";
 import {
     type FlowState,
+    STEP_MS,
     downloadProgress,
     jobHref,
     markVisited,
@@ -95,8 +97,8 @@ function plural(count: number, one: string, many = `${one}s`): string {
 function servingText(engine: LoadedEngine): string {
     const settled = engine.adapters.filter((adapter) => !adapter.loading);
     const names = settled.map((adapter) =>
-        adapter.version === "no version live"
-            ? `${adapter.name} (no version live yet, answers as the base)`
+        adapter.version === "no version deployed"
+            ? `${adapter.name} (no version deployed yet, answers as the base)`
             : `${adapter.name} ${adapter.version}`,
     );
     if (engine.servesBase) {
@@ -119,6 +121,30 @@ type Line = {
     kind: "serving" | "job" | "demand" | "loading" | "idle" | "system";
 };
 
+function RolloutLink({ id, text }: { id: number | null; text: string }) {
+    if (id === null) {
+        return null;
+    }
+    return (
+        <Link href={jobHref(id)} className="relative z-10 text-primary hover:underline">
+            {text}
+        </Link>
+    );
+}
+
+function withRollout(meta: string, id: number | null, text: string): ReactNode {
+    if (id === null) {
+        return meta;
+    }
+    return (
+        <>
+            {meta}
+            {" · "}
+            <RolloutLink id={id} text={text} />
+        </>
+    );
+}
+
 function engineLine(engine: LoadedEngine, now: number): Line {
     const memory = engineMemoryOf(engine);
     const adding = engine.adapters.filter((adapter) => adapter.loading);
@@ -132,7 +158,9 @@ function engineLine(engine: LoadedEngine, now: number): Line {
             memory,
             progress: engine.progress,
             text: `Loading ${engine.serve.label}${forWhom} · ${Math.round(engine.progress * 100)}%`,
-            meta: engine.demand ? `On demand for the ${engine.demand.reason}` : "Deploying",
+            meta: engine.demand
+                ? `On demand for the ${engine.demand.reason}`
+                : withRollout("Deploying", engine.job, `rollout #${engine.job}`),
         };
     }
     if (engine.state === "unloading") {
@@ -144,7 +172,11 @@ function engineLine(engine: LoadedEngine, now: number): Line {
             text: `Unloading ${engine.serve.label}`,
             meta: engine.demand
                 ? "Idle for 5 min and nothing deployed needs it"
-                : "Undeployed; nothing else needs this base",
+                : withRollout(
+                      "Undeployed; nothing else needs this base",
+                      engine.job,
+                      `rollout #${engine.job}`,
+                  ),
         };
     }
     const serving = servingText(engine);
@@ -180,7 +212,14 @@ function engineLine(engine: LoadedEngine, now: number): Line {
                 {serving && <span className="text-muted-foreground">{` · ${serving}`}</span>}
             </>
         ),
-        meta: [addingText, traffic].filter(Boolean).join(" · ") || "No requests today",
+        meta:
+            adding.length > 0 && engine.job !== null
+                ? withRollout(addingText ?? "", engine.job, `rollout #${engine.job}`)
+                : withRollout(
+                      [addingText, traffic].filter(Boolean).join(" · ") || "No requests today",
+                      engine.rollout,
+                      `deployed by rollout #${engine.rollout}`,
+                  ),
     };
 }
 
@@ -352,14 +391,42 @@ function SlotBlock({
     );
 }
 
-function machineActivity(machine: Machine, world: World): string[] {
+type Activity = { key: string; text: string; job: number | null };
+
+function rolloutDownloads(machine: Machine, world: World): Activity[] {
+    return Object.entries(world.compute.deployments).flatMap(([target, deployment]) => {
+        const job = world.state.jobs.find((item) => item.id === deployment.job);
+        const step = job?.rollout?.steps.find((item) => item.state === "running");
+        if (
+            !job ||
+            step?.key !== "download" ||
+            !deployment.placements.some((placement) => placement.machine === machine.id)
+        ) {
+            return [];
+        }
+        const done = Math.min(0.99, (world.now - (step.start ?? world.now)) / STEP_MS.download);
+        return [
+            {
+                key: `rollout:${job.id}`,
+                text: `Downloading ${targetName(target, world.state)} weights · ${Math.round(done * 100)}%`,
+                job: job.id,
+            },
+        ];
+    });
+}
+
+function machineActivity(machine: Machine, world: World): Activity[] {
     if (!machine.main) {
-        return [];
+        return rolloutDownloads(machine, world);
     }
     return Object.keys(world.state.downloads).map((slug) => {
         const name = world.state.models.find((model) => model.slug === slug)?.name ?? slug;
         const progress = downloadProgress(world.state, slug, world.now) ?? 0;
-        return `Downloading ${name} to storage · ${Math.round(progress * 100)}% · nothing loads on a GPU`;
+        return {
+            key: slug,
+            text: `Downloading ${name} to storage · ${Math.round(progress * 100)}% · nothing loads on a GPU`,
+            job: null,
+        };
     });
 }
 
@@ -401,9 +468,9 @@ function MachineCard({
                     {`Pool ${machinePools(machine).join(" and ")} · reserve ${machine.reserve.ram} GB RAM${machine.gpus.length > 0 ? ` + ${machine.reserve.gpu} GB per GPU` : ""}`}
                 </span>
             </div>
-            {machineActivity(machine, world).map((text) => (
-                <StatusText key={text} tone="info" className="whitespace-normal">
-                    {text}
+            {machineActivity(machine, world).map((item) => (
+                <StatusText key={item.key} tone="info" className="whitespace-normal">
+                    {withRollout(item.text, item.job, `rollout #${item.job}`)}
                 </StatusText>
             ))}
             {machine.gpus.length > 0 ? (

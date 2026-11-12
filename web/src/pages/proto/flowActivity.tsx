@@ -21,11 +21,13 @@ import {
     type FlowModel,
     type FlowState,
     type FlowVersion,
+    type Job,
     baseModelSlug,
     beatsLive,
     jobHref,
     modelHref,
     pct,
+    rolloutsOf,
     shortAgo,
     useFlowState,
     versionHref,
@@ -101,7 +103,7 @@ function trainedNote(model: FlowModel, version: FlowVersion): string {
         return "below rule";
     }
     const newer = model.live === null || version.number > model.live;
-    return newer && beatsLive(model, version) ? "beats live" : "passed";
+    return newer && beatsLive(model, version) ? "beats deployed" : "passed";
 }
 
 function versionEvent(model: FlowModel, version: FlowVersion): ActivityEvent {
@@ -147,10 +149,22 @@ function versionEvent(model: FlowModel, version: FlowVersion): ActivityEvent {
     };
 }
 
-function liveEvents(model: FlowModel): ActivityEvent[] {
+function rolledOut(state: FlowState, model: FlowModel): Set<number> {
+    return new Set(
+        rolloutsOf(state, model.slug)
+            .filter((job) => job.kind === "deploy" && job.status === "done")
+            .map((job) => job.version ?? -1),
+    );
+}
+
+function liveEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
     const actor = firstName(model.slug);
-    return pointersOf(model).map((pointer, index) => {
+    const covered = rolledOut(state, model);
+    return pointersOf(model).flatMap((pointer, index) => {
         const shown = pointer.canary?.version ?? pointer.version;
+        if (!pointer.canary && covered.has(shown)) {
+            return [];
+        }
         return {
             id: `${model.slug}:live:${index}`,
             model: model.slug,
@@ -159,11 +173,58 @@ function liveEvents(model: FlowModel): ActivityEvent[] {
                 ? `started a v${shown} canary at ${pointer.canary.share}%`
                 : index === 0
                   ? `deployed ${model.slug} with v${shown}`
-                  : `made v${shown} live`,
+                  : `deployed v${shown}`,
             link: `v${shown}`,
             hoursAgo: pointer.hoursAgo,
             href: versionHref(model.slug, shown),
-            tone: "success",
+            tone: "success" as const,
+        };
+    });
+}
+
+function rolloutText(job: Job, model: FlowModel): { actor: string | null; text: string } {
+    const by = job.rollout?.by ?? "You";
+    const target = job.rollout?.target ?? model.slug;
+    const variant = model.variants.find((item) => target === `${model.slug}#${item.id}`);
+    const what = job.version !== null ? `v${job.version}` : (variant?.apiName ?? model.slug);
+    const tail = " · view rollout";
+    if (job.kind === "undeploy") {
+        return {
+            actor: by,
+            text: `${job.status === "running" ? "is undeploying" : "undeployed"} ${what}${tail}`,
+        };
+    }
+    if (job.status === "failed") {
+        const memory = /memory/i.test(job.error ?? "");
+        return { actor: null, text: `Deploy failed${memory ? ": out of memory" : ""}${tail}` };
+    }
+    if (job.status === "running") {
+        return { actor: by, text: `is deploying ${what}${tail}` };
+    }
+    if (job.status === "cancelled") {
+        return { actor: by, text: `cancelled deploying ${what}${tail}` };
+    }
+    return { actor: by, text: `deployed ${what}${tail}` };
+}
+
+function rolloutEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
+    return rolloutsOf(state, model.slug).map((job) => {
+        const { actor, text } = rolloutText(job, model);
+        return {
+            id: `${model.slug}:rollout:${job.id}`,
+            model: model.slug,
+            actor,
+            text,
+            link: "view rollout",
+            hoursAgo: job.hoursAgo,
+            atMs: job.atMs,
+            href: jobHref(job.id),
+            tone:
+                job.status === "failed"
+                    ? "failed"
+                    : job.kind === "deploy" && job.status === "done"
+                      ? "success"
+                      : "neutral",
         };
     });
 }
@@ -218,6 +279,13 @@ function feedbackEvents(model: FlowModel): ActivityEvent[] {
     }));
 }
 
+function firstJobAt(state: FlowState, slug: string): number | undefined {
+    const times = state.jobs
+        .filter((job) => job.model === slug && job.atMs !== undefined)
+        .map((job) => job.atMs ?? 0);
+    return times.length > 0 ? Math.min(...times) - 1000 : undefined;
+}
+
 function customEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
     const first = [...model.versions].sort((a, b) => hoursOfItem(b) - hoursOfItem(a))[0];
     const owner = ownerOf(model.slug);
@@ -232,12 +300,13 @@ function customEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
                 : `created ${model.name}`,
             link: model.name,
             hoursAgo: first && !first.atMs ? first.hoursAgo + 0.5 : 0,
-            atMs: first?.atMs ? first.atMs - 1000 : undefined,
+            atMs: first?.atMs ? first.atMs - 1000 : firstJobAt(state, model.slug),
             href: modelHref(model.slug),
             tone: "neutral",
         },
         ...model.versions.map((version) => versionEvent(model, version)),
-        ...liveEvents(model),
+        ...liveEvents(state, model),
+        ...rolloutEvents(state, model),
         ...keyEvents(state, model),
         ...jobEvents(state, model),
         ...feedbackEvents(model),
@@ -290,7 +359,7 @@ function baseEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
                 tone: "neutral",
             });
         }
-        if (variant.live) {
+        if (variant.live && !rolledOutTarget(state, `${model.slug}#${variant.id}`)) {
             events.push({
                 id: `${model.slug}:deploy:${variant.id}`,
                 model: model.slug,
@@ -331,7 +400,11 @@ function baseEvents(state: FlowState, model: FlowModel): ActivityEvent[] {
             tone: "neutral",
         });
     }
-    return [...events, ...keyEvents(state, model)];
+    return [...events, ...rolloutEvents(state, model), ...keyEvents(state, model)];
+}
+
+function rolledOutTarget(state: FlowState, target: string): boolean {
+    return state.jobs.some((job) => job.rollout?.target === target);
 }
 
 export function activityOf(state: FlowState, model: FlowModel): ActivityEvent[] {

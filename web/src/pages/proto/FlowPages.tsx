@@ -152,6 +152,8 @@ function InboxRow({ item }: { item: InboxItem }) {
                 number: item.version,
                 source: "inbox",
             });
+        } else if (item.action === "rollout" && item.job !== undefined) {
+            router.history.push(jobHref(item.job));
         } else if (item.action === "review") {
             router.history.push(`${FLOW}/feedback`);
         } else if (item.action === "monitor") {
@@ -189,7 +191,11 @@ function InboxRow({ item }: { item: InboxItem }) {
                 <span aria-hidden="true" className="size-8 shrink-0" />
             )}
             <span className="flex min-w-0 flex-1 flex-col">
-                {item.model && item.version !== undefined ? (
+                {item.job !== undefined ? (
+                    <Link href={jobHref(item.job)} className="truncate font-medium hover:underline">
+                        {item.text}
+                    </Link>
+                ) : item.model && item.version !== undefined ? (
                     <Link
                         href={versionHref(item.model.slug, item.version)}
                         className="truncate font-medium hover:underline"

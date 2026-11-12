@@ -13,6 +13,7 @@ import {
 } from "obp-ui";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { count } from "~/lib/format";
+import { DeploymentSections } from "./flowDeployment";
 import {
     CallersSection,
     ErrorsSection,
@@ -83,7 +84,7 @@ function partRows(model: FlowModel, source: Source, range: UsageRange): PartRow[
                 ? { text: `Canary ${model.canary?.share}%`, variant: "info" }
                 : live
                   ? {
-                        text: model.canary ? `Live ${100 - model.canary.share}%` : "Live",
+                        text: model.canary ? `Deployed ${100 - model.canary.share}%` : "Deployed",
                         variant: "success",
                     }
                   : { text: "Earlier", variant: "neutral" },
@@ -106,7 +107,7 @@ function PartsSection({
             title={`By ${noun.toLowerCase()}`}
             description={
                 model.canary
-                    ? `Each version ${SPAN[range]}. The live pointer splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
+                    ? `Each version ${SPAN[range]}. The deployment splits traffic: v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%.`
                     : `Each ${noun.toLowerCase()} that answered ${SPAN[range]}.`
             }
             flush
@@ -165,7 +166,7 @@ function PartsSection({
 
 function emptyText(model: FlowModel, range: UsageRange): string {
     if (model.live === null && model.kind !== "base") {
-        return "Not deployed, so its name answers nothing. Make a version live to deploy it.";
+        return "Not deployed, so its name answers nothing. Deploy a version from Use › Deploy…";
     }
     if (!model.deployed) {
         return `${model.name} is not deployed, so nothing calls it. Deploy it from the header.`;
@@ -197,6 +198,7 @@ export function ModelMonitoring({ model }: { model: FlowModel }) {
                 </Link>
             </div>
             <PanelSections>
+                <DeploymentSections model={model} />
                 <PanelSection
                     icon={ChartLine}
                     title="Traffic"

@@ -18,7 +18,7 @@ export function UsagePanel({ model }: { model: FlowModel }) {
             description={
                 model.kind === "base"
                     ? "Requests to its deployed variants, by format."
-                    : "Requests to the live model, by version."
+                    : "Requests to the deployed model, by version."
             }
         >
             <div className="flex min-w-0 flex-col gap-4">

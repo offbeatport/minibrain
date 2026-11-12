@@ -316,7 +316,7 @@ function SelectionBar({
             </Button>
             {skipped.length > 0 && (
                 <span className="text-sm text-muted-foreground">
-                    {`${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} live and will not be deleted.`}
+                    {`${skipped.join(", ")} ${skipped.length === 1 ? "is" : "are"} deployed and will not be deleted.`}
                 </span>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -325,8 +325,8 @@ function SelectionBar({
                         Only Delete fits both
                         <InfoTip label="Why only Delete">
                             Compare works on two versions of one custom model; Deploy and Undeploy
-                            work on base formats, since a custom model makes one version live from
-                            its row. Tick only versions or only variants to see those.
+                            work on base formats, since a custom model deploys one version from its
+                            row. Tick only versions or only variants to see those.
                         </InfoTip>
                     </span>
                 )}
@@ -355,7 +355,7 @@ function SelectionBar({
                         <WithTip
                             tip={
                                 liveVariants.length === variants.length
-                                    ? "Every ticked variant is already live."
+                                    ? "Every ticked variant is already deployed."
                                     : null
                             }
                         >
@@ -373,7 +373,9 @@ function SelectionBar({
                                 Deploy
                             </Button>
                         </WithTip>
-                        <WithTip tip={liveVariants.length === 0 ? "None of them is live." : null}>
+                        <WithTip
+                            tip={liveVariants.length === 0 ? "None of them is deployed." : null}
+                        >
                             <Button
                                 variant="outline"
                                 disabled={liveVariants.length === 0}
@@ -391,7 +393,7 @@ function SelectionBar({
                     orientation="vertical"
                     className="mx-1 data-[orientation=vertical]:h-5"
                 />
-                <WithTip tip={deletable === 0 ? "Everything ticked is live." : null}>
+                <WithTip tip={deletable === 0 ? "Everything ticked is deployed." : null}>
                     <Button variant="destructive" disabled={deletable === 0} onClick={onDelete}>
                         <Trash2 aria-hidden="true" />
                         {variants.length > 0 && versions.length === 0 ? "Delete files" : "Delete"}
@@ -480,7 +482,7 @@ function confirmDeletion(
                     <p>Variant files can be downloaded again from Discover.</p>
                 )}
                 {skipped > 0 && (
-                    <p>{`${plural(skipped, "live item")} skipped: undeploy it or move the live pointer first.`}</p>
+                    <p>{`${plural(skipped, "deployed item")} skipped: undeploy it or deploy another version first.`}</p>
                 )}
             </div>
         ),
@@ -569,7 +571,8 @@ export function ModelsFlowList() {
                         : `Undeploy ${plural(chosen.length, "model")}?`,
                 description: (
                     <p>
-                        Their names stop answering; the live pointer, versions, keys and files stay.
+                        Their names stop answering; the deployed version, versions, keys and files
+                        stay.
                     </p>
                 ),
                 label: "Undeploy",

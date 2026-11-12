@@ -58,8 +58,8 @@ function adapterNote(adapter: Adapter): string {
     if (adapter.trained) {
         return `${adapter.version} adapter`;
     }
-    return adapter.version === "no version live"
-        ? "no version live, answers as the base"
+    return adapter.version === "no version deployed"
+        ? "no version deployed, answers as the base"
         : `${adapter.version}, no adapter`;
 }
 

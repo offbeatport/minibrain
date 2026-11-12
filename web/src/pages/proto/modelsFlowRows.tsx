@@ -275,7 +275,7 @@ export function LiveStatus({
 }
 
 const AUTOPILOT_TIP =
-    "Autopilot: once accepted feedback reaches the threshold it trains a new version, scores it, sends it a canary share of traffic, then deploys it. It makes the previous version live again if errors rise or the score drops.";
+    "Autopilot: once accepted feedback reaches the threshold it trains a new version, scores it, sends it a canary share of traffic, then deploys it. It deploys the previous version again if errors rise or the score drops.";
 
 export function AutopilotBadge() {
     return (
@@ -386,7 +386,7 @@ function QualityCell({ model, on }: { model: FlowModel; on: Handlers }) {
             <Sparkline
                 points={scored.map((version) => ({
                     key: String(version.number),
-                    label: `v${version.number}${version.number === live?.number ? " live" : ""}`,
+                    label: `v${version.number}${version.number === live?.number ? " deployed" : ""}`,
                     value: version.scores?.[0] ?? 0,
                     marked: version.number === live?.number,
                 }))}
@@ -398,7 +398,7 @@ function QualityCell({ model, on }: { model: FlowModel; on: Handlers }) {
             <span className="flex flex-col tabular-nums">
                 <span>{pct(headline.scores?.[0])}</span>
                 <span className="text-sm text-muted-foreground">
-                    {live ? `v${live.number} live` : `v${headline.number}, not live`}
+                    {live ? `v${live.number} deployed` : `v${headline.number}, not deployed`}
                 </span>
             </span>
         </button>
@@ -480,7 +480,7 @@ function ModelStatus({ model }: { model: FlowModel }) {
                         }
                         className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                        {`Make v${version} live`}
+                        {`Deploy v${version}`}
                     </button>
                 </>
             )}
@@ -666,7 +666,7 @@ function VersionStatusCell({ model, version }: { model: FlowModel; version: Flow
         return (
             <LiveStatus
                 machines={model.replicas}
-                text={share === 100 ? "Live" : `Live · ${share}%`}
+                text={share === 100 ? "Deployed" : `Deployed · ${share}%`}
             />
         );
     }
@@ -728,7 +728,7 @@ function VersionMenu({
                         }
                     >
                         <GitCompare />
-                        {`Compare with live v${target.number}`}
+                        {`Compare with deployed v${target.number}`}
                     </DropdownMenuItem>
                 )}
                 {version.status === "ready" && (
@@ -754,7 +754,7 @@ function VersionMenu({
                     onSelect={() => on.removeVersions([{ model, version }])}
                 >
                     <Trash2 />
-                    {isLive ? `v${version.number} is live` : `Delete v${version.number}`}
+                    {isLive ? `v${version.number} is deployed` : `Delete v${version.number}`}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -940,7 +940,7 @@ export function VariantRow({
                             onSelect={() => on.removeVariants([key])}
                         >
                             <Trash2 />
-                            {variant.live ? `${variant.format} is live` : "Delete files"}
+                            {variant.live ? `${variant.format} is deployed` : "Delete files"}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>

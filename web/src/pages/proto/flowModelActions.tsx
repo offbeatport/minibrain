@@ -2,7 +2,9 @@ import { useRouter } from "@tanstack/react-router";
 import {
     ChevronDown,
     CopyPlus,
+    GitBranchPlus,
     GraduationCap,
+    ListChecks,
     MoreHorizontal,
     Pencil,
     Play,
@@ -10,7 +12,6 @@ import {
     PowerOff,
     Replace,
     Rocket,
-    Server,
     SlidersHorizontal,
     SmilePlus,
     SquarePlus,
@@ -28,19 +29,20 @@ import {
     Link,
     useToast,
 } from "obp-ui";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { PickerDialog } from "~/components/avatar/AvatarPicker";
 import { choiceFor } from "~/components/avatar/avatarSvg";
 import {
     deploymentOf,
     downloadingBase,
     liveReplicas,
-    undeployModel,
+    placementNames,
     useCompute,
     useNow,
 } from "./flowCompute";
-import { DeployDialog } from "./flowDeploy";
+import { DeployDialog, type DeployMode } from "./flowDeploy";
 import { openTrain, useCan } from "./flowOverlays";
+import { startUndeploy, undeployTargets } from "./flowRollout";
 import { trainBlock } from "./flowTraining";
 import {
     FLOW,
@@ -48,6 +50,8 @@ import {
     deleteModels,
     editModel,
     flowHref,
+    jobHref,
+    lastRollout,
     playgroundHref,
     useFlowState,
 } from "./modelsFlowData";
@@ -150,150 +154,205 @@ function MoreMenu({ model }: { model: FlowModel }) {
     );
 }
 
-function UseMenu({ model }: { model: FlowModel }) {
-    const router = useRouter();
-    const download = useDownload(model);
-    const tryIt = () => {
-        router.history.push(playgroundHref(model.slug));
-    };
+function Detail({ title, detail }: { title: string; detail: string }) {
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="outline">
-                    <Play />
-                    Use
-                    <ChevronDown aria-hidden="true" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-                <DropdownMenuItem disabled={Boolean(download)} onSelect={tryIt}>
-                    <Play />
-                    <span className="flex flex-col">
-                        <span>Try it in the Playground</span>
-                        <span className="text-sm whitespace-normal text-muted-foreground">
-                            {download
-                                ? `Waits for ${download.name} to download.`
-                                : model.deployed
-                                  ? "Runs on its deployment."
-                                  : "Loads it on demand; it unloads when idle."}
-                        </span>
-                    </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => openConnect(model.slug)}>
-                    <Plug />
-                    <span className="flex flex-col">
-                        <span>Connect</span>
-                        <span className="text-sm whitespace-normal text-muted-foreground">
-                            Call it from code through /v1.
-                        </span>
-                    </span>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <span className="flex flex-col">
+            <span>{title}</span>
+            <span className="text-sm whitespace-normal text-muted-foreground">{detail}</span>
+        </span>
     );
 }
 
-function DeployControl({ model }: { model: FlowModel }) {
-    const router = useRouter();
-    const state = useFlowState();
-    const compute = useCompute(state.mode);
-    const download = useDownload(model);
-    const [dialog, setDialog] = useState<"deploy" | "change" | null>(null);
-    const [confirm, setConfirm] = useState<Confirm | null>(null);
-    const toast = useToast();
-    const deployment = deploymentOf(model, compute);
+function deployedLine(model: FlowModel, compute: ReturnType<typeof useCompute>): string {
     const replicas = liveReplicas(model);
     const where =
         model.kind === "custom"
             ? model.replicas
             : [...new Set(model.variants.flatMap((item) => item.replicas))];
+    const parts = [
+        model.kind === "custom" && model.live !== null ? `v${model.live}` : null,
+        where.join(", "),
+        `${replicas} ${replicas === 1 ? "replica" : "replicas"}`,
+    ];
+    const deployment = deploymentOf(model, compute);
+    if (deployment && deployment.phase !== "undeploying") {
+        return `Deploying to ${placementNames(deployment.placements, compute)}`;
+    }
+    return `Deployed: ${parts.filter(Boolean).join(" · ")}`;
+}
+
+function DeployItems({
+    model,
+    onDeploy,
+    onUndeploy,
+}: {
+    model: FlowModel;
+    onDeploy: (mode: DeployMode) => void;
+    onUndeploy: () => void;
+}) {
+    const router = useRouter();
+    const state = useFlowState();
+    const compute = useCompute(state.mode);
+    const download = useDownload(model);
+    const deployment = deploymentOf(model, compute);
+    const last = lastRollout(state, model.slug);
+    const custom = model.kind === "custom";
     const idleFormats = model.kind === "base" && model.variants.some((item) => !item.live);
+    if (deployment?.job) {
+        const job = deployment.job;
+        return (
+            <>
+                <DropdownMenuLabel className="font-normal text-muted-foreground tabular-nums">
+                    {deployment.phase === "undeploying"
+                        ? `Undeploying · job #${job}`
+                        : `${deployedLine(model, compute)} · job #${job}`}
+                </DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => router.history.push(jobHref(job))}>
+                    <ListChecks />
+                    View rollout
+                </DropdownMenuItem>
+            </>
+        );
+    }
+    if (!model.deployed) {
+        return (
+            <DropdownMenuItem disabled={Boolean(download)} onSelect={() => onDeploy("deploy")}>
+                <Rocket />
+                <Detail
+                    title="Deploy…"
+                    detail={
+                        download
+                            ? `Waits for ${download.name} to download.`
+                            : "Pick the version, pool and replicas; a Deploy job rolls it out."
+                    }
+                />
+            </DropdownMenuItem>
+        );
+    }
+    return (
+        <>
+            <DropdownMenuLabel className="font-normal text-muted-foreground tabular-nums">
+                {deployedLine(model, compute)}
+            </DropdownMenuLabel>
+            {custom && (
+                <DropdownMenuItem onSelect={() => onDeploy("version")}>
+                    <GitBranchPlus />
+                    Deploy another version…
+                </DropdownMenuItem>
+            )}
+            {idleFormats && (
+                <DropdownMenuItem onSelect={() => onDeploy("deploy")}>
+                    <Rocket />
+                    Deploy another format…
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={() => onDeploy("change")}>
+                <SlidersHorizontal />
+                Change pool or replicas…
+            </DropdownMenuItem>
+            {last && (
+                <DropdownMenuItem onSelect={() => router.history.push(jobHref(last.id))}>
+                    <ListChecks />
+                    View last rollout
+                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onSelect={onUndeploy}>
+                <PowerOff />
+                {custom ? "Undeploy" : "Undeploy every format"}
+            </DropdownMenuItem>
+        </>
+    );
+}
+
+function UseMenu({ model }: { model: FlowModel }) {
+    const router = useRouter();
+    const toast = useToast();
+    const builder = useCan("builder");
+    const download = useDownload(model);
+    const [dialog, setDialog] = useState<DeployMode | null>(null);
+    const [confirm, setConfirm] = useState<Confirm | null>(null);
+    const tryIt = () => {
+        router.history.push(playgroundHref(model.slug));
+    };
     const askUndeploy = () =>
         setConfirm({
             title: `Undeploy ${model.name}?`,
             description: (
                 <p>
-                    {`Apps calling ${model.slug} get errors at once. Its engine unloads ${model.kind === "custom" ? "the adapter, and the base too if nothing else needs it" : "the base unless a custom model still needs it"}. Versions and keys stay.`}
+                    {`Apps calling ${model.slug} get errors at once. An Undeploy job stops routing, unloads ${model.kind === "custom" ? "the adapter, and the base too if nothing else needs it" : "the base unless a custom model still needs it"}. Versions and keys stay.`}
                 </p>
             ),
             label: "Undeploy",
             run: () => {
-                undeployModel(model);
+                const ids = undeployTargets(model).map((target) => startUndeploy(model, target));
+                const first = ids[0];
                 toast({
                     title: `Undeploying ${model.name}`,
-                    description: "Infrastructure shows it unloading.",
+                    description: `Undeploy job #${first} stops routing and unloads it.`,
+                    action: first
+                        ? {
+                              label: "View rollout",
+                              onClick: () => router.history.push(jobHref(first)),
+                          }
+                        : undefined,
                 });
             },
         });
-    let control: ReactNode;
-    if (deployment) {
-        control = (
-            <Button variant="outline" disabled>
-                <Rocket />
-                {deployment.phase === "undeploying" ? "Undeploying" : "Deploying"}
-            </Button>
-        );
-    } else if (model.deployed) {
-        control = (
+    return (
+        <>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="outline">
-                        <Rocket />
-                        Deployed
+                        <Play />
+                        Use
                         <ChevronDown aria-hidden="true" />
                     </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuLabel className="font-normal text-muted-foreground tabular-nums">
-                        {`${replicas} ${replicas === 1 ? "replica" : "replicas"} on ${where.join(", ")}`}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem
-                        onSelect={() => router.history.push(`${FLOW}/infrastructure`)}
-                    >
-                        <Server />
-                        See it in Infrastructure
+                <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuItem disabled={Boolean(download)} onSelect={tryIt}>
+                        <Play />
+                        <Detail
+                            title="Try it in the Playground"
+                            detail={
+                                download
+                                    ? `Waits for ${download.name} to download.`
+                                    : model.deployed
+                                      ? "Runs on its deployment."
+                                      : "Loads it on demand; it unloads when idle."
+                            }
+                        />
                     </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    {idleFormats && (
-                        <DropdownMenuItem onSelect={() => setDialog("deploy")}>
-                            <Rocket />
-                            Deploy another format
-                        </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openConnect(model.slug)}>
+                        <Plug />
+                        <Detail
+                            title="Connect"
+                            detail={
+                                model.deployed
+                                    ? `API name ${model.slug}, code and keys.`
+                                    : "Deploy it first so apps can call it."
+                            }
+                        />
+                    </DropdownMenuItem>
+                    {builder && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DeployItems
+                                model={model}
+                                onDeploy={setDialog}
+                                onUndeploy={askUndeploy}
+                            />
+                        </>
                     )}
-                    <DropdownMenuItem onSelect={() => setDialog("change")}>
-                        <SlidersHorizontal />
-                        Change pool or replicas
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={askUndeploy}>
-                        <PowerOff />
-                        {model.kind === "custom" ? "Undeploy" : "Undeploy every format"}
-                    </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
-        );
-    } else {
-        control = (
-            <Tip tip={download ? `Waits for ${download.name} to download.` : null}>
-                <Button
-                    variant="outline"
-                    disabled={Boolean(download)}
-                    onClick={() => setDialog("deploy")}
-                >
-                    <Rocket />
-                    Deploy
-                </Button>
-            </Tip>
-        );
-    }
-    return (
-        <>
-            {control}
-            <DeployDialog
-                model={model}
-                changing={dialog === "change"}
-                open={dialog !== null}
-                onOpenChange={(open) => !open && setDialog(null)}
-            />
+            {builder && (
+                <DeployDialog
+                    model={model}
+                    mode={dialog ?? "deploy"}
+                    open={dialog !== null}
+                    onOpenChange={(open) => !open && setDialog(null)}
+                />
+            )}
             <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
         </>
     );
@@ -333,7 +392,6 @@ export function ModelHeaderActions({ model }: { model: FlowModel }) {
                     </Link>
                 </Button>
             )}
-            <DeployControl model={model} />
             <UseMenu model={model} />
             <MoreMenu model={model} />
         </>

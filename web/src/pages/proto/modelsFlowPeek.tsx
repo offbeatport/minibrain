@@ -64,7 +64,7 @@ function ScoreTrend({ model }: { model: FlowModel }) {
             <Sparkline
                 points={scored.map((version) => ({
                     key: String(version.number),
-                    label: `v${version.number}${version.number === live?.number ? " live" : ""}`,
+                    label: `v${version.number}${version.number === live?.number ? " deployed" : ""}`,
                     value: version.scores?.[0] ?? 0,
                     marked: version.number === live?.number,
                 }))}
@@ -78,7 +78,7 @@ function ScoreTrend({ model }: { model: FlowModel }) {
                 {live && (
                     <span className="flex items-center gap-1.5 text-foreground">
                         <span aria-hidden="true" className="size-2 rounded-full bg-primary" />
-                        {`live v${live.number} · ${pct(live.scores?.[0])}`}
+                        {`deployed v${live.number} · ${pct(live.scores?.[0])}`}
                     </span>
                 )}
                 <span>{`v${last.number} · ${pct(last.scores?.[0])}`}</span>
@@ -124,7 +124,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                         <SheetTitle className="truncate">{model.name}</SheetTitle>
                         <SheetDescription>
                             {model.kind === "custom"
-                                ? `On ${model.base} · ${live ? `v${live.number} live` : "not deployed"}${live && !model.deployed ? " · not deployed" : ""}`
+                                ? `On ${model.base} · ${live && model.deployed ? `v${live.number} deployed` : "not deployed"}`
                                 : `Base · ${plural(model.variants.length, "variant")}`}
                         </SheetDescription>
                     </div>
@@ -196,7 +196,7 @@ function Body({ model, on }: { model: FlowModel; on: Handlers }) {
                         model={model}
                         version={candidate}
                         variant="secondary"
-                        label={`Make v${candidate.number} live`}
+                        label={`Deploy v${candidate.number}`}
                     />
                 )}
                 <Button variant="outline" onClick={() => openConnect(model.slug)}>

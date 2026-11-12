@@ -111,7 +111,7 @@ function markersOf(model: FlowModel, range: UsageRange): StepMarker[] {
             at: Math.min(now, now - pointer.hoursAgo * HOUR_MS),
             label: pointer.canary
                 ? `v${pointer.canary.version} canary ${pointer.canary.share}%`
-                : `v${pointer.version} made live`,
+                : `v${pointer.version} deployed`,
             first: position === 0,
         }))
         .filter((item) => item.at > start + BUCKET_HOURS[range] * HOUR_MS && !item.first)
@@ -132,7 +132,7 @@ export function eventsOf(models: FlowModel[], range: UsageRange): StepMarker[] {
                           ? `${model.name} v${pointer.canary.version} canary at ${pointer.canary.share}%`
                           : position === 0
                             ? `${model.name} deployed with v${pointer.version}`
-                            : `${model.name} v${pointer.version} made live`,
+                            : `${model.name} v${pointer.version} deployed`,
             })),
         )
         .filter((item) => item.at > start)
@@ -184,7 +184,7 @@ export function usageOf(
                     model.kind === "base"
                         ? "Deployed variants"
                         : model.live === version
-                          ? `v${version} live`
+                          ? `v${version} deployed`
                           : `v${version}`,
                 color: SLOTS[colored.indexOf(version)],
                 dots: buckets.filter((bucket) => bucket.groups.has(`v${version}`)).length < 3,

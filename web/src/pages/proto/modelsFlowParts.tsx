@@ -1,3 +1,4 @@
+import { useRouter } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
 import {
     Badge,
@@ -22,7 +23,9 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { AvatarTile } from "~/components/avatar/AvatarTile";
 import { choiceFor } from "~/components/avatar/avatarSvg";
 import { StatusText } from "~/components/models/StatusText";
+import { DeployForm, direction } from "./flowDeploy";
 import { useCan } from "./flowOverlays";
+import { startVersionDeploy } from "./flowRollout";
 import {
     BASELINE_HINT,
     type FlowModel,
@@ -174,7 +177,7 @@ export function ScoreBadge({ model, version }: { model: FlowModel; version: Flow
         return null;
     }
     if (note.kind === "beats") {
-        return <Badge variant="success">{`beats live ${points(note.delta)}`}</Badge>;
+        return <Badge variant="success">{`beats deployed ${points(note.delta)}`}</Badge>;
     }
     return (
         <Tooltip>
@@ -195,7 +198,10 @@ export function makeLiveLabel(model: FlowModel, version: FlowVersion): string | 
     if (model.live === version.number) {
         return "End canary";
     }
-    return `Make v${version.number} live`;
+    if (version.kind === "prompt") {
+        return null;
+    }
+    return `Deploy v${version.number}`;
 }
 
 export function MakeLiveButton({
@@ -246,21 +252,6 @@ function Callout({ tone, children }: { tone: "warning" | "info"; children: React
     );
 }
 
-function direction(model: FlowModel, version: FlowVersion): string {
-    const live = liveVersion(model);
-    if (!live || live.number === version.number) {
-        return "";
-    }
-    const delta =
-        live.scores && version.scores ? ` (${points(version.scores[0] - live.scores[0])})` : "";
-    if (version.number < live.number) {
-        return `v${version.number} replaces live v${live.number}${delta}.`;
-    }
-    return live.scores && version.scores
-        ? `v${version.number} scores ${points(version.scores[0] - live.scores[0])} over live v${live.number}.`
-        : `v${version.number} replaces live v${live.number}.`;
-}
-
 function MakeLiveBody({
     model,
     version,
@@ -273,31 +264,34 @@ function MakeLiveBody({
     onClose: () => void;
 }) {
     const toast = useToast();
+    const router = useRouter();
     const live = liveVersion(model);
     const below = version.passed === false;
-    const first = model.live === null && !model.deployed;
     const confirm = () => {
-        makeLive(model.slug, version.number, source);
         onClose();
+        if (model.live === version.number) {
+            makeLive(model.slug, version.number, source);
+            toast({ title: `The v${model.canary?.version} canary ended`, tone: "success" });
+            return;
+        }
+        const id = startVersionDeploy(model, version.number, source);
         toast({
-            title: `v${version.number} of ${model.name} is live`,
-            description: live
-                ? `v${live.number} stays callable as ${model.slug}@${live.number}.`
-                : undefined,
-            tone: "success",
+            title: `Deploying v${version.number} of ${model.name}`,
+            description: `Deploy job #${id} swaps the adapter; v${live?.number} answers until it routes.`,
+            action: { label: "View rollout", onClick: () => router.history.push(jobHref(id)) },
         });
     };
     return (
         <>
             <DialogHeader>
-                <DialogTitle>{`Make v${version.number} of ${model.name} live?`}</DialogTitle>
+                <DialogTitle>{`Deploy v${version.number} of ${model.name}?`}</DialogTitle>
                 <DialogDescription>
                     {[
                         direction(model, version),
-                        `Requests to ${model.slug} are answered by v${version.number} from now on.`,
+                        `A Deploy job fetches the v${version.number} adapter, attaches it, then routes ${model.slug} to it.`,
                         model.canary ? `The v${model.canary.version} canary ends.` : "",
                         live
-                            ? `v${live.number} stays callable as ${model.slug}@${live.number}, and you can make it live again at any time.`
+                            ? `v${live.number} stays callable as ${model.slug}@${live.number}, and you can deploy it again at any time.`
                             : "",
                     ]
                         .filter(Boolean)
@@ -310,20 +304,12 @@ function MakeLiveBody({
                     <p className="text-sm">{ruleReason(model, version)}</p>
                 </Callout>
             )}
-            {first && (
-                <Callout tone="info">{`${model.name} is not deployed yet: making v${version.number} live also deploys it, so ${model.slug} starts answering.`}</Callout>
-            )}
-            {!first && !model.deployed && (
-                <Callout tone="info">
-                    {`${model.name} is not deployed: nothing calls it until you deploy it.`}
-                </Callout>
-            )}
             <DialogFooter>
                 <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                 </DialogClose>
                 <Button onClick={confirm}>
-                    {below ? `Make v${version.number} live anyway` : `Make v${version.number} live`}
+                    {below ? `Deploy v${version.number} anyway` : `Deploy v${version.number}`}
                 </Button>
             </DialogFooter>
         </>
@@ -381,7 +367,7 @@ function ConnectBody({ model, onClose }: { model: FlowModel; onClose: () => void
                 <DialogTitle>{`Connect to ${model.name}`}</DialogTitle>
                 <DialogDescription>
                     {model.kind === "custom"
-                        ? `OpenAI-compatible. ${model.slug} answers with the live version; ${model.slug}@N calls one version, live or not.`
+                        ? `OpenAI-compatible. ${model.slug} answers with the deployed version; ${model.slug}@N calls one version, deployed or not.`
                         : "OpenAI-compatible. Each deployed format has its own model name."}
                 </DialogDescription>
             </DialogHeader>
@@ -421,11 +407,28 @@ export function IntentDialogs() {
         intent?.kind === "make-live" && model ? findVersion(model, intent.number) : undefined;
     return (
         <Dialog open={Boolean(model)} onOpenChange={(open) => !open && close()}>
-            <DialogContent className={intent?.kind === "connect" ? "sm:max-w-4xl" : "sm:max-w-lg"}>
-                {intent?.kind === "make-live" && model && version && (
+            <DialogContent
+                className={
+                    intent?.kind === "connect"
+                        ? "sm:max-w-4xl"
+                        : model?.deployed
+                          ? "sm:max-w-lg"
+                          : "sm:max-w-xl [&>*]:min-w-0"
+                }
+            >
+                {intent?.kind === "make-live" && model && version && model.deployed && (
                     <MakeLiveBody
                         model={model}
                         version={version}
+                        source={intent.source}
+                        onClose={close}
+                    />
+                )}
+                {intent?.kind === "make-live" && model && version && !model.deployed && (
+                    <DeployForm
+                        model={model}
+                        mode="deploy"
+                        version={version.number}
                         source={intent.source}
                         onClose={close}
                     />

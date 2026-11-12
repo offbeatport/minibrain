@@ -146,9 +146,9 @@ export function versusLive(t: Trainer, rows: number, number: number): string | n
         return null;
     }
     if (t.live.number === number) {
-        return "live";
+        return "deployed";
     }
-    return `${signed(rows - t.live.rows)} vs live`;
+    return `${signed(rows - t.live.rows)} vs deployed`;
 }
 
 export function DataList({ t, id }: { t: Trainer; id?: string }) {

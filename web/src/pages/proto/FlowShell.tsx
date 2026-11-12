@@ -130,19 +130,35 @@ function journeyModel(state: FlowState): string {
     return added?.slug ?? focusOf(state);
 }
 
+function rolloutHref(state: FlowState, slug: string, failed: boolean): string {
+    const job = state.jobs.find(
+        (item) =>
+            item.model === slug &&
+            item.kind === "deploy" &&
+            item.atMs !== undefined &&
+            (!failed || item.status === "failed"),
+    );
+    return job ? jobHref(job.id) : modelHref(slug);
+}
+
 function infraSteps(state: FlowState): Step[] {
     const slug = journeyModel(state);
     return [
         {
             id: "infra-add",
-            label: "Add model on Mistral 7B: its page downloads, then reads Ready",
+            label: "Add model on Mistral 7B: its page downloads, then reads Not deployed",
             href: `${FLOW}/models/new?base=${JOURNEY_BASE}`,
             mode: "full",
         },
         {
             id: "infra-deploy",
-            label: "Deploy it: pick the pool and replicas",
+            label: "Use › Deploy…: pick the version, pool and replicas",
             href: modelHref(slug),
+        },
+        {
+            id: "infra-rollout",
+            label: "The Deploy job: download, load on gpu-a10-1, attach, route",
+            href: rolloutHref(state, slug, false),
         },
         {
             id: "infra-loading",
@@ -151,8 +167,17 @@ function infraSteps(state: FlowState): Step[] {
         },
         { id: "infra-try", label: "Use › Try it in the Playground", href: playgroundHref(slug) },
         { id: "infra-traffic", label: "Infrastructure: the GPU card shows traffic", href: INFRA },
-        { id: "infra-undeploy", label: "Deployed › Undeploy", href: modelHref(slug) },
+        {
+            id: "infra-undeploy",
+            label: "Use › Undeploy: an Undeploy job runs",
+            href: modelHref(slug),
+        },
         { id: "infra-unload", label: "Infrastructure: it unloads", href: INFRA },
+        {
+            id: "infra-fail",
+            label: "Deploy fails, and you read the rollout (Advanced › 32,768 tokens)",
+            href: rolloutHref(state, slug, true),
+        },
     ];
 }
 
@@ -218,7 +243,7 @@ function steps(state: FlowState): Step[] {
             href: compareHref(focus, 0, 1),
             match: (path) => path.endsWith("/compare") || path.startsWith(`${FLOW}/playground`),
         },
-        { id: "live", label: "Open v1 and make it live", href: versionHref(focus, 1) },
+        { id: "live", label: "Open v1 and deploy it", href: versionHref(focus, 1) },
         {
             id: "connect",
             label: "Connect, plus an API key",
@@ -243,7 +268,7 @@ function steps(state: FlowState): Step[] {
             href: `${FLOW}/training`,
             match: (path) => path === `${FLOW}/training`,
         },
-        { id: "inbox", label: "Inbox: v2 beats live, Make v2 live", href: FLOW },
+        { id: "inbox", label: "Inbox: v2 beats deployed v1, Deploy v2", href: FLOW },
         {
             id: "jobs",
             label: "Jobs: every job, bulk retry",
@@ -252,7 +277,7 @@ function steps(state: FlowState): Step[] {
         },
         {
             id: "older",
-            label: "Versions: make an older version live",
+            label: "Versions: deploy an older version",
             href: modelHref(focus, "versions"),
         },
         {

@@ -372,7 +372,7 @@ export function About({ model }: { model: FlowModel }) {
             <Fact label="Task">
                 <Clipped text={taskText(model, labels)} href={modelHref(model.slug, "training")} />
             </Fact>
-            <Fact label="Live">
+            <Fact label="Deployed">
                 {live ? (
                     <Clipped
                         text={`v${live.number} · ${pct(live.scores?.[0])} ${model.metrics[0].toLowerCase()}`}
@@ -465,7 +465,7 @@ export function Details({ model }: { model: FlowModel }) {
                 </Row>
                 <Row label="Promotion rule" edit={edit("rule")}>
                     <Clipped
-                        text={`${model.metrics[0]} ≥ ${Math.round(model.rule[0] * 100)}%, beats live`}
+                        text={`${model.metrics[0]} ≥ ${Math.round(model.rule[0] * 100)}%, beats deployed`}
                     />
                 </Row>
             </Group>
@@ -530,9 +530,9 @@ export function Details({ model }: { model: FlowModel }) {
                 </Row>
             </Group>
             <Group title="Integrity" caption="SHA-256, checked each time the weights load.">
-                <Row label="Live adapter">
+                <Row label="Deployed adapter">
                     {liveSha ? (
-                        <Mono value={liveSha} label="Copy live adapter SHA-256" />
+                        <Mono value={liveSha} label="Copy deployed adapter SHA-256" />
                     ) : (
                         <Muted>None</Muted>
                     )}
@@ -547,7 +547,7 @@ export function Details({ model }: { model: FlowModel }) {
                             href={cardHref(model.slug, live.number)}
                         />
                     ) : (
-                        <Muted>After a version is live</Muted>
+                        <Muted>After a version is deployed</Muted>
                     )}
                 </Row>
             </Group>

@@ -27,12 +27,14 @@ import { PageHeader } from "~/components/PageHeader";
 import { Page, PanelSection, PanelSections } from "~/components/Section";
 import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import { openTrain, useCan } from "./flowOverlays";
+import { cancelRollout, retryRollout } from "./flowRollout";
 import {
     type FlowModel,
     type Job,
     type JobStatus,
     cancelJobs,
     findVersion,
+    isRollout,
     jobHref,
     modelHref,
     nextNumber,
@@ -89,7 +91,10 @@ export const JOB_STATUS: Record<JobStatus, { tone: Tone; label: string }> = {
 };
 
 export function JobStatusText({ job }: { job: Job }) {
-    const status = JOB_STATUS[job.status];
+    const status =
+        job.status === "done" && isRollout(job)
+            ? { tone: "success" as const, label: "Succeeded" }
+            : JOB_STATUS[job.status];
     return (
         <span className="flex items-center gap-2">
             <StatusText tone={status.tone}>
@@ -130,6 +135,9 @@ export function BulkJobs({
                 disabled={retryable.length === 0}
                 onClick={() => {
                     retryJobs(retryable.map((job) => job.id));
+                    for (const job of retryable.filter(isRollout)) {
+                        retryRollout(job);
+                    }
                     onDone("Retrying", retryable.length);
                 }}
             >
@@ -141,6 +149,9 @@ export function BulkJobs({
                 disabled={cancellable.length === 0}
                 onClick={() => {
                     cancelJobs(cancellable.map((job) => job.id));
+                    for (const job of cancellable.filter(isRollout)) {
+                        cancelRollout(job.id);
+                    }
                     onDone("Cancelled", cancellable.length);
                 }}
             >

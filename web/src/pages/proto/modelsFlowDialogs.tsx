@@ -95,7 +95,7 @@ function AutopilotForm({ model, onClose }: { model: FlowModel; onClose: () => vo
                 <DialogDescription>
                     Once accepted feedback reaches the threshold, it trains a new version, scores it
                     against live, sends it a canary share of traffic and deploys it when the canary
-                    ends. Any trigger below makes the previous version live again.
+                    ends. Any trigger below deploys the previous version again.
                 </DialogDescription>
             </DialogHeader>
             <FieldGroup>
@@ -142,7 +142,7 @@ function AutopilotForm({ model, onClose }: { model: FlowModel; onClose: () => vo
                 </div>
                 <fieldset className="flex flex-col gap-2.5">
                     <legend className="mb-2 font-medium">
-                        Make the previous version live again if
+                        Deploy the previous version again if
                     </legend>
                     <CheckboxField
                         label="Errors rise"
@@ -152,7 +152,7 @@ function AutopilotForm({ model, onClose }: { model: FlowModel; onClose: () => vo
                     />
                     <CheckboxField
                         label="The score drops"
-                        description="The new version scores below live on the held-out set or on rated canary answers."
+                        description="The new version scores below the deployed one on the held-out set or on rated canary answers."
                         checked={draft.revertOnScore}
                         onCheckedChange={(value) => change({ revertOnScore: value === true })}
                     />

@@ -230,7 +230,7 @@ export function VersionsTab({ model }: { model: FlowModel }) {
             description: (
                 <p>
                     {`${deletable.map((version) => `${model.slug}@${version.number}`).join(", ")} stop answering; adapters, scores and cards are removed.`}
-                    {chosen.length > deletable.length && ` Live v${model.live} is kept.`}
+                    {chosen.length > deletable.length && ` Deployed v${model.live} is kept.`}
                 </p>
             ),
             label: deletable.length === 1 ? "Delete version" : "Delete versions",
@@ -282,7 +282,7 @@ export function VersionsTab({ model }: { model: FlowModel }) {
                                     picked.length === 0
                                         ? "Tick the versions to delete."
                                         : deletable.length === 0
-                                          ? "The live version cannot be deleted."
+                                          ? "The deployed version cannot be deleted."
                                           : null
                                 }
                             >
@@ -318,7 +318,7 @@ export function VersionsTab({ model }: { model: FlowModel }) {
                             <TableHead>Version</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">{model.metrics[0]}</TableHead>
-                            <TableHead>Against live</TableHead>
+                            <TableHead>Against deployed</TableHead>
                             <TableHead>Created</TableHead>
                             <TableHead className="pr-4">
                                 <span className="sr-only">Actions</span>

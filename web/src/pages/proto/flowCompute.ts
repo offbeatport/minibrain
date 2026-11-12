@@ -9,11 +9,15 @@ import {
     baseModelSlug,
     catalogEntry,
     downloadProgress,
+    failedRollout,
     findVersion,
     flowMode,
     flowState,
+    jobHref,
+    lastRollout,
     liveVersion,
     markVisited,
+    modelHref,
     setDeployment,
     setVariantsLive,
     variantKey,
@@ -56,6 +60,7 @@ type Engine = {
     since: number;
     ms: number;
     demand: { reason: string; until: number } | null;
+    job?: number;
 };
 
 export type Placement = { machine: string; gpu: number | null };
@@ -69,6 +74,7 @@ export type Deployment = {
     pool: string;
     placements: Placement[];
     loads: boolean;
+    job: number | null;
 };
 
 type Request = { key: string; at: number };
@@ -81,14 +87,11 @@ type Compute = {
     placements: Record<string, Placement[]>;
     requests: Request[];
     joined: number;
+    cached: string[];
 };
 
 export const DEFAULT_RESERVE: Reserve = { ram: 4, gpu: 1 };
 export const ON_DEMAND_MS = 5 * 60000;
-const DEPLOYING_MS = 1200;
-const LOAD_MS = 6000;
-const ADAPTER_MS = 1500;
-const UNDEPLOY_MS = 1000;
 const UNLOAD_MS = 2500;
 const DEMAND_LOAD_MS = 2500;
 const ADAPTER_GB = 0.3;
@@ -190,6 +193,7 @@ const FULL: Compute = {
     placements: {},
     requests: [],
     joined: 0,
+    cached: ["gpu-a10-2:qwen3-8b", "gpu-a10-1:llama-3.2-1b", "cpu-1:qwen3-8b"],
 };
 
 const EMPTY: Compute = {
@@ -200,6 +204,7 @@ const EMPTY: Compute = {
     placements: {},
     requests: [],
     joined: 0,
+    cached: [],
 };
 
 let worlds: Record<Mode, Compute> = { full: FULL, empty: EMPTY };
@@ -224,6 +229,10 @@ function subscribe(listener: () => void) {
 
 export function useComputeWorlds(): Record<Mode, Compute> {
     return useSyncExternalStore(subscribe, () => worlds);
+}
+
+export function computeNow(): Compute {
+    return worlds[flowMode()];
 }
 
 export function useCompute(mode: Mode): Compute {
@@ -351,12 +360,14 @@ export type LoadedEngine = {
     demand: { reason: string; until: number } | null;
     today: number;
     recent: number;
+    job: number | null;
+    rollout: number | null;
 };
 
 function versionLabel(model: FlowModel): string {
     const live = liveVersion(model);
     if (!live) {
-        return "no version live";
+        return "no version deployed";
     }
     if (live.kind === "prompt") {
         return `v${live.number}, prompt only`;
@@ -382,33 +393,50 @@ type Use = {
     serve: Serve;
     adapter: Adapter | null;
     today: number;
+    job: number | null;
 };
+
+type Active = { placements: Placement[]; loading: boolean; job: number | null };
+
+function activeOf(
+    target: string,
+    live: boolean,
+    replicas: string[],
+    compute: Compute,
+): Active | null {
+    const deployment = compute.deployments[target];
+    if (deployment && deployment.phase !== "deploying") {
+        return {
+            placements: deployment.placements,
+            loading: deployment.phase === "loading",
+            job: deployment.job,
+        };
+    }
+    if (!live) {
+        return null;
+    }
+    return { placements: placementsOf(target, replicas, compute), loading: false, job: null };
+}
 
 function usesOf(state: FlowState, compute: Compute): Use[] {
     const uses: Use[] = [];
     for (const model of state.models) {
         if (model.kind === "custom") {
             const serve = baseOf(model, state);
-            const deployment = compute.deployments[model.slug];
-            const loading = deployment && deployment.phase !== "undeploying";
-            if (!model.deployed && !loading) {
-                continue;
-            }
-            const placements = loading
-                ? deployment.placements
-                : placementsOf(model.slug, model.replicas, compute);
-            for (const placement of placements) {
+            const active = activeOf(model.slug, model.deployed, model.replicas, compute);
+            for (const placement of active?.placements ?? []) {
                 uses.push({
                     target: model.slug,
                     placement,
                     serve,
+                    job: active?.job ?? null,
                     today: model.traffic.at(-1) ?? 0,
                     adapter: {
                         slug: model.slug,
                         name: model.name,
                         version: versionLabel(model),
                         trained: liveVersion(model)?.kind === "trained",
-                        loading: Boolean(loading),
+                        loading: Boolean(active?.loading),
                     },
                 });
             }
@@ -416,18 +444,12 @@ function usesOf(state: FlowState, compute: Compute): Use[] {
         }
         for (const variant of model.variants) {
             const target = variantKey(model.slug, variant.id);
-            const deployment = compute.deployments[target];
-            const loading = deployment && deployment.phase !== "undeploying";
-            if (!variant.live && !loading) {
-                continue;
-            }
-            const placements = loading
-                ? deployment.placements
-                : placementsOf(target, variant.replicas, compute);
-            for (const placement of placements) {
+            const active = activeOf(target, variant.live, variant.replicas, compute);
+            for (const placement of active?.placements ?? []) {
                 uses.push({
                     target,
                     placement,
+                    job: active?.job ?? null,
                     serve: serveFor(model.slug, variant.format, state),
                     today: variant.traffic.at(-1) ?? 0,
                     adapter: null,
@@ -457,13 +479,18 @@ export function enginesOf(state: FlowState, compute: Compute, now: number): Load
             demand: null,
             today: 0,
             recent: 0,
+            job: null,
+            rollout: null,
         };
         engines.set(key, created);
         return created;
     };
+    const rollouts = latestDeploys(state);
     for (const use of usesOf(state, compute)) {
         const engine = touch(use.placement, use.serve);
         engine.today += use.today;
+        engine.job ??= use.job;
+        engine.rollout ??= rollouts.get(use.target) ?? null;
         if (use.adapter) {
             engine.adapters.push(use.adapter);
         } else {
@@ -478,6 +505,7 @@ export function enginesOf(state: FlowState, compute: Compute, now: number): Load
         }
         const engine = touch(placement, serveFor(item.base, item.format, state));
         engine.demand = item.demand;
+        engine.job ??= item.job ?? null;
         const done = (now - item.since) / Math.max(1, item.ms);
         if (item.demand && now > item.demand.until) {
             engine.state = "unloading";
@@ -495,6 +523,25 @@ export function enginesOf(state: FlowState, compute: Compute, now: number): Load
         }
     }
     return [...engines.values()];
+}
+
+function latestDeploys(state: FlowState): Map<string, number> {
+    const found = new Map<string, number>();
+    for (const job of state.jobs) {
+        const target = job.rollout?.target;
+        if (job.kind !== "deploy" || job.status !== "done" || !target) {
+            continue;
+        }
+        const known = state.jobs.find((item) => item.id === found.get(target));
+        if (!known || jobHours(job) < jobHours(known)) {
+            found.set(target, job.id);
+        }
+    }
+    return found;
+}
+
+function jobHours(job: Job): number {
+    return job.atMs ? (Date.now() - job.atMs) / 3600000 : job.hoursAgo;
 }
 
 export type JobLoad = {
@@ -749,7 +796,7 @@ export function loadSeconds(serve: Serve, loaded: boolean): number {
     return loaded ? 2 : Math.max(10, Math.round(serve.memory * 2));
 }
 
-function placementOf(slot: Slot): Placement {
+export function placementOf(slot: Slot): Placement {
     return { machine: slot.machine.id, gpu: slot.gpu?.index ?? null };
 }
 
@@ -757,7 +804,7 @@ function omit<T>(record: Record<string, T>, key: string): Record<string, T> {
     return Object.fromEntries(Object.entries(record).filter(([name]) => name !== key));
 }
 
-function finishDeploy(mode: Mode, target: string, placements: Placement[], serve: Serve) {
+export function completeDeploy(mode: Mode, target: string, placements: Placement[], serve: Serve) {
     const machines = [...new Set(placements.map((placement) => placement.machine))];
     if (target.includes("#")) {
         setVariantsLive([target], true, machines);
@@ -777,134 +824,145 @@ function finishDeploy(mode: Mode, target: string, placements: Placement[], serve
     }));
 }
 
-export function deploy(target: string, pool: string, slots: Slot[]) {
-    const mode = flowMode();
-    const state = flowState();
-    const serve = serveOf(target, state);
-    if (!serve) {
-        return;
-    }
-    const placements = slots.map(placementOf);
-    const loads = slots.some((slot) => !slot.loaded);
-    const now = Date.now();
+export function setRolloutPhase(mode: Mode, target: string, deployment: Deployment | null) {
     change(mode, (compute) => ({
         ...compute,
-        deployments: {
-            ...compute.deployments,
-            [target]: { phase: "deploying", since: now, ms: DEPLOYING_MS, pool, placements, loads },
-        },
+        deployments: deployment
+            ? { ...compute.deployments, [target]: deployment }
+            : omit(compute.deployments, target),
     }));
-    window.setTimeout(() => {
-        const ms = loads ? LOAD_MS : ADAPTER_MS;
-        const since = Date.now();
-        change(mode, (compute) => ({
-            ...compute,
-            deployments: {
-                ...compute.deployments,
-                [target]: { phase: "loading", since, ms, pool, placements, loads },
-            },
-            engines: [
-                ...compute.engines,
-                ...slots
-                    .filter((slot) => !slot.loaded)
-                    .map(
-                        (slot): Engine => ({
-                            ...placementOf(slot),
-                            base: serve.base,
-                            format: serve.format,
-                            state: "loading",
-                            since,
-                            ms,
-                            demand: null,
-                        }),
-                    ),
-            ],
-        }));
-        window.setTimeout(() => finishDeploy(mode, target, placements, serve), ms);
-    }, DEPLOYING_MS);
 }
 
-export function undeploy(target: string) {
+export function startLoading(
+    mode: Mode,
+    placements: Placement[],
+    serve: Serve,
+    ms: number,
+    job: number,
+) {
+    const since = Date.now();
+    change(mode, (compute) => ({
+        ...compute,
+        engines: [
+            ...compute.engines,
+            ...placements.map(
+                (placement): Engine => ({
+                    ...placement,
+                    base: serve.base,
+                    format: serve.format,
+                    state: "loading",
+                    since,
+                    ms,
+                    demand: null,
+                    job,
+                }),
+            ),
+        ],
+    }));
+}
+
+export function dropLoading(mode: Mode, job: number) {
+    change(mode, (compute) => ({
+        ...compute,
+        engines: compute.engines.filter((engine) => engine.job !== job),
+    }));
+}
+
+export function isCached(mode: Mode, machine: string, base: string): boolean {
+    return machine === "local" || worlds[mode].cached.includes(`${machine}:${base}`);
+}
+
+export function markCached(mode: Mode, machines: string[], base: string) {
+    change(mode, (compute) => ({
+        ...compute,
+        cached: [...new Set([...compute.cached, ...machines.map((id) => `${id}:${base}`)])],
+    }));
+}
+
+export function deployedPlacements(target: string): Placement[] {
     const mode = flowMode();
-    const before = flowState();
-    const serve = serveOf(target, before);
-    const model = before.models.find((item) => item.slug === target.split("#")[0]);
-    if (!serve || !model) {
-        return;
+    const state = flowState();
+    const model = state.models.find((item) => item.slug === target.split("#")[0]);
+    if (!model) {
+        return [];
     }
     const replicas = target.includes("#")
         ? (model.variants.find((item) => variantKey(model.slug, item.id) === target)?.replicas ??
           [])
         : model.replicas;
-    const placements = placementsOf(target, replicas, worlds[mode]);
-    markVisited("infra-undeploy");
-    change(mode, (compute) => ({
-        ...compute,
-        deployments: {
-            ...compute.deployments,
-            [target]: {
-                phase: "undeploying",
-                since: Date.now(),
-                ms: UNDEPLOY_MS,
-                pool: "",
-                placements,
-                loads: false,
-            },
-        },
-    }));
-    window.setTimeout(() => {
-        if (target.includes("#")) {
-            setVariantsLive([target], false, []);
-        } else {
-            setDeployment(target, false, []);
-        }
-        const after = enginesOf(flowState(), worlds[mode], Date.now());
-        const since = Date.now();
-        const unloading = placements
-            .filter(
-                (placement) =>
-                    !after.some(
-                        (engine) =>
-                            engine.key === engineKey(placement, serve.base, serve.format) &&
-                            engine.state !== "unloading",
-                    ),
-            )
-            .map(
-                (placement): Engine => ({
-                    ...placement,
-                    base: serve.base,
-                    format: serve.format,
-                    state: "unloading",
-                    since,
-                    ms: UNLOAD_MS,
-                    demand: null,
-                }),
-            );
-        change(mode, (compute) => ({
-            ...compute,
-            deployments: omit(compute.deployments, target),
-            placements: omit(compute.placements, target),
-            engines: [...compute.engines, ...unloading],
-        }));
-        window.setTimeout(
-            () =>
-                change(mode, (compute) => ({
-                    ...compute,
-                    engines: compute.engines.filter((engine) => !unloading.includes(engine)),
-                })),
-            UNLOAD_MS,
-        );
-    }, UNDEPLOY_MS);
+    return placementsOf(target, replicas, worlds[mode]);
 }
 
-export function undeployModel(model: FlowModel) {
-    if (model.kind === "custom") {
-        undeploy(model.slug);
-        return;
+export function stopRouting(target: string) {
+    if (target.includes("#")) {
+        setVariantsLive([target], false, []);
+    } else {
+        setDeployment(target, false, []);
     }
-    for (const variant of model.variants.filter((item) => item.live)) {
-        undeploy(variantKey(model.slug, variant.id));
-    }
+}
+
+export function baseUsers(target: string, placements: Placement[], serve: Serve): string[] {
+    const state = flowState();
+    const mode = flowMode();
+    const keys = new Set(
+        placements.map((placement) => engineKey(placement, serve.base, serve.format)),
+    );
+    return usesOf(state, worlds[mode])
+        .filter(
+            (use) =>
+                use.target !== target &&
+                keys.has(engineKey(use.placement, use.serve.base, use.serve.format)),
+        )
+        .map((use) => targetName(use.target, state));
+}
+
+export function releaseBase(
+    mode: Mode,
+    target: string,
+    placements: Placement[],
+    serve: Serve,
+    job: number,
+) {
+    change(mode, (compute) => ({
+        ...compute,
+        deployments: omit(compute.deployments, target),
+        placements: omit(compute.placements, target),
+    }));
+    const after = enginesOf(flowState(), worlds[mode], Date.now());
+    const since = Date.now();
+    const unloading = placements
+        .filter(
+            (placement) =>
+                !after.some(
+                    (engine) =>
+                        engine.key === engineKey(placement, serve.base, serve.format) &&
+                        engine.state !== "unloading",
+                ),
+        )
+        .map(
+            (placement): Engine => ({
+                ...placement,
+                base: serve.base,
+                format: serve.format,
+                state: "unloading",
+                since,
+                ms: UNLOAD_MS,
+                demand: null,
+                job,
+            }),
+        );
+    change(mode, (compute) => ({
+        ...compute,
+        engines: [...compute.engines, ...unloading],
+    }));
+    window.setTimeout(
+        () =>
+            change(mode, (compute) => ({
+                ...compute,
+                engines: compute.engines.filter((engine) => !unloading.includes(engine)),
+            })),
+        UNLOAD_MS,
+    );
 }
 
 export type Served = { where: string; onDemand: boolean; loading: boolean };
@@ -1102,7 +1160,20 @@ export function joinMachine(id: string, pool: string) {
     }));
 }
 
-export type ModelPhase = { tone: "success" | "info" | "neutral"; text: string };
+export type ModelPhase = {
+    tone: "success" | "info" | "neutral" | "warning" | "destructive";
+    text: string;
+    href?: string;
+    reason?: string;
+};
+
+const UNHEALTHY: Record<string, string> = {
+    guy1: "health checks time out on local; the engine restarted 3 times in 10 min",
+};
+
+export function unhealthyReason(model: FlowModel, mode: Mode): string | null {
+    return mode === "full" && model.deployed ? (UNHEALTHY[model.slug] ?? null) : null;
+}
 
 function targetsOf(model: FlowModel): string[] {
     return model.kind === "custom"
@@ -1155,22 +1226,60 @@ export function modelPhase(
         };
     }
     const deployment = deploymentOf(model, compute);
+    const href = deployment?.job ? jobHref(deployment.job) : undefined;
+    const job = state.jobs.find((item) => item.id === deployment?.job);
+    const what =
+        model.kind === "custom" && job?.version !== null && job?.version !== undefined
+            ? `Deploying v${job.version}`
+            : "Deploying";
     if (deployment?.phase === "deploying") {
-        return { tone: "info", text: "Deploying" };
+        return { tone: "info", text: what, href };
     }
     if (deployment?.phase === "loading") {
         return {
             tone: "info",
-            text: `Loading on ${placementNames(deployment.placements, compute)}`,
+            text: `${what} · loading on ${placementNames(deployment.placements, compute)}`,
+            href,
         };
     }
     if (deployment?.phase === "undeploying") {
-        return { tone: "info", text: "Undeploying" };
+        return { tone: "info", text: "Undeploying", href };
+    }
+    const failed = failedRollout(state, model.slug);
+    if (failed) {
+        return {
+            tone: "destructive",
+            text: model.deployed
+                ? `Deploy failed · ${model.kind === "custom" && model.live !== null ? `v${model.live}` : "the old deployment"} still serves`
+                : "Deploy failed",
+            href: jobHref(failed.id),
+            reason: failed.error,
+        };
+    }
+    const unhealthy = unhealthyReason(model, state.mode);
+    if (unhealthy) {
+        return {
+            tone: "warning",
+            text: "Unhealthy",
+            reason: unhealthy,
+            href: `${modelHref(model.slug, "monitoring")}#deployment`,
+        };
     }
     if (model.deployed) {
-        return { tone: "success", text: "Deployed" };
+        const last = lastRollout(state, model.slug);
+        const version =
+            model.kind === "custom" && model.live !== null
+                ? model.canary
+                    ? ` · v${model.live} ${100 - model.canary.share}% · v${model.canary.version} ${model.canary.share}%`
+                    : ` · v${model.live}`
+                : "";
+        return {
+            tone: "success",
+            text: `Deployed${version}`,
+            href: last ? jobHref(last.id) : undefined,
+        };
     }
-    return { tone: "neutral", text: "Ready" };
+    return { tone: "neutral", text: "Not deployed" };
 }
 
 export function liveReplicas(model: FlowModel): number {

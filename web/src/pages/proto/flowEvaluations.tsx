@@ -149,7 +149,7 @@ const CANDIDATES: Candidate[] = [
         id: "st-4",
         label: "support-triage@4",
         kind: "Version",
-        detail: "Live · fine-tuned on Qwen3 8B",
+        detail: "Deployed · fine-tuned on Qwen3 8B",
         score: 0.867,
         cost: 9.6,
         p95: 240,
