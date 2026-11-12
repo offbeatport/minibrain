@@ -296,52 +296,56 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
             icon={History}
             title="Versions"
             actions={
-                <>
-                    {picked.length > 0 && (
-                        <Button variant="outline" onClick={() => setPicked([])}>
-                            <X aria-hidden="true" />
-                            Clear
-                        </Button>
-                    )}
-                    <Tip
-                        tip={
-                            sorted.length === 2 ? null : "Tick two scored versions to compare them."
+                picked.length > 0 && (
+                    <>
+                        {
+                            <Button variant="outline" onClick={() => setPicked([])}>
+                                <X aria-hidden="true" />
+                                Clear
+                            </Button>
                         }
-                    >
-                        <Button
-                            variant="outline"
-                            disabled={sorted.length !== 2}
-                            onClick={() =>
-                                router.history.push(modelCompareHref(row.key, sorted[0], sorted[1]))
-                            }
-                        >
-                            <GitCompare aria-hidden="true" />
-                            {sorted.length === 2
-                                ? `Compare v${sorted[0]} and v${sorted[1]}`
-                                : "Compare"}
-                        </Button>
-                    </Tip>
-                    {can.build && (
                         <Tip
                             tip={
-                                picked.length === 0
-                                    ? "Tick the versions to delete."
-                                    : deletable.length === 0
-                                      ? "The live version cannot be deleted."
-                                      : null
+                                sorted.length === 2
+                                    ? null
+                                    : "Tick two scored versions to compare them."
                             }
                         >
                             <Button
-                                variant="destructive"
-                                disabled={deletable.length === 0}
-                                onClick={remove}
+                                variant="outline"
+                                disabled={sorted.length !== 2}
+                                onClick={() =>
+                                    router.history.push(
+                                        modelCompareHref(row.key, sorted[0], sorted[1]),
+                                    )
+                                }
                             >
-                                <Trash2 aria-hidden="true" />
-                                {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
+                                <GitCompare aria-hidden="true" />
+                                {sorted.length === 2
+                                    ? `Compare v${sorted[0]} and v${sorted[1]}`
+                                    : "Compare"}
                             </Button>
                         </Tip>
-                    )}
-                </>
+                        {can.build && (
+                            <Tip
+                                tip={
+                                    deletable.length === 0
+                                        ? "The live version cannot be deleted."
+                                        : null
+                                }
+                            >
+                                <Button
+                                    variant="destructive"
+                                    disabled={deletable.length === 0}
+                                    onClick={remove}
+                                >
+                                    <Trash2 aria-hidden="true" />
+                                    {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
+                                </Button>
+                            </Tip>
+                        )}
+                    </>
+                )
             }
             flush
         >
