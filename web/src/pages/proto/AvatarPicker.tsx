@@ -41,8 +41,6 @@ import {
 } from "./avatarSession";
 import { AVATAR_STYLES, type AvatarStyleId, styleById } from "./avatarStyles";
 
-const SHIFT_HOLD_MS = 120;
-
 export function isTyping(target: EventTarget | null): boolean {
     return (
         target instanceof HTMLElement &&
@@ -52,45 +50,6 @@ export function isTyping(target: EventTarget | null): boolean {
 
 function plainKey(event: globalThis.KeyboardEvent): boolean {
     return !event.metaKey && !event.ctrlKey && !event.altKey && !isTyping(event.target);
-}
-
-function useHeldShift(open: boolean): boolean {
-    const [held, setHeld] = useState(false);
-    useEffect(() => {
-        if (!open) {
-            setHeld(false);
-            return;
-        }
-        let timer: number | undefined;
-        const release = () => {
-            window.clearTimeout(timer);
-            setHeld(false);
-        };
-        const onDown = (event: globalThis.KeyboardEvent) => {
-            if (event.key !== "Shift") {
-                release();
-                return;
-            }
-            if (!event.repeat && plainKey(event)) {
-                timer = window.setTimeout(() => setHeld(true), SHIFT_HOLD_MS);
-            }
-        };
-        const onUp = (event: globalThis.KeyboardEvent) => {
-            if (event.key === "Shift") {
-                release();
-            }
-        };
-        window.addEventListener("keydown", onDown);
-        window.addEventListener("keyup", onUp);
-        window.addEventListener("blur", release);
-        return () => {
-            release();
-            window.removeEventListener("keydown", onDown);
-            window.removeEventListener("keyup", onUp);
-            window.removeEventListener("blur", release);
-        };
-    }, [open]);
-    return held;
 }
 
 export function PickerDialog({
@@ -108,9 +67,6 @@ export function PickerDialog({
 }) {
     const [session, setSession] = useState(() => startSession(value));
     const [peek, setPeek] = useState<AvatarChoice | null>(null);
-    const [comparing, setComparing] = useState(false);
-    const held = useHeldShift(open);
-    const compare = comparing || held;
     const displayName = name.trim() || "Untitled model";
     const style = styleById(session.tab);
     const draft = draftOf(session);
@@ -132,7 +88,7 @@ export function PickerDialog({
             return;
         }
         const onKey = (event: globalThis.KeyboardEvent) => {
-            if (event.key.toLowerCase() === "r" && !event.shiftKey && plainKey(event)) {
+            if (event.key.toLowerCase() === "r" && plainKey(event)) {
                 event.preventDefault();
                 setPeek(null);
                 setSession(deal);
@@ -148,7 +104,6 @@ export function PickerDialog({
                 if (next) {
                     setSession(startSession(value));
                     setPeek(null);
-                    setComparing(false);
                 }
                 onOpenChange(next);
             }}
@@ -162,13 +117,7 @@ export function PickerDialog({
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-6 lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-6 lg:gap-y-4">
                     <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-                        <HeroStage
-                            shown={shown}
-                            saved={value}
-                            previewing={previewing}
-                            compare={compare}
-                            name={displayName}
-                        />
+                        <HeroStage shown={shown} previewing={previewing} name={displayName} />
                     </div>
                     <div className="flex min-w-0 flex-col gap-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
                         <Tabs
@@ -186,12 +135,12 @@ export function PickerDialog({
                                     <TabsTrigger
                                         key={item.id}
                                         value={item.id}
-                                        className="flex-none gap-2 px-2 sm:px-3"
+                                        className="h-11 flex-none gap-2.5 px-3 text-base sm:px-4"
                                     >
                                         <AvatarTile
                                             choice={session.selected[item.id]}
                                             name={displayName}
-                                            size="sm"
+                                            size="md"
                                             className="hidden sm:flex"
                                         />
                                         {item.name}
@@ -229,19 +178,6 @@ export function PickerDialog({
                                 className="sm:ml-auto"
                             >
                                 Surprise me
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                aria-pressed={compare}
-                                onClick={() => setComparing((on) => !on)}
-                                className={cn(
-                                    compare &&
-                                        "border-primary bg-accent text-accent-foreground hover:bg-accent",
-                                )}
-                            >
-                                Compare
-                                <Kbd className="hidden sm:inline-flex">Shift</Kbd>
                             </Button>
                         </div>
                         {style.seeded ? (

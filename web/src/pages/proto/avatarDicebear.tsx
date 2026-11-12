@@ -26,6 +26,8 @@ import {
 
 const DEFAULT_PX = 48;
 
+const SINGLE_LETTER = "initials-single";
+
 export type AvatarChoice = { style: AvatarStyleId; seed: string; tone: ToneName; letters?: string };
 
 export const TONE_LABELS: Record<ToneName, string> = {
@@ -96,7 +98,12 @@ export function candidateChoices(
     letters?: string,
 ): AvatarChoice[] {
     if (!styleById(style).seeded) {
-        return TONE_KEYS.map((key) => ({ style, seed: "initials", tone: key, letters }));
+        const extra = crypto.getRandomValues(new Uint32Array(1))[0];
+        const single = [0, 5].map((step) => TONE_KEYS[(extra + step) % TONE_KEYS.length]);
+        return [
+            ...TONE_KEYS.map((key) => ({ style, seed: "initials", tone: key, letters })),
+            ...single.map((key) => ({ style, seed: SINGLE_LETTER, tone: key, letters })),
+        ].slice(0, count);
     }
     const offset = crypto.getRandomValues(new Uint32Array(1))[0];
     return Array.from({ length: count }, (_, index) => ({
@@ -111,7 +118,8 @@ export function sameChoice(one: AvatarChoice, two: AvatarChoice): boolean {
     return (
         one.style === two.style &&
         one.tone === two.tone &&
-        (seeded ? one.seed === two.seed : (one.letters ?? "") === (two.letters ?? ""))
+        one.seed === two.seed &&
+        (seeded || (one.letters ?? "") === (two.letters ?? ""))
     );
 }
 
@@ -130,7 +138,8 @@ export function defaultLetters(name: string): string {
 }
 
 export function lettersOf(choice: AvatarChoice, name: string): string {
-    return choice.letters?.trim() || defaultLetters(name);
+    const text = choice.letters?.trim() || defaultLetters(name);
+    return choice.seed === SINGLE_LETTER ? text.slice(0, 1) : text;
 }
 
 function framed(svg: string, frame: Frame, fill: string | null): string {

@@ -58,15 +58,11 @@ function Figure({
 
 export function HeroStage({
     shown,
-    saved,
     previewing,
-    compare,
     name,
 }: {
     shown: AvatarChoice;
-    saved: AvatarChoice;
     previewing: boolean;
-    compare: boolean;
     name: string;
 }) {
     return (
@@ -76,34 +72,17 @@ export function HeroStage({
             className="relative flex min-w-0 items-center justify-center rounded-lg border bg-background px-4 pt-9 pb-5 sm:h-76"
         >
             <div className="absolute top-3 left-3 flex h-5 items-center">
-                {previewing && !compare && <Badge variant="info">Preview</Badge>}
+                {previewing && <Badge variant="info">Preview</Badge>}
             </div>
-            {compare ? (
-                <div className="grid grid-cols-2 gap-3 [--hero-scale:2.5] sm:[--hero-scale:3.333]">
-                    <Figure
-                        choice={saved}
-                        name={name}
-                        caption={<span className="font-medium">Now</span>}
-                    />
-                    <Figure
-                        choice={shown}
-                        name={name}
-                        caption={
-                            <span className="font-medium">{previewing ? "Preview" : "New"}</span>
-                        }
-                    />
-                </div>
-            ) : (
-                <div className="flex min-w-0 max-w-full [--hero-scale:2.5] sm:[--hero-scale:3.667]">
-                    <Figure
-                        choice={shown}
-                        name={name}
-                        caption={
-                            <span className="max-w-full truncate text-lg font-medium">{name}</span>
-                        }
-                    />
-                </div>
-            )}
+            <div className="flex min-w-0 max-w-full [--hero-scale:2.5] sm:[--hero-scale:3.667]">
+                <Figure
+                    choice={shown}
+                    name={name}
+                    caption={
+                        <span className="max-w-full truncate text-lg font-medium">{name}</span>
+                    }
+                />
+            </div>
         </section>
     );
 }
