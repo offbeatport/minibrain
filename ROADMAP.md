@@ -230,6 +230,23 @@ stay comparable; changing the promotion rule saves without re-scoring (2026-11-1
 | Feedback | A flagged or corrected output from the gateway or playground; lands in the review queue. A test example from the Playground is accepted feedback held out for scoring |
 | Index | The model's fact store, built from the same sources as training: chunks, embeddings, access metadata, synced continuously |
 
+## The core journey
+
+Every UI change serves one of these steps or questions itself (2026-11-13). Home's checklist, empty states and each
+model's next-step line follow them.
+
+1. **Install** on one server; sign in with the setup link as the admin.
+2. **Add data**: upload a CSV or JSONL, or connect Postgres; it becomes a dataset with held-out rows set aside.
+3. **Add a model**: base (downloads or imports in the background if missing), dataset, name, output (labels, JSON or
+   free text).
+4. **Baseline**: v0 (base + instructions) is scored at once on the held-out rows.
+5. **Train**: one click from the Train page; the new version is scored on the same rows ("+18 vs v0").
+6. **Deploy** the version that passes the promotion rule; a deploy job loads it and routes the API name to it.
+7. **Connect**: create an API key; apps call `/v1` with the model's API name.
+8. **Run**: Monitoring shows requests, latency, errors and cost per version; the audit log records every change.
+9. **Improve**: reviewed feedback and new dataset versions show "vN available · Train"; retrain, compare, deploy.
+10. **Own it**: weights, data, scores and logs stay on the server; export the adapter or a merged model at any time.
+
 ## Flow
 
 base + dataset + name → version 0 as a Chat assistant: prompt-only on the base at once, scored on the held-out rows
