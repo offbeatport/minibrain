@@ -152,7 +152,7 @@ function infraSteps(state: FlowState): Step[] {
         },
         {
             id: "infra-deploy",
-            label: "Use › Deploy…: pick the version, pool and replicas",
+            label: "Deploy: pick the version, pool and replicas",
             href: modelHref(slug),
         },
         {
@@ -165,11 +165,11 @@ function infraSteps(state: FlowState): Step[] {
             label: "Infrastructure: it loads, then serves on gpu-a10-1",
             href: INFRA,
         },
-        { id: "infra-try", label: "Use › Try it in the Playground", href: playgroundHref(slug) },
+        { id: "infra-try", label: "Use › Playground", href: playgroundHref(slug) },
         { id: "infra-traffic", label: "Infrastructure: the GPU card shows traffic", href: INFRA },
         {
             id: "infra-undeploy",
-            label: "Use › Undeploy: an Undeploy job runs",
+            label: "Monitoring › Deployment › Undeploy: an Undeploy job runs",
             href: modelHref(slug),
         },
         { id: "infra-unload", label: "Infrastructure: it unloads", href: INFRA },

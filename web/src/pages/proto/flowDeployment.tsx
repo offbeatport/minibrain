@@ -1,4 +1,5 @@
-import { History, Logs, Server } from "lucide-react";
+import { useRouter } from "@tanstack/react-router";
+import { History, Logs, PowerOff, Server, SlidersHorizontal } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -14,6 +15,7 @@ import {
     TableHead,
     TableHeader,
     TableRow,
+    useToast,
 } from "obp-ui";
 import { useState } from "react";
 import { PanelSection } from "~/components/Section";
@@ -28,7 +30,9 @@ import {
     useCompute,
     useNow,
 } from "./flowCompute";
-import { engineLog, versionText, whereOf } from "./flowRollout";
+import { DeployDialog } from "./flowDeploy";
+import { useCan } from "./flowOverlays";
+import { engineLog, startUndeploy, undeployTargets, versionText, whereOf } from "./flowRollout";
 import { JobStatusText } from "./flowTraining";
 import {
     type FlowModel,
@@ -40,6 +44,7 @@ import {
     useFlowState,
     variantKey,
 } from "./modelsFlowData";
+import { type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 
 type Compute = ReturnType<typeof useCompute>;
 
@@ -315,12 +320,59 @@ function RolloutHistory({ jobs, compute }: { jobs: Job[]; compute: Compute }) {
     );
 }
 
+function DeploymentActions({ model }: { model: FlowModel }) {
+    const router = useRouter();
+    const toast = useToast();
+    const state = useFlowState();
+    const compute = useCompute(state.mode);
+    const busy = Boolean(deploymentOf(model, compute)?.job);
+    const [editing, setEditing] = useState(false);
+    const [confirm, setConfirm] = useState<Confirm | null>(null);
+    const undeploy = () =>
+        setConfirm({
+            title: `Undeploy ${model.name}?`,
+            description: (
+                <p>{`Apps calling ${model.slug} get errors at once. Versions and keys stay.`}</p>
+            ),
+            label: "Undeploy",
+            run: () => {
+                const ids = undeployTargets(model).map((target) => startUndeploy(model, target));
+                const first = ids[0];
+                toast({
+                    title: `Undeploying ${model.name}`,
+                    description: `Undeploy job #${first} stops routing and unloads it.`,
+                    action: first
+                        ? {
+                              label: "View rollout",
+                              onClick: () => router.history.push(jobHref(first)),
+                          }
+                        : undefined,
+                });
+            },
+        });
+    return (
+        <>
+            <Button variant="outline" disabled={busy} onClick={() => setEditing(true)}>
+                <SlidersHorizontal />
+                Edit
+            </Button>
+            <Button variant="outline" disabled={busy} onClick={undeploy}>
+                <PowerOff />
+                Undeploy
+            </Button>
+            <DeployDialog model={model} mode="change" open={editing} onOpenChange={setEditing} />
+            <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
+        </>
+    );
+}
+
 export function DeploymentSections({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const compute = useCompute(state.mode);
     const [open, setOpen] = useState<Replica | null>(null);
     const jobs = rolloutsOf(state, model.slug);
     const rows = replicasOf(model, jobs);
+    const builder = useCan("builder");
     return (
         <>
             <PanelSection
@@ -330,7 +382,10 @@ export function DeploymentSections({ model }: { model: FlowModel }) {
                 description={
                     rows.length > 0
                         ? `${rows.length} ${rows.length === 1 ? "replica" : "replicas"}, kept alive with restarts and reloads. Open a replica's engine logs.`
-                        : "Not deployed: nothing serves it. Deploy it from Use › Deploy…"
+                        : "Not deployed: nothing serves it."
+                }
+                actions={
+                    builder && model.deployed ? <DeploymentActions model={model} /> : undefined
                 }
                 bare
             >

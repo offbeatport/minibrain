@@ -32,6 +32,7 @@ import {
     USE_LABELS,
     automaticPool,
     deployedPlacements,
+    liveReplicas,
     loadSeconds,
     placementOf,
     poolFits,
@@ -221,7 +222,7 @@ export function DeployForm({
     source?: "inbox";
     onClose: () => void;
 }) {
-    const changing = mode !== "deploy";
+    const changing = mode !== "deploy" || model.deployed;
     const state = useFlowState();
     const compute = useCompute(state.mode);
     const now = useNow(5000);
@@ -229,7 +230,7 @@ export function DeployForm({
     const [target, setTarget] = useState(() => initialTarget(model));
     const [choice, setChoice] = useState(AUTOMATIC);
     const [picking, setPicking] = useState(false);
-    const [replicas, setReplicas] = useState(1);
+    const [replicas, setReplicas] = useState(() => (model.deployed ? liveReplicas(model) : 1));
     const [context, setContext] = useState(DEFAULT_CONTEXT);
     const [advanced, setAdvanced] = useState(false);
     const custom = model.kind === "custom" && deployable(model).length > 0;
@@ -276,7 +277,7 @@ export function DeployForm({
     };
     const title =
         mode === "change"
-            ? `Change ${model.name} deployment`
+            ? `Edit ${model.name} deployment`
             : mode === "version"
               ? `Deploy another version of ${model.name}`
               : `Deploy ${model.name}`;

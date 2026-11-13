@@ -166,7 +166,7 @@ function PartsSection({
 
 function emptyText(model: FlowModel, range: UsageRange): string {
     if (model.live === null && model.kind !== "base") {
-        return "Not deployed, so its name answers nothing. Deploy a version from Use › Deploy…";
+        return "Not deployed, so its name answers nothing. Deploy it from the header.";
     }
     if (!model.deployed) {
         return `${model.name} is not deployed, so nothing calls it. Deploy it from the header.`;
