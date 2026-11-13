@@ -522,6 +522,14 @@ export function ModelsList() {
                 chips={<FilterChips models={models} filters={filters} onFilters={setFilters} />}
                 actions={
                     <>
+                        {can.build && (
+                            <Button asChild>
+                                <Link href="/models/new">
+                                    <CubePlus />
+                                    Add model
+                                </Link>
+                            </Button>
+                        )}
                         <ViewOptions
                             pool={pool}
                             models={models}
@@ -552,14 +560,6 @@ export function ModelsList() {
                             columns={shownColumns}
                             onColumns={setColumns}
                         />
-                        {can.build && (
-                            <Button asChild>
-                                <Link href="/models/new">
-                                    <CubePlus />
-                                    Add model
-                                </Link>
-                            </Button>
-                        )}
                     </>
                 }
             />
