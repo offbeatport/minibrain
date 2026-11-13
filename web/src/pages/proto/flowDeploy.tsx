@@ -276,7 +276,7 @@ export function DeployForm({
     };
     const title =
         mode === "change"
-            ? `Change where ${model.name} runs`
+            ? `Change ${model.name} deployment`
             : mode === "version"
               ? `Deploy another version of ${model.name}`
               : `Deploy ${model.name}`;

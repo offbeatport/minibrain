@@ -2,7 +2,6 @@ import { useRouter } from "@tanstack/react-router";
 import {
     ChevronDown,
     CopyPlus,
-    GitBranchPlus,
     GraduationCap,
     ListChecks,
     MoreHorizontal,
@@ -154,15 +153,6 @@ function MoreMenu({ model }: { model: FlowModel }) {
     );
 }
 
-function Detail({ title, detail }: { title: string; detail: string }) {
-    return (
-        <span className="flex flex-col">
-            <span>{title}</span>
-            <span className="text-sm whitespace-normal text-muted-foreground">{detail}</span>
-        </span>
-    );
-}
-
 function deployedLine(model: FlowModel, compute: ReturnType<typeof useCompute>): string {
     const replicas = liveReplicas(model);
     const where =
@@ -218,38 +208,22 @@ function DeployItems({
         return (
             <DropdownMenuItem disabled={Boolean(download)} onSelect={() => onDeploy("deploy")}>
                 <Rocket />
-                <Detail
-                    title="Deploy…"
-                    detail={
-                        download
-                            ? `Waits for ${download.name} to download.`
-                            : "Pick the version, pool and replicas; a Deploy job rolls it out."
-                    }
-                />
+                Deploy…
             </DropdownMenuItem>
         );
     }
     return (
         <>
-            <DropdownMenuLabel className="font-normal text-muted-foreground tabular-nums">
-                {deployedLine(model, compute)}
-            </DropdownMenuLabel>
-            {custom && (
-                <DropdownMenuItem onSelect={() => onDeploy("version")}>
-                    <GitBranchPlus />
-                    Deploy another version…
-                </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onSelect={() => onDeploy("change")}>
+                <SlidersHorizontal />
+                Change deployment…
+            </DropdownMenuItem>
             {idleFormats && (
                 <DropdownMenuItem onSelect={() => onDeploy("deploy")}>
                     <Rocket />
                     Deploy another format…
                 </DropdownMenuItem>
             )}
-            <DropdownMenuItem onSelect={() => onDeploy("change")}>
-                <SlidersHorizontal />
-                Change pool or replicas…
-            </DropdownMenuItem>
             {last && (
                 <DropdownMenuItem onSelect={() => router.history.push(jobHref(last.id))}>
                     <ListChecks />
@@ -311,27 +285,11 @@ function UseMenu({ model }: { model: FlowModel }) {
                 <DropdownMenuContent align="end" className="w-72">
                     <DropdownMenuItem disabled={Boolean(download)} onSelect={tryIt}>
                         <Play />
-                        <Detail
-                            title="Try it in the Playground"
-                            detail={
-                                download
-                                    ? `Waits for ${download.name} to download.`
-                                    : model.deployed
-                                      ? "Runs on its deployment."
-                                      : "Loads it on demand; it unloads when idle."
-                            }
-                        />
+                        Try it in the Playground
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => openConnect(model.slug)}>
                         <Plug />
-                        <Detail
-                            title="Connect"
-                            detail={
-                                model.deployed
-                                    ? `API name ${model.slug}, code and keys.`
-                                    : "Deploy it first so apps can call it."
-                            }
-                        />
+                        API Connect
                     </DropdownMenuItem>
                     {builder && (
                         <>
