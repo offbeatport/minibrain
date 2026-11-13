@@ -1,10 +1,13 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { Lock } from "lucide-react";
-import { Button, Card, ConfirmDialog, InfoTip, Kbd, Textarea, cn } from "obp-ui";
-import { type KeyboardEvent, type ReactNode, useState } from "react";
+import { GraduationCap, Lock, ScrollText } from "lucide-react";
+import { Button, Card, ConfirmDialog, InfoTip, Textarea } from "obp-ui";
+import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useModel, useVersions } from "~/api/queries";
+import { CreateLayout, FormCard } from "~/components/CreateLayout";
+import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
 import { PageHeader } from "~/components/PageHeader";
+import { PickSelect } from "~/components/PickSelect";
 import { ErrorLine, Page } from "~/components/Section";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
@@ -15,9 +18,9 @@ import { relativeTime } from "~/lib/time";
 import { ModelDataNotice } from "../../../data/versionData";
 import { Crumbs, modelCrumbs, nextVersion, trainBlock } from "../header";
 import { Advanced } from "./advanced";
-import { AUTO, HeldOutWarning, PickSelect, fitText, timeText } from "./parts";
+import { AUTO, HeldOutWarning, fitText, timeText } from "./parts";
 import { MIN_HELD_OUT, QUALITIES, duration, presetText, startFrom } from "./recipe";
-import { ProblemLine, RunSummary, StatusLine } from "./summary";
+import { RunSummary, problemsOf, statusOf } from "./summary";
 import { type TrainRun, type TrainStart, useTrainRun } from "./useTrainRun";
 
 const INSTRUCTIONS_ANCHOR = "instructions";
@@ -74,55 +77,23 @@ function useMethod(): [TrainMethod, (next: TrainMethod) => void] {
     return [method, choose];
 }
 
-function FormRow({
-    id,
-    label,
-    tip,
-    anchor,
-    children,
-}: {
-    id: string;
-    label: string;
-    tip?: ReactNode;
-    anchor?: string;
-    children: ReactNode;
-}) {
-    return (
-        <section
-            id={anchor}
-            aria-labelledby={id}
-            className="grid scroll-my-24 gap-label py-3 first:pt-0 last:pb-0 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-4"
-        >
-            <span className="flex items-center gap-1.5 sm:h-8 sm:self-start">
-                <h3 id={id} className="font-medium">
-                    {label}
-                </h3>
-                {tip && <InfoTip label={`About ${label.toLowerCase()}`}>{tip}</InfoTip>}
-            </span>
-            <div className="flex min-w-0 flex-col gap-1.5">{children}</div>
-        </section>
-    );
-}
-
-function Control({ children }: { children: ReactNode }) {
-    return <div className="w-full max-w-md">{children}</div>;
-}
-
 function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run: TrainRun }) {
     const chosen = run.chosen;
     if (!chosen) {
         return (
-            <p className="text-destructive sm:leading-8">
-                Add training data first: training needs examples.
-            </p>
+            <FormRow label="Data">
+                <p className="text-destructive">
+                    Add training data first: training needs examples.
+                </p>
+            </FormRow>
         );
     }
     const dataset = detail.dataset_name ?? detail.dataset ?? "Data";
     return (
-        <>
-            <Control>
+        <FormRow id="train-data" label="Data" align="start">
+            <FormControl>
                 <PickSelect
-                    id="train-data-select"
+                    id="train-data"
                     value={String(chosen.id)}
                     onChange={(next) => run.setPicked(Number(next))}
                     options={run.saved.map((item, index) => ({
@@ -134,10 +105,10 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
                         ].join(" · "),
                     }))}
                 />
-            </Control>
-            <ModelDataNotice slug={row.key} />
-            {run.heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={run.heldOut} />}
-        </>
+                <ModelDataNotice slug={row.key} />
+                {run.heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={run.heldOut} />}
+            </FormControl>
+        </FormRow>
     );
 }
 
@@ -167,50 +138,63 @@ function InstructionsRow({
     const changed = text.trim() !== detail.instructions.trim();
     return (
         <FormRow
-            id="train-instructions"
+            id={open ? "train-instructions" : undefined}
             label="Instructions"
-            anchor={INSTRUCTIONS_ANCHOR}
+            align={open ? "start" : "center"}
             tip="The system prompt. The new version keeps its own copy, and later versions start from it."
         >
-            {open ? (
-                <div className="flex w-full max-w-2xl flex-col gap-2">
-                    <Textarea
-                        id="train-instructions-text"
-                        aria-labelledby="train-instructions"
-                        className="min-h-40"
-                        value={text}
-                        placeholder={detail.default_instructions}
-                        onChange={(event) => onText(event.target.value)}
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                        {onOpen && (
-                            <Button type="button" variant="outline" onClick={() => onOpen(false)}>
-                                Done
+            <FormControl width="full">
+                <div id={INSTRUCTIONS_ANCHOR} className="flex scroll-my-24 flex-col gap-2">
+                    {open ? (
+                        <>
+                            <Textarea
+                                id="train-instructions"
+                                className="min-h-40"
+                                value={text}
+                                placeholder={detail.default_instructions}
+                                onChange={(event) => onText(event.target.value)}
+                            />
+                            {(onOpen || changed) && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {onOpen && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => onOpen(false)}
+                                        >
+                                            Done
+                                        </Button>
+                                    )}
+                                    {changed && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            onClick={() => onText(detail.instructions)}
+                                        >
+                                            Undo changes
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex min-w-0 items-center gap-3">
+                            <span className="min-w-0 truncate">
+                                {firstLine(shown) || "None"}
+                                {!text.trim() && (
+                                    <span className="text-muted-foreground"> (default)</span>
+                                )}
+                            </span>
+                            {changed && (
+                                <span className="text-sm text-muted-foreground">Changed</span>
+                            )}
+                            <Button type="button" variant="outline" onClick={() => onOpen?.(true)}>
+                                Edit
                             </Button>
-                        )}
-                        {changed && (
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => onText(detail.instructions)}
-                            >
-                                Undo changes
-                            </Button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-            ) : (
-                <div className="flex w-full max-w-2xl min-w-0 items-center gap-3">
-                    <span className="min-w-0 flex-1 truncate sm:leading-8">
-                        {firstLine(shown) || "None"}
-                        {!text.trim() && <span className="text-muted-foreground"> (default)</span>}
-                    </span>
-                    {changed && <span className="text-sm text-muted-foreground">Changed</span>}
-                    <Button type="button" variant="outline" onClick={() => onOpen?.(true)}>
-                        Edit
-                    </Button>
-                </div>
-            )}
+            </FormControl>
         </FormRow>
     );
 }
@@ -293,158 +277,135 @@ function TrainForm({
         }
     };
     const training = method === "sft";
-    const disabled = !run.ready || run.create.isPending;
-    const submitLabel = training ? `Train v${run.number}` : `Create v${run.number}`;
+    const SubmitIcon = training ? GraduationCap : ScrollText;
     const serveOnly = detail.serve_only ?? row.serve_only;
-    return (
-        <form
-            noValidate
-            className="@container"
-            onSubmit={(event) => {
-                event.preventDefault();
-                run.submit();
-            }}
-            onKeyDown={onKeyDown}
-        >
-            <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
-                <div className="flex min-w-0 flex-col gap-6">
-                    <Card className="gap-0 divide-y p-panel">
-                        <FormRow id="train-method" label="Method">
-                            <Control>
+    const form = (
+        <>
+            <FormCard>
+                <FormGroup>
+                    <FormRow id="train-method" label="Method">
+                        <FormControl>
+                            <PickSelect
+                                id="train-method"
+                                value={method}
+                                onChange={(next) => onMethod(next as TrainMethod)}
+                                options={[
+                                    {
+                                        value: "sft",
+                                        label: "Supervised fine-tuning (SFT)",
+                                        meta: serveOnly ? serveOnly.reason : "trains an adapter",
+                                        disabled: Boolean(serveOnly),
+                                    },
+                                    {
+                                        value: "instructions",
+                                        label: "Instructions only (no training)",
+                                        meta: "scored at once",
+                                    },
+                                ]}
+                            />
+                        </FormControl>
+                    </FormRow>
+                    <InstructionsRow
+                        detail={detail}
+                        text={text}
+                        onText={setText}
+                        open={editing || !training}
+                        onOpen={training ? setEditing : undefined}
+                    />
+                    <DataRow row={row} detail={detail} run={run} />
+                    {training && (
+                        <FormRow id="train-quality" label="Training">
+                            <FormControl>
                                 <PickSelect
-                                    id="train-method-select"
-                                    value={method}
-                                    onChange={(next) => onMethod(next as TrainMethod)}
+                                    id="train-quality"
+                                    value={run.level}
+                                    onChange={(next) => run.choose(next as typeof run.level)}
                                     options={[
+                                        ...QUALITIES.map((item) => ({
+                                            value: item.id,
+                                            label: item.label,
+                                            meta: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
+                                        })),
                                         {
-                                            value: "sft",
-                                            label: "Supervised fine-tuning (SFT)",
-                                            meta: serveOnly
-                                                ? serveOnly.reason
-                                                : "trains an adapter",
-                                            disabled: Boolean(serveOnly),
-                                        },
-                                        {
-                                            value: "instructions",
-                                            label: "Instructions only (no training)",
-                                            meta: "scored at once",
+                                            value: "custom",
+                                            label: "Custom",
+                                            meta: "set each parameter",
+                                            separated: true,
                                         },
                                     ]}
                                 />
-                            </Control>
+                            </FormControl>
                         </FormRow>
-                        <InstructionsRow
-                            detail={detail}
-                            text={text}
-                            onText={setText}
-                            open={editing || !training}
-                            onOpen={training ? setEditing : undefined}
-                        />
-                        <FormRow id="train-data" label="Data">
-                            <DataRow row={row} detail={detail} run={run} />
-                        </FormRow>
-                        {training && (
-                            <FormRow id="train-quality" label="Training">
-                                <Control>
-                                    <PickSelect
-                                        id="train-quality-select"
-                                        value={run.level}
-                                        onChange={(next) => run.choose(next as typeof run.level)}
-                                        options={[
-                                            ...QUALITIES.map((item) => ({
-                                                value: item.id,
-                                                label: item.label,
-                                                meta: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
-                                            })),
-                                            {
-                                                value: "custom",
-                                                label: "Custom",
-                                                meta: "set each parameter",
-                                                separated: true,
-                                            },
-                                        ]}
-                                    />
-                                </Control>
-                            </FormRow>
-                        )}
-                        {training && (
-                            <FormRow id="train-compute" label="Compute">
-                                <Control>
-                                    <PickSelect
-                                        id="train-compute-select"
-                                        value={run.compute}
-                                        onChange={run.setCompute}
-                                        options={[
-                                            {
-                                                value: AUTO,
-                                                label: "Automatic",
-                                                meta: run.fastest
-                                                    ? `fastest that fits · ${run.fastest.name}`
-                                                    : "nothing fits",
-                                            },
-                                            ...(run.info?.machines ?? []).map((item, index) => ({
-                                                value: item.name,
-                                                label: `${item.name} · ${item.pool}`,
-                                                meta: item.chosen
-                                                    ? `${fitText(item.chosen)} · ≈ ${duration(item.minutes)}`
-                                                    : (item.reason ?? "does not fit"),
-                                                disabled: !item.chosen,
-                                                separated: index === 0,
-                                            })),
-                                        ]}
-                                    />
-                                </Control>
-                            </FormRow>
-                        )}
-                    </Card>
-                    {training && (
-                        <Card aria-labelledby="train-parameters" className="gap-0 py-0">
-                            <ParametersHeader run={run} />
-                            <div className="p-panel">
-                                <Advanced
-                                    disabled={!run.custom}
-                                    recipe={run.recipe}
-                                    onChange={run.change}
-                                    plan={run.info}
-                                    available={run.available}
-                                    heldOut={run.heldOut}
-                                    issues={run.issues}
-                                    next={run.number}
-                                />
-                            </div>
-                        </Card>
                     )}
-                    <div className="hidden flex-wrap items-center gap-3 @4xl:flex">
-                        <Button type="submit" disabled={disabled}>
-                            {submitLabel}
-                            <Kbd>↵</Kbd>
-                        </Button>
-                        <Button type="button" variant="outline" onClick={back}>
-                            Cancel
-                        </Button>
-                        {disabled && (
-                            <ProblemLine run={run} blocked={blocked} className="min-w-0" />
-                        )}
+                    {training && (
+                        <FormRow id="train-compute" label="Compute">
+                            <FormControl>
+                                <PickSelect
+                                    id="train-compute"
+                                    value={run.compute}
+                                    onChange={run.setCompute}
+                                    options={[
+                                        {
+                                            value: AUTO,
+                                            label: "Automatic",
+                                            meta: run.fastest
+                                                ? `fastest that fits · ${run.fastest.name}`
+                                                : "nothing fits",
+                                        },
+                                        ...(run.info?.machines ?? []).map((item, index) => ({
+                                            value: item.name,
+                                            label: `${item.name} · ${item.pool}`,
+                                            meta: item.chosen
+                                                ? `${fitText(item.chosen)} · ≈ ${duration(item.minutes)}`
+                                                : (item.reason ?? "does not fit"),
+                                            disabled: !item.chosen,
+                                            separated: index === 0,
+                                        })),
+                                    ]}
+                                />
+                            </FormControl>
+                        </FormRow>
+                    )}
+                </FormGroup>
+            </FormCard>
+            {training && (
+                <Card aria-labelledby="train-parameters" className="gap-0 py-0">
+                    <ParametersHeader run={run} />
+                    <div className="p-panel">
+                        <Advanced
+                            disabled={!run.custom}
+                            recipe={run.recipe}
+                            onChange={run.change}
+                            plan={run.info}
+                            available={run.available}
+                            heldOut={run.heldOut}
+                            issues={run.issues}
+                            next={run.number}
+                        />
                     </div>
-                </div>
-                <aside aria-label="Run summary" className="min-w-0 @4xl:sticky @4xl:top-6">
-                    <RunSummary run={run} blocked={blocked} changed={changed} />
-                </aside>
-            </div>
-            <div
-                className={cn(
-                    "sticky bottom-0 z-10 -mx-6 -mb-6 mt-6 flex items-center gap-3 border-t bg-background px-6 pt-3",
-                    "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] @4xl:hidden",
-                )}
-            >
-                <StatusLine run={run} blocked={blocked} className="min-w-0 flex-1 truncate" />
-                <Button type="button" variant="outline" onClick={back}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={disabled}>
-                    {submitLabel}
-                </Button>
-            </div>
+                </Card>
+            )}
+        </>
+    );
+    return (
+        <>
+            <CreateLayout
+                form={form}
+                summary={<RunSummary run={run} blocked={blocked} changed={changed} />}
+                summaryLabel="Run summary"
+                submit={
+                    <>
+                        <SubmitIcon />
+                        {training ? `Train v${run.number}` : `Create v${run.number}`}
+                    </>
+                }
+                disabled={!run.ready || run.create.isPending}
+                status={statusOf(run, blocked)}
+                problem={problemsOf(run, blocked).length > 0}
+                onSubmit={run.submit}
+                onCancel={back}
+                onKeyDown={onKeyDown}
+            />
             <ConfirmDialog
                 open={run.breaking !== null}
                 onOpenChange={(open) => !open && run.setBreaking(null)}
@@ -457,7 +418,7 @@ function TrainForm({
                     return run.create.mutateAsync(true);
                 }}
             />
-        </form>
+        </>
     );
 }
 

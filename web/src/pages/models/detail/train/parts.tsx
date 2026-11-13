@@ -1,13 +1,7 @@
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectSeparator,
-    SelectTrigger,
-    SelectValue,
-    cn,
-} from "obp-ui";
-import { Fragment, type ReactNode } from "react";
+import { MemoryStick } from "lucide-react";
+import { cn } from "obp-ui";
+import type { ReactNode } from "react";
+import { SummaryLine } from "~/components/CreateLayout";
 import { count } from "~/lib/format";
 import { ResourceBar } from "../../ResourceGauges";
 import { type OptionInfo, duration, gigabytes } from "./recipe";
@@ -103,62 +97,6 @@ export function HeldOutWarning({ heldOut }: { heldOut: number }) {
     );
 }
 
-export type PickOption = {
-    value: string;
-    label: ReactNode;
-    meta?: ReactNode;
-    disabled?: boolean;
-    separated?: boolean;
-};
-
-export function PickSelect({
-    id,
-    value,
-    options,
-    onChange,
-    disabled,
-}: {
-    id: string;
-    value: string;
-    options: PickOption[];
-    onChange: (value: string) => void;
-    disabled?: boolean;
-}) {
-    return (
-        <Select
-            value={value}
-            disabled={disabled}
-            onValueChange={(next) => next !== null && onChange(String(next))}
-        >
-            <SelectTrigger
-                id={id}
-                aria-labelledby={id.replace("-select", "")}
-                className="w-full max-sm:[&_[data-pick-meta]]:hidden"
-            >
-                <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-                {options.map((option) => (
-                    <Fragment key={option.value}>
-                        {option.separated && <SelectSeparator />}
-                        <SelectItem value={option.value} disabled={option.disabled}>
-                            <span className="truncate">{option.label}</span>
-                            {option.meta && (
-                                <span
-                                    data-pick-meta
-                                    className="ml-auto truncate pl-4 text-sm text-muted-foreground tabular-nums"
-                                >
-                                    {option.meta}
-                                </span>
-                            )}
-                        </SelectItem>
-                    </Fragment>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-}
-
 export function MemoryGaugeFooter({
     option,
     memoryLabel,
@@ -209,13 +147,7 @@ export function MemorySummary({
     const parts = partsOf(option);
     const available = option.available_bytes ?? option.peak_bytes;
     return (
-        <div className="flex flex-col gap-2">
-            <div className="flex items-baseline justify-between gap-3">
-                <span className="text-muted-foreground">Memory</span>
-                <span className={cn("tabular-nums", !ok && "text-destructive")}>
-                    {`${gigabytes(option.peak_bytes)} of ${gigabytes(available)}`}
-                </span>
-            </div>
+        <>
             <ResourceBar
                 label={`${memoryLabel} for training`}
                 total={Math.max(available, option.peak_bytes)}
@@ -225,6 +157,14 @@ export function MemorySummary({
                     fill: ok ? segment.fill : segment.danger,
                 }))}
             />
+            <SummaryLine
+                icon={MemoryStick}
+                className={cn("tabular-nums", !ok && "text-destructive")}
+            >
+                {ok
+                    ? `${gigabytes(option.peak_bytes)} of ${gigabytes(available)} ${memoryLabel}`
+                    : `${gigabytes(option.peak_bytes)} needed · only ${gigabytes(available)} ${memoryLabel}`}
+            </SummaryLine>
             <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground tabular-nums">
                 {SEGMENTS.map((segment) => (
                     <li key={segment.key} className="flex items-center gap-2">
@@ -237,7 +177,7 @@ export function MemorySummary({
                     </li>
                 ))}
             </ul>
-        </div>
+        </>
     );
 }
 

@@ -1,5 +1,22 @@
-import { Card, cn } from "obp-ui";
-import type { ReactNode } from "react";
+import {
+    Cpu,
+    GraduationCap,
+    ListOrdered,
+    MemoryStick,
+    Play,
+    Rows3,
+    ScrollText,
+    Server,
+    Timer,
+} from "lucide-react";
+import {
+    BlockedReasons,
+    SummaryCard,
+    SummaryFact,
+    SummaryFacts,
+    SummaryLine,
+    SummarySection,
+} from "~/components/CreateLayout";
 import { count } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { MemorySummary } from "./parts";
@@ -17,7 +34,7 @@ function estimateOf(run: TrainRun, blocked: string | null): string {
     return run.planning ? "Planning…" : "–";
 }
 
-function problemsOf(run: TrainRun, blocked: string | null): string[] {
+export function problemsOf(run: TrainRun, blocked: string | null): string[] {
     if (blocked) {
         return [blocked];
     }
@@ -32,44 +49,12 @@ function problemsOf(run: TrainRun, blocked: string | null): string[] {
     return [...(run.failure ? [run.failure] : []), ...shown.map((issue) => issue.text)];
 }
 
-function Item({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <>
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 truncate text-right tabular-nums">{children}</dd>
-        </>
-    );
-}
-
 function scoreTime(run: TrainRun): string {
     return run.scoreSeconds === null ? "–" : `≈ ${durationText(run.scoreSeconds)}`;
 }
 
-function Problems({
-    run,
-    blocked,
-    note,
-}: {
-    run: TrainRun;
-    blocked: string | null;
-    note?: string | null;
-}) {
-    const problems = problemsOf(run, blocked);
-    if (problems.length === 0 && !note) {
-        return null;
-    }
-    return (
-        <div className="flex flex-col gap-3 p-panel">
-            {problems.length > 0 && (
-                <ul role="alert" className="flex flex-col gap-1.5 text-destructive">
-                    {problems.map((text) => (
-                        <li key={text}>{text}</li>
-                    ))}
-                </ul>
-            )}
-            {note && <p className="text-sm text-muted-foreground">{note}</p>}
-        </div>
-    );
+function heldOutText(run: TrainRun): string {
+    return run.chosen ? `scored on ${count(run.heldOut)} held-out rows` : "not scored: no data";
 }
 
 function ScoreSummary({
@@ -81,26 +66,28 @@ function ScoreSummary({
     blocked: string | null;
     changed: boolean;
 }) {
-    const data = run.chosen;
     return (
-        <Card className="gap-0 divide-y py-0">
-            <div className="flex flex-col gap-1 p-panel">
-                <span className="text-muted-foreground">Scores in</span>
-                <output className="text-3xl tabular-nums" aria-live="polite">
-                    {blocked || !data ? "–" : scoreTime(run)}
-                </output>
-                <span className="text-muted-foreground tabular-nums">
-                    {data ? `on ${count(run.heldOut)} held-out rows` : "Not scored: no data"}
-                </span>
-            </div>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 p-panel">
-                <Item label="Method">Instructions only</Item>
-                <Item label="Instructions">{changed ? "Changed" : "Unchanged"}</Item>
-                <Item label="Held out">{count(run.heldOut)}</Item>
-                <Item label="Creates">{`v${run.number}`}</Item>
-            </dl>
-            <Problems run={run} blocked={blocked} />
-        </Card>
+        <SummaryCard>
+            <SummarySection title="Estimate">
+                <SummaryFacts>
+                    <SummaryFact icon={Timer} label="Scores in">
+                        {blocked || !run.chosen ? "–" : scoreTime(run)}
+                    </SummaryFact>
+                    <SummaryFact icon={Rows3} label="Held out">
+                        {count(run.heldOut)}
+                    </SummaryFact>
+                    <SummaryFact icon={ScrollText} label="Instructions">
+                        {changed ? "Changed" : "Unchanged"}
+                    </SummaryFact>
+                </SummaryFacts>
+            </SummarySection>
+            <SummarySection title="What you'll get">
+                <SummaryLine icon={Play} className="tabular-nums">
+                    {`v${run.number} · instructions only, ${heldOutText(run)}`}
+                </SummaryLine>
+            </SummarySection>
+            <BlockedReasons reasons={problemsOf(run, blocked)} />
+        </SummaryCard>
     );
 }
 
@@ -121,104 +108,63 @@ export function RunSummary({
     const machine = fits ? run.pickedMachine : null;
     const minutes = fits ? (info?.minutes ?? null) : null;
     const unknown = info && !info.chosen && info.level === "unknown" ? info.basis : null;
+    const memoryLabel = info?.memory_label ?? "memory";
     return (
-        <Card className="gap-0 divide-y py-0">
-            <div className="flex flex-col gap-1 p-panel">
-                <span className="text-muted-foreground">Estimated time</span>
-                <output className="text-3xl tabular-nums" aria-live="polite">
-                    {estimateOf(run, blocked)}
-                </output>
-            </div>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 p-panel">
-                <Item label="Machine">
-                    {machine ? `${machine.name} · ${machine.pool}` : (info?.machine ?? "–")}
-                </Item>
-                <Item label={machine?.kind === "cpu" ? "CPU-hours" : "GPU-hours"}>
-                    {minutes === null ? "–" : hoursText(minutes)}
-                </Item>
-                <Item label="Queue">
-                    {info
-                        ? info.queue.ahead > 0
-                            ? `${info.queue.ahead} ahead`
-                            : "Starts now"
-                        : "–"}
-                </Item>
-                <Item label="Rows">{count(info?.rows ?? run.available)}</Item>
-                <Item label="Held out">{count(run.heldOut)}</Item>
-                <Item label="Creates">{`v${run.number}`}</Item>
-            </dl>
-            {run.option && !blocked && (
-                <div className="p-panel">
-                    <MemorySummary
-                        option={run.option}
-                        memoryLabel={info?.memory_label ?? "memory"}
-                    />
-                </div>
-            )}
-            <Problems run={run} blocked={blocked} note={unknown} />
-        </Card>
+        <SummaryCard>
+            <SummarySection title="Estimate">
+                <SummaryFacts>
+                    <SummaryFact icon={Timer} label="Time">
+                        {estimateOf(run, blocked)}
+                    </SummaryFact>
+                    <SummaryFact icon={Server} label="Machine">
+                        {machine ? `${machine.name} · ${machine.pool}` : (info?.machine ?? "–")}
+                    </SummaryFact>
+                    <SummaryFact
+                        icon={Cpu}
+                        label={machine?.kind === "cpu" ? "CPU-hours" : "GPU-hours"}
+                    >
+                        {minutes === null ? "–" : hoursText(minutes)}
+                    </SummaryFact>
+                    <SummaryFact icon={ListOrdered} label="Queue">
+                        {info
+                            ? info.queue.ahead > 0
+                                ? `${info.queue.ahead} ahead`
+                                : "Starts now"
+                            : "–"}
+                    </SummaryFact>
+                </SummaryFacts>
+            </SummarySection>
+            <SummarySection title="Memory on your compute">
+                {run.option && !blocked ? (
+                    <MemorySummary option={run.option} memoryLabel={memoryLabel} />
+                ) : (
+                    <SummaryLine icon={MemoryStick} className="text-muted-foreground">
+                        {run.planning ? "Planning…" : "Not planned yet"}
+                    </SummaryLine>
+                )}
+                {unknown && <p className="text-sm text-muted-foreground">{unknown}</p>}
+            </SummarySection>
+            <SummarySection title="What you'll get">
+                <SummaryLine icon={GraduationCap} className="tabular-nums">
+                    {`v${run.number} · trained on ${count(info?.rows ?? run.available)} rows, ${heldOutText(run)}`}
+                </SummaryLine>
+            </SummarySection>
+            <BlockedReasons reasons={problemsOf(run, blocked)} />
+        </SummaryCard>
     );
 }
 
-export function ProblemLine({
-    run,
-    blocked,
-    className,
-}: {
-    run: TrainRun;
-    blocked: string | null;
-    className?: string;
-}) {
+export function statusOf(run: TrainRun, blocked: string | null): string {
     const problem = problemsOf(run, blocked)[0];
-    return problem ? (
-        <p role="alert" className={cn("text-destructive", className)}>
-            {problem}
-        </p>
-    ) : null;
-}
-
-export function StatusLine({
-    run,
-    blocked,
-    className,
-}: {
-    run: TrainRun;
-    blocked: string | null;
-    className?: string;
-}) {
-    const problem = problemsOf(run, blocked)[0];
+    if (problem) {
+        return problem;
+    }
     if (!run.training) {
-        return (
-            <p
-                aria-live="polite"
-                className={cn(
-                    "tabular-nums",
-                    problem ? "text-destructive" : "text-muted-foreground",
-                    className,
-                )}
-            >
-                {problem ?? `Scores in ${scoreTime(run)} on ${count(run.heldOut)} held-out rows`}
-            </p>
-        );
+        return `Scores in ${scoreTime(run)} on ${count(run.heldOut)} held-out rows`;
     }
     const minutes = run.info?.chosen ? run.info.minutes : null;
-    const text =
-        problem ??
-        (run.ready && minutes !== null && minutes !== undefined
-            ? `≈ ${duration(minutes)} · ${count(run.info?.rows ?? run.available)} rows`
-            : run.planning
-              ? "Planning…"
-              : "Waiting for the planner.");
-    return (
-        <p
-            aria-live="polite"
-            className={cn(
-                "tabular-nums",
-                problem ? "text-destructive" : "text-muted-foreground",
-                className,
-            )}
-        >
-            {text}
-        </p>
-    );
+    if (run.ready && minutes !== null && minutes !== undefined) {
+        return `≈ ${duration(minutes)} · ${count(run.info?.rows ?? run.available)} rows`;
+    }
+    return run.planning ? "Planning…" : "Waiting for the planner.";
 }

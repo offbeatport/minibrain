@@ -33,11 +33,11 @@ function Warn({ children }: { children: ReactNode }) {
 
 function Group({ id, label, children }: { id: string; label: string; children: ReactNode }) {
     return (
-        <section aria-labelledby={id} className="flex flex-col gap-2">
+        <section aria-labelledby={id} className="flex flex-col gap-4">
             <h4 id={id} className="text-sm text-muted-foreground">
                 {label}
             </h4>
-            <div className="flex flex-col gap-2">{children}</div>
+            <div className="flex flex-col gap-panel-gap">{children}</div>
         </section>
     );
 }
@@ -55,7 +55,7 @@ function Field({
 }) {
     return (
         <div className="flex flex-col gap-1">
-            <div className="grid gap-1.5 @sm:grid-cols-[minmax(0,1fr)_10.5rem] @sm:items-center @sm:gap-3">
+            <div className="grid gap-label @sm:grid-cols-[minmax(0,1fr)_10.5rem] @sm:items-center @sm:gap-3">
                 <Label htmlFor={id} className="min-w-0 font-normal">
                     {label}
                 </Label>
@@ -152,8 +152,8 @@ export function Advanced({
     const checks = evalEvery ? Math.floor(Math.max(steps - 1, 0) / evalEvery) + 1 : null;
     return (
         <div className="@container">
-            <div className="grid gap-x-8 gap-y-5 @xl:grid-cols-2">
-                <div className="flex flex-col gap-5">
+            <div className="grid gap-field @xl:grid-cols-2">
+                <div className="flex flex-col gap-field">
                     <Group id="train-group-adapter" label="Adapter">
                         <Field
                             id="train-rank"
@@ -376,7 +376,7 @@ export function Advanced({
                         </Field>
                     </Group>
                 </div>
-                <div className="flex flex-col gap-5">
+                <div className="flex flex-col gap-field">
                     <Group id="train-group-sequence" label="Sequence">
                         <Field
                             id="train-seq"
