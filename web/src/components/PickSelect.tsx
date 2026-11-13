@@ -5,6 +5,7 @@ import {
     SelectSeparator,
     SelectTrigger,
     SelectValue,
+    cn,
 } from "obp-ui";
 import { Fragment, type ReactNode } from "react";
 
@@ -24,6 +25,7 @@ export function PickSelect({
     placeholder,
     invalid,
     disabled,
+    compact,
 }: {
     id: string;
     value: string | null;
@@ -32,6 +34,7 @@ export function PickSelect({
     placeholder?: string;
     invalid?: boolean;
     disabled?: boolean;
+    compact?: boolean;
 }) {
     return (
         <Select
@@ -42,7 +45,10 @@ export function PickSelect({
             <SelectTrigger
                 id={id}
                 aria-invalid={invalid || undefined}
-                className="w-full max-sm:[&_[data-pick-meta]]:hidden"
+                className={cn(
+                    "w-full",
+                    compact ? "[&_[data-pick-meta]]:hidden" : "max-sm:[&_[data-pick-meta]]:hidden",
+                )}
             >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>

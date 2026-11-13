@@ -24,6 +24,7 @@ Repo rules on top of `~/Development/CLAUDE.md`.
 
 ## Code rules
 
+- Forms use `~/components/FormRows`; row and group spacing come from its constants and are never set locally.
 - Hashing and crypto stay FIPS-ready: SHA-256 for content hashes and signatures, never MD5 or SHA-1 (ruff `S324`).
   Non-security hashes pass `usedforsecurity=False`. All crypto goes through OpenSSL or the `cryptography` library;
   never hand-rolled.

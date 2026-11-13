@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Button, Card, cn } from "obp-ui";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
+import { FORM_GROUP_GAP } from "./FormRows";
 
 export function CreateLayout({
     form,
@@ -52,15 +53,13 @@ export function CreateLayout({
     return (
         <form noValidate className="@container" onSubmit={send} onKeyDown={onKeyDown}>
             <div className="grid items-start gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="flex min-w-0 flex-col gap-6">
-                    {form}
-                    <div className="hidden items-center gap-3 border-t pt-4 @3xl:flex">
-                        {actions()}
-                    </div>
-                </div>
+                <div className="flex min-w-0 flex-col gap-6">{form}</div>
                 <aside aria-label={summaryLabel} className="min-w-0 @3xl:sticky @3xl:top-6">
                     {summary}
                 </aside>
+            </div>
+            <div className="mt-6 hidden items-center gap-3 border-t pt-4 @3xl:flex">
+                {actions()}
             </div>
             <div
                 className={cn(
@@ -75,7 +74,7 @@ export function CreateLayout({
 }
 
 export function FormCard({ children }: { children: ReactNode }) {
-    return <Card className="gap-field p-panel">{children}</Card>;
+    return <Card className={cn("p-panel", FORM_GROUP_GAP)}>{children}</Card>;
 }
 
 export function SummaryCard({ children }: { children: ReactNode }) {
