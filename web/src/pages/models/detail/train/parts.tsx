@@ -1,4 +1,7 @@
 import {
+    Label,
+    RadioGroup,
+    RadioGroupItem,
     Select,
     SelectContent,
     SelectItem,
@@ -20,7 +23,7 @@ export function Row({
     return (
         <section
             aria-labelledby={id}
-            className="grid gap-label py-4 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-x-6"
+            className="grid gap-label py-4 sm:grid-cols-[6rem_minmax(0,1fr)] sm:gap-x-6"
         >
             <h3 id={id} className="text-base font-medium sm:leading-8">
                 {label}
@@ -203,6 +206,55 @@ export function MemoryGaugeFooter({
                     </span>
                 ))}
             </p>
+        </div>
+    );
+}
+
+export function PresetPicker({
+    value,
+    options,
+    onPick,
+}: {
+    value: string;
+    options: { value: string; label: string; detail: ReactNode }[];
+    onPick: (value: string) => void;
+}) {
+    return (
+        <RadioGroup
+            aria-label="Parameters"
+            value={value}
+            onValueChange={(next) => onPick(String(next))}
+            className="grid grid-cols-4 gap-0.5 rounded-md border bg-tabs-background p-0.5"
+        >
+            {options.map((option) => (
+                <Label
+                    key={option.value}
+                    className="flex cursor-pointer flex-col items-center gap-0 rounded-sm border border-transparent px-1 py-1.5 font-normal text-muted-foreground hover:bg-secondary hover:text-foreground has-focus-visible:ring-2 has-focus-visible:ring-ring has-data-checked:border-input has-data-checked:bg-tabs-active has-data-checked:text-accent-foreground has-data-checked:hover:bg-tabs-active"
+                >
+                    <RadioGroupItem value={option.value} className="sr-only" />
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-sm tabular-nums">{option.detail}</span>
+                </Label>
+            ))}
+        </RadioGroup>
+    );
+}
+
+export function PaneHeader({
+    id,
+    title,
+    action,
+}: {
+    id: string;
+    title: string;
+    action?: ReactNode;
+}) {
+    return (
+        <div className="flex min-h-12 items-center justify-between gap-3 border-b">
+            <h3 id={id} className="font-medium">
+                {title}
+            </h3>
+            {action}
         </div>
     );
 }

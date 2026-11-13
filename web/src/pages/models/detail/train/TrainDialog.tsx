@@ -37,7 +37,9 @@ import {
     HeldOutWarning,
     MemoryGaugeFooter,
     Meta,
+    PaneHeader,
     PickSelect,
+    PresetPicker,
     Row,
     fitText,
     timeText,
@@ -58,7 +60,6 @@ import {
     labelOf,
     planQuery,
     presetRecipe,
-    presetText,
 } from "./recipe";
 
 function fetchPlan(slug: string, query: PlanQuery) {
@@ -241,6 +242,14 @@ function Body({
                 best === null || (item.minutes ?? 0) < (best.minutes ?? 0) ? item : best,
             null,
         );
+    const estimate =
+        info?.chosen && info.minutes !== null && info.minutes !== undefined
+            ? [
+                  `≈ ${duration(info.minutes)} on ${info.machine}`,
+                  deviceHours(info.minutes, info.machines.find((item) => item.picked)?.kind),
+                  info.queue.ahead > 0 ? `${info.queue.ahead} ahead in the queue` : "starts now",
+              ].join(" · ")
+            : null;
     const diff = chosen
         ? versusLive({ id: chosen.id, number: chosen.number, rows: chosen.rows }, live)
         : null;
@@ -260,7 +269,11 @@ function Body({
             </DialogHeader>
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
                 <div className="min-h-fit px-5 sm:px-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain">
+                    <PaneHeader id="train-general" title="General" />
                     <div className="divide-y">
+                        <Row id="train-method" label="Method">
+                            <p className="min-h-8 sm:leading-8">Supervised fine-tuning (SFT)</p>
+                        </Row>
                         <Row id="train-data" label="Data">
                             {chosen ? (
                                 <>
@@ -308,37 +321,6 @@ function Body({
                                 </p>
                             )}
                         </Row>
-                        <Row id="train-method" label="Method">
-                            <PickSelect
-                                id="train-method-select"
-                                value="sft"
-                                onChange={() => undefined}
-                                options={[{ value: "sft", label: "Supervised fine-tuning (SFT)" }]}
-                            />
-                        </Row>
-                        <Row id="train-quality" label="Training">
-                            <PickSelect
-                                id="train-quality-select"
-                                value={level}
-                                onChange={(next) => choose(next as Level)}
-                                options={[
-                                    ...QUALITIES.map((item) => ({
-                                        value: item.id,
-                                        label: item.label,
-                                        meta: `${presetText(item.id)} · ${timeText(minutes[item.id])}`,
-                                    })),
-                                    {
-                                        value: "custom",
-                                        label: "Custom",
-                                        meta:
-                                            custom && changed > 0
-                                                ? `${changed} changed from ${labelOf(basis)}`
-                                                : "set each parameter",
-                                        separated: true,
-                                    },
-                                ]}
-                            />
-                        </Row>
                         <Row id="train-compute" label="Compute">
                             <PickSelect
                                 id="train-compute-select"
@@ -369,6 +351,10 @@ function Body({
                             {info && !info.chosen && info.level === "unknown" && (
                                 <Meta>{info.basis}</Meta>
                             )}
+                            {option && (
+                                <MemoryGaugeFooter option={option} memoryLabel={memoryLabel} />
+                            )}
+                            {estimate && <p className="tabular-nums">{estimate}</p>}
                         </Row>
                     </div>
                 </div>
@@ -376,31 +362,36 @@ function Body({
                     aria-labelledby="train-parameters"
                     className="flex min-h-0 flex-col border-t bg-muted md:border-t-0 md:border-l"
                 >
-                    <div className="flex min-h-14 items-center justify-between gap-3 border-b px-5 py-3">
-                        <h3 id="train-parameters" className="font-medium">
-                            Training parameters
-                        </h3>
-                        {custom ? (
-                            changed > 0 && (
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => setRecipe(presetRecipe(basis))}
-                                >
-                                    {`Reset to ${labelOf(basis)}`}
-                                </Button>
-                            )
-                        ) : (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => choose("custom")}
-                            >
-                                Customise
-                            </Button>
-                        )}
+                    <div className="px-5">
+                        <PaneHeader
+                            id="train-parameters"
+                            title="Parameters"
+                            action={
+                                custom && changed > 0 ? (
+                                    <button
+                                        type="button"
+                                        className="rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        onClick={() => setRecipe(presetRecipe(basis))}
+                                    >
+                                        {`${changed} changed · Reset`}
+                                    </button>
+                                ) : undefined
+                            }
+                        />
                     </div>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+                    <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-5 py-5">
+                        <PresetPicker
+                            value={level}
+                            onPick={(next) => choose(next as Level)}
+                            options={[
+                                ...QUALITIES.map((item) => ({
+                                    value: item.id,
+                                    label: item.label,
+                                    detail: timeText(minutes[item.id]).replace("≈ ", ""),
+                                })),
+                                { value: "custom", label: "Custom", detail: "edit" },
+                            ]}
+                        />
                         <Advanced
                             disabled={!custom}
                             recipe={recipe}
@@ -414,43 +405,26 @@ function Body({
                     </div>
                 </aside>
             </div>
-            <div className="flex flex-col gap-4 border-t px-5 py-4 sm:flex-row sm:items-end sm:px-7">
-                <div className="flex min-w-0 flex-1 flex-col gap-2">
-                    {option ? (
-                        <MemoryGaugeFooter option={option} memoryLabel={memoryLabel} />
-                    ) : null}
-                    <p
-                        aria-live="polite"
-                        className={cn(
-                            "text-sm tabular-nums",
-                            failure || (!ready && !plan.isFetching)
-                                ? "text-destructive"
-                                : "text-muted-foreground",
-                        )}
-                    >
-                        {failure ??
-                            (ready &&
-                            info?.chosen &&
-                            info.minutes !== null &&
-                            info.minutes !== undefined
-                                ? [
-                                      `≈ ${duration(info.minutes)} on ${info.machine}`,
-                                      deviceHours(
-                                          info.minutes,
-                                          info.machines.find((item) => item.picked)?.kind,
-                                      ),
-                                      info.queue.ahead > 0
-                                          ? `${info.queue.ahead} ahead in the queue`
-                                          : "starts now",
-                                  ].join(" · ")
-                                : plan.isFetching
-                                  ? "Planning…"
-                                  : (issues[0]?.text ??
-                                    (chosen
-                                        ? "Waiting for the planner."
-                                        : "Add training data first.")))}
-                    </p>
-                </div>
+            <div className="flex flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:items-center sm:px-7">
+                <p
+                    aria-live="polite"
+                    className={cn(
+                        "min-w-0 flex-1 text-sm tabular-nums",
+                        failure || (!ready && !plan.isFetching)
+                            ? "text-destructive"
+                            : "text-muted-foreground",
+                    )}
+                >
+                    {failure ??
+                        (ready
+                            ? `Trains v${number} on ${count(info?.rows ?? 0)} rows · ${custom ? "Custom" : labelOf(basis)}`
+                            : plan.isFetching
+                              ? "Planning…"
+                              : (issues[0]?.text ??
+                                (chosen
+                                    ? "Waiting for the planner."
+                                    : "Add training data first.")))}
+                </p>
                 <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
                     <DialogClose asChild>
                         <Button type="button" variant="outline">

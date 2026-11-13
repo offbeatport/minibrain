@@ -1,6 +1,6 @@
 import {
-    Field,
     InfoTip,
+    Label,
     NumberField,
     Select,
     SelectContent,
@@ -37,8 +37,32 @@ function Group({ id, label, children }: { id: string; label: string; children: R
             <h4 id={id} className="text-sm text-muted-foreground">
                 {label}
             </h4>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-4">{children}</div>
+            <div className="flex flex-col gap-2.5">{children}</div>
         </section>
+    );
+}
+
+function Field({
+    id,
+    label,
+    error,
+    children,
+}: {
+    id: string;
+    label: ReactNode;
+    error?: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex flex-col gap-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_10rem] items-center gap-3">
+                <Label htmlFor={id} className="min-w-0 font-normal">
+                    {label}
+                </Label>
+                <div className="min-w-0">{children}</div>
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
     );
 }
 
@@ -141,6 +165,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-rank"
                         value={recipe.rank}
                         onValueChange={(value) => onChange({ rank: value ?? recipe.rank })}
@@ -166,6 +192,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-alpha"
                         value={alpha}
                         onValueChange={(value) =>
@@ -226,6 +254,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-epochs"
                         value={recipe.epochs}
                         onValueChange={(value) => onChange({ epochs: value ?? recipe.epochs })}
@@ -254,8 +284,11 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-rows"
-                        value={rows}
+                        value={recipe.maxRows === "all" ? null : rows}
+                        placeholder="All"
                         onValueChange={(value) =>
                             onChange({
                                 maxRows: value === null || value >= available ? "all" : value,
@@ -266,7 +299,6 @@ export function Advanced({
                         step={100}
                         largeStep={1000}
                         format={WHOLE}
-                        unit="rows"
                     />
                 </Field>
                 <Field
@@ -325,7 +357,7 @@ export function Advanced({
                     id="train-seq"
                     label={
                         <Tipped
-                            label="Length"
+                            label="Length (tokens)"
                             tip={
                                 recipe.seqLen !== "auto" && recipe.seqLen < longest ? (
                                     <Warn>{`Longest example: about ${count(longest)} tokens; longer rows get cut.`}</Warn>
@@ -339,6 +371,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-seq"
                         value={seq}
                         onValueChange={(value) => onChange({ seqLen: value ?? "auto" })}
@@ -347,7 +381,6 @@ export function Advanced({
                         step={16}
                         largeStep={256}
                         format={WHOLE}
-                        unit="tokens"
                     />
                 </Field>
             </Group>
@@ -410,7 +443,7 @@ export function Advanced({
                     id="train-eval"
                     label={
                         <Tipped
-                            label="Score held-out rows every"
+                            label="Score every (steps)"
                             tip={
                                 checks === null
                                     ? `Automatic scores ${count(heldOut)} held-out rows a few times during the run and at the end.`
@@ -421,6 +454,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-eval"
                         value={evalEvery}
                         onValueChange={(value) => onChange({ evalEvery: value ?? "auto" })}
@@ -429,7 +464,6 @@ export function Advanced({
                         step={10}
                         largeStep={100}
                         format={WHOLE}
-                        unit="steps"
                         placeholder="Automatic"
                     />
                 </Field>
@@ -446,6 +480,8 @@ export function Advanced({
                 >
                     <NumberField
                         disabled={disabled}
+                        className="w-full"
+                        groupClassName="w-full"
                         id="train-seed"
                         value={recipe.seed}
                         onValueChange={(value) => onChange({ seed: value ?? recipe.seed })}
