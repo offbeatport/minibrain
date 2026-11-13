@@ -171,6 +171,7 @@ export function AddMenu({
     onNewDataset,
     onNewFolder,
     onFromSources,
+    startOpen = false,
 }: {
     adder: SourceAdder;
     picked: number;
@@ -178,12 +179,13 @@ export function AddMenu({
     onNewDataset: () => void;
     onNewFolder: () => void;
     onFromSources: () => void;
+    startOpen?: boolean;
 }) {
     const router = useRouter();
     const samples = useSamples();
     const blocks = useSourceBlocks();
     const can = useCan();
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = useState(startOpen);
     const idle = adder.pending === null;
     useOpenKey(setOpen, idle);
     const pick = addSourceKind(adder, onAdd);

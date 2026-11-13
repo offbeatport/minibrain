@@ -1,8 +1,7 @@
-import { ExternalLink } from "lucide-react";
+import { Download, ExternalLink, GraduationCap, HardDrive, Play } from "lucide-react";
 import {
     Button,
     Checkbox,
-    InfoTip,
     Label,
     Select,
     SelectContent,
@@ -10,7 +9,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from "obp-ui";
-import type { ReactNode } from "react";
 import type {
     CatalogEntry,
     CatalogResponse,
@@ -18,42 +16,28 @@ import type {
     FitInfo,
     TrainFitInfo,
 } from "~/api/client";
-import { PublisherLogo } from "~/components/PublisherLogo";
+import {
+    BlockedReasons,
+    SummaryCard,
+    SummaryFact,
+    SummaryFacts,
+    SummarySection,
+} from "~/components/CreateLayout";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
-import { type BaseOption, logoPublisher, trainableVariant } from "./baseOptions";
-import { FormatHelp, formatName, formatUse, scheme, trainable } from "./formats";
-
-function Block({
-    title,
-    info,
-    children,
-}: {
-    title: string;
-    info?: ReactNode;
-    children: ReactNode;
-}) {
-    return (
-        <div className="flex flex-col gap-2.5 px-panel py-4">
-            <span className="flex items-center gap-1.5 font-medium">
-                {title}
-                {info}
-            </span>
-            {children}
-        </div>
-    );
-}
+import { type BaseOption, trainableVariant } from "./baseOptions";
+import { formatName, formatUse, scheme, trainable } from "./formats";
 
 function variantLabel(variant: CatalogVariantInfo): string {
     const name = variant.format === "gguf" ? `GGUF ${scheme(variant)}` : scheme(variant);
     return [name, bytes(variant.size_bytes), formatUse(variant)].join(" · ");
 }
 
-function Formats({
+export function Formats({
     plan,
     variant,
     servesOnly,
@@ -70,7 +54,7 @@ function Formats({
                 value={plan.variant.id}
                 onValueChange={(value) => value && onVariant(String(value))}
             >
-                <SelectTrigger aria-label="Format" className="w-full tabular-nums">
+                <SelectTrigger id="create-format" className="w-full tabular-nums">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -93,25 +77,18 @@ function Formats({
     );
 }
 
-function Requirement({ label, children }: { label: string; children: ReactNode }) {
-    return (
-        <div className="contents">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="text-right tabular-nums">{children}</dd>
-        </div>
-    );
-}
-
 function Requirements({
     fit,
     trainFit,
     servesOnly,
     storage,
+    download,
 }: {
     fit: FitInfo | null;
     trainFit: TrainFitInfo | null;
     servesOnly: boolean;
     storage: number | null;
+    download: number | null;
 }) {
     const train = servesOnly
         ? "Can't be trained"
@@ -119,11 +96,22 @@ function Requirements({
           ? `${bytes(trainFit.qlora_bytes)} (QLoRA)`
           : "Unknown";
     return (
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
-            <Requirement label="Run">{fit ? bytes(fit.needed_bytes) : "Unknown"}</Requirement>
-            <Requirement label="Train">{train}</Requirement>
-            <Requirement label="Storage">{storage ? bytes(storage) : "Unknown"}</Requirement>
-        </dl>
+        <SummaryFacts>
+            <SummaryFact icon={Play} label="Run">
+                {fit ? bytes(fit.needed_bytes) : "Unknown"}
+            </SummaryFact>
+            <SummaryFact icon={GraduationCap} label="Train">
+                {train}
+            </SummaryFact>
+            <SummaryFact icon={HardDrive} label="Storage">
+                {storage ? bytes(storage) : "Unknown"}
+            </SummaryFact>
+            {download !== null && (
+                <SummaryFact icon={Download} label="Download">
+                    {bytes(download)}
+                </SummaryFact>
+            )}
+        </SummaryFacts>
     );
 }
 
@@ -133,7 +121,7 @@ function installed(entry: CatalogEntry, variant: CatalogVariantInfo): boolean {
     );
 }
 
-function ServeOnlyNotice({
+export function ServeOnlyNotice({
     entry,
     variant,
     onVariant,
@@ -254,12 +242,24 @@ export function Licence({
     );
 }
 
+export function servesOnlyOf(option: BaseOption | null, plan: SourcePlan): boolean {
+    const variant = plan.variant ?? option?.variant ?? null;
+    const local = option?.kind === "local";
+    const found = option ? undefined : plan.found;
+    const trainFit = local ? null : (variant?.train_fit ?? found?.train_fit ?? null);
+    return variant
+        ? !trainable(variant)
+        : Boolean(found?.quantized) || trainFit?.level === "unsupported";
+}
+
 export function AddModelSummary({
     option,
     plan,
     need,
     free,
     catalog,
+    outcome,
+    blocked,
     onVariant,
     onPickAnother,
 }: {
@@ -268,6 +268,8 @@ export function AddModelSummary({
     need: DiskNeed;
     free: number | null | undefined;
     catalog: CatalogResponse | undefined;
+    outcome: string;
+    blocked: string[];
     onVariant: (variant: string) => void;
     onPickAnother: () => void;
 }) {
@@ -278,65 +280,24 @@ export function AddModelSummary({
     const local = option?.kind === "local";
     const fit = local ? null : (variant?.fit ?? found?.fit ?? null);
     const trainFit = local ? null : (variant?.train_fit ?? found?.train_fit ?? null);
-    const servesOnly = variant
-        ? !trainable(variant)
-        : Boolean(found?.quantized) || trainFit?.level === "unsupported";
+    const servesOnly = servesOnlyOf(option, plan);
     const storage = need?.size ?? onDisk ?? (found?.size_bytes || null);
-    const facts = [option?.publisher, option?.params, option?.entry?.license_name].filter(Boolean);
     const pool = catalog?.pools.find((item) => item.name === catalog.pool)?.label ?? null;
     const compute = catalog
         ? { memoryLabel: catalog.hardware.memory_label, machine: catalog.hardware.machine, pool }
         : null;
     return (
-        <section
-            aria-label="Summary"
-            className="flex flex-1 flex-col divide-y rounded-xl border bg-card text-card-foreground"
-        >
-            <div className="flex items-center gap-3 px-panel py-4">
-                <PublisherLogo publisher={logoPublisher(option)} name={option?.name ?? "Model"} />
-                <div className="flex min-w-0 flex-col">
-                    <span className="truncate font-semibold">
-                        {option?.name ?? "Pick a base model"}
-                    </span>
-                    {facts.length > 0 && (
-                        <span className="truncate text-sm text-muted-foreground">
-                            {facts.join(" · ")}
-                        </span>
-                    )}
-                </div>
-            </div>
-            <Block
-                title="Format"
-                info={
-                    <InfoTip label="What the formats mean">
-                        <FormatHelp />
-                    </InfoTip>
-                }
-            >
-                <Formats
-                    plan={plan}
-                    variant={variant}
-                    servesOnly={servesOnly}
-                    onVariant={onVariant}
-                />
-                {variant && !trainable(variant) && (
-                    <ServeOnlyNotice
-                        entry={entry}
-                        variant={variant}
-                        onVariant={onVariant}
-                        onPickAnother={onPickAnother}
-                    />
-                )}
-            </Block>
-            <Block title="System requirements">
+        <SummaryCard>
+            <SummarySection title="System requirements">
                 <Requirements
                     fit={fit}
                     trainFit={trainFit}
                     servesOnly={servesOnly}
                     storage={storage}
+                    download={need ? need.size : null}
                 />
-            </Block>
-            <Block title="Memory on your compute">
+            </SummarySection>
+            <SummarySection title="Memory on your compute">
                 <MemoryGauge fit={fit} trainFit={servesOnly ? null : trainFit} compute={compute} />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp
@@ -345,8 +306,8 @@ export function AddModelSummary({
                         onPickAnother={onPickAnother}
                     />
                 )}
-            </Block>
-            <Block title="Storage on your compute">
+            </SummarySection>
+            <SummarySection title="Storage on your compute">
                 <DiskGauge
                     need={need}
                     free={free}
@@ -359,7 +320,19 @@ export function AddModelSummary({
                     }}
                 />
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
-            </Block>
-        </section>
+            </SummarySection>
+            <SummarySection title="What you'll get">
+                <p className="tabular-nums">{outcome}</p>
+                {variant && !trainable(variant) && (
+                    <ServeOnlyNotice
+                        entry={entry}
+                        variant={variant}
+                        onVariant={onVariant}
+                        onPickAnother={onPickAnother}
+                    />
+                )}
+            </SummarySection>
+            <BlockedReasons reasons={blocked} />
+        </SummaryCard>
     );
 }

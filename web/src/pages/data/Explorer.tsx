@@ -47,6 +47,7 @@ import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
+import { useSearchParam } from "~/lib/listSearch";
 import { bytes } from "~/lib/time";
 import { AddMenu, SourceChoices, useSourceBlocks } from "./AddMenu";
 import {
@@ -369,6 +370,7 @@ export function DataExplorer() {
     const requested = useRouterState({
         select: (state) => parseItem((state.location.search as { item?: unknown }).item),
     });
+    const startAdding = useSearchParam("add") !== null;
     const sources = useSources();
     const datasets = useDatasets();
     const folders = useDatasetFolders();
@@ -792,6 +794,7 @@ export function DataExplorer() {
                                 setAction({ kind: "new-folder", parentId: currentFolder() })
                             }
                             onFromSources={fromSources}
+                            startOpen={startAdding}
                         />
                     }
                 />

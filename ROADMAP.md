@@ -1329,8 +1329,11 @@ keys, and `/v1` stays key-only.
     list, Callers and the request log; the secret is shown once), the endpoint and harness configs, the feedback API,
     kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
 - Add model (`/models/new`) asks for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
-  one search over four tabs), a dataset (required; Create stays off until one is picked) and a name; description and tags are optional, and the licence acceptance and the disk
-  and memory gauges stay. Every model starts as a Chat assistant. The name row (built 2026-11-12) is the
+  one search over four tabs), a dataset (required; Create stays off until one is picked, with Upload new… opening the
+  Data page's Add menu) and a name; description and tags live in the model's Settings. It is the create-page pattern
+  (2026-11-13): the form in one card with labels in a 9rem column, a sticky summary card on the right with the
+  consequences and cost (memory and storage gauges, "v0 · untrained baseline, scored on N held-out rows", blocked
+  reasons), Create model and Cancel under the form, and below 48rem one column with a sticky bottom bar. Every model starts as a Chat assistant. The name row (built 2026-11-12) is the
   avatar button, then the name, then a dice Shuffle (R): the name is prefilled and required, a generated adjective
   and noun ("Brisk Heron") never held by a base or custom model, with an inline error when a typed one is taken.
   Typing a name or picking an avatar keeps it ("Name kept · Undo"), and Shuffle then rerolls only the other. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat

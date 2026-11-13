@@ -1,5 +1,7 @@
+import { GraduationCap, HardDrive, type LucideIcon, MemoryStick, Play, Server } from "lucide-react";
 import type { ReactNode } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
+import { SummaryLine } from "~/components/CreateLayout";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import type { DiskNeed } from "./BaseSummary";
@@ -60,12 +62,20 @@ export function ResourceBar({
     );
 }
 
-function Figures({ children }: { children: ReactNode }) {
-    return <span className="tabular-nums">{children}</span>;
+function Figures({ icon, children }: { icon: LucideIcon; children: ReactNode }) {
+    return (
+        <SummaryLine icon={icon} className="tabular-nums">
+            {children}
+        </SummaryLine>
+    );
 }
 
 function Where({ children }: { children: ReactNode }) {
-    return <span className="text-sm text-muted-foreground">{children}</span>;
+    return (
+        <SummaryLine icon={Server} className="text-sm text-muted-foreground">
+            {children}
+        </SummaryLine>
+    );
 }
 
 export type WeightsStore = {
@@ -96,7 +106,7 @@ export function DiskGauge({
                 : `${bytes(store.stagingFree)} free on main's disk to pass through`;
         return (
             <>
-                <Figures>{[amount, staging].filter(Boolean).join(" · ")}</Figures>
+                <Figures icon={HardDrive}>{[amount, staging].filter(Boolean).join(" · ")}</Figures>
                 <Where>{`${store.label}: S3 reports no free space, so the bucket's quota is the limit.`}</Where>
             </>
         );
@@ -104,7 +114,7 @@ export function DiskGauge({
     if (free === null || free === undefined || !total) {
         return (
             <>
-                <Figures>{`${amount} · free space unknown`}</Figures>
+                <Figures icon={HardDrive}>{`${amount} · free space unknown`}</Figures>
                 <Where>{store.label}</Where>
             </>
         );
@@ -128,7 +138,9 @@ export function DiskGauge({
                     },
                 ]}
             />
-            <Figures>{`${amount} · ${bytes(free)} free of ${bytes(total)}`}</Figures>
+            <Figures
+                icon={HardDrive}
+            >{`${amount} · ${bytes(free)} free of ${bytes(total)}`}</Figures>
             <Where>{store.label}</Where>
         </>
     );
@@ -165,9 +177,9 @@ export function MemoryGauge({
     const available = fit?.available_bytes;
     if (!fit || !available || fit.level === "unknown") {
         return (
-            <span className="text-muted-foreground">
+            <SummaryLine icon={MemoryStick} className="text-muted-foreground">
                 {fit ? "Not checked: no machine has reported its memory yet" : "Unknown"}
-            </span>
+            </SummaryLine>
         );
     }
     const needed = fit.needed_bytes;
@@ -189,7 +201,7 @@ export function MemoryGauge({
                     { id: "needs", value: Math.min(needed, available), fill: TONE_FILL[tone] },
                 ]}
             />
-            <Figures>
+            <Figures icon={MemoryStick}>
                 {short
                     ? `${bytes(needed)} needed · only ${bytes(available)} available`
                     : `${bytes(needed)} of ${bytes(available)} available`}
@@ -198,14 +210,18 @@ export function MemoryGauge({
             {(serve || train) && (
                 <span className="flex flex-col gap-1">
                     {serve && (
-                        <StatusText tone={serve.tone} className="whitespace-normal">
-                            {serve.text}
-                        </StatusText>
+                        <SummaryLine icon={Play}>
+                            <StatusText tone={serve.tone} className="whitespace-normal">
+                                {serve.text}
+                            </StatusText>
+                        </SummaryLine>
                     )}
                     {train && (
-                        <StatusText tone={train.tone} className="whitespace-normal">
-                            {train.text}
-                        </StatusText>
+                        <SummaryLine icon={GraduationCap}>
+                            <StatusText tone={train.tone} className="whitespace-normal">
+                                {train.text}
+                            </StatusText>
+                        </SummaryLine>
                     )}
                 </span>
             )}

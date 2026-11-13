@@ -1,11 +1,58 @@
 import { InfoTip, cn } from "obp-ui";
-import type { ReactNode } from "react";
+import { type ReactNode, useId } from "react";
 
-export function FormRows({ children }: { children: ReactNode }) {
+type LabelWidth = "wide" | "narrow";
+
+const COLUMNS: Record<LabelWidth, string> = {
+    wide: "sm:grid-cols-[12rem_minmax(0,1fr)]",
+    narrow: "sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-x-4",
+};
+
+export function FormRows({
+    labels = "wide",
+    children,
+}: {
+    labels?: LabelWidth;
+    children: ReactNode;
+}) {
     return (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-[12rem_minmax(0,1fr)] sm:gap-y-3">
+        <div className={cn("grid grid-cols-1 gap-x-6 gap-y-1 sm:gap-y-3", COLUMNS[labels])}>
             {children}
         </div>
+    );
+}
+
+export function FormGroup({ title, children }: { title: string; children: ReactNode }) {
+    const id = useId();
+    return (
+        <section
+            aria-labelledby={id}
+            className="flex flex-col gap-3 border-t pt-panel first:border-t-0 first:pt-0"
+        >
+            <h3 id={id} className="font-medium">
+                {title}
+            </h3>
+            <FormRows labels="narrow">{children}</FormRows>
+        </section>
+    );
+}
+
+const CONTROL_WIDTHS = {
+    select: "sm:max-w-sm",
+    text: "sm:max-w-sm",
+    short: "sm:max-w-64",
+    full: "",
+} as const;
+
+export function FormControl({
+    width = "select",
+    children,
+}: {
+    width?: keyof typeof CONTROL_WIDTHS;
+    children: ReactNode;
+}) {
+    return (
+        <div className={cn("flex w-full flex-col gap-1.5", CONTROL_WIDTHS[width])}>{children}</div>
     );
 }
 

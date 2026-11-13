@@ -64,6 +64,7 @@ export function NameAvatarField({
     onChange,
     taken,
     error,
+    labelled = true,
     children,
 }: {
     id: string;
@@ -71,6 +72,7 @@ export function NameAvatarField({
     onChange: (next: Identity) => void;
     taken: NameTaken;
     error?: string;
+    labelled?: boolean;
     children?: ReactNode;
 }) {
     const [locks, setLocks] = useState<Locks>({ name: null, avatar: null });
@@ -137,7 +139,7 @@ export function NameAvatarField({
     const label = shuffleLabel(locks);
     return (
         <div data-testid="name-row" className="flex flex-col gap-label">
-            <Label htmlFor={id}>Name</Label>
+            {labelled && <Label htmlFor={id}>Name</Label>}
             <div className="flex items-center gap-2">
                 <Tooltip>
                     <TooltipTrigger asChild>
