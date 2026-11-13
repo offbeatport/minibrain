@@ -1,4 +1,4 @@
-import type { LucideIcon } from "lucide-react";
+import { type LucideIcon, X } from "lucide-react";
 import { Button, Card, cn } from "obp-ui";
 import type { FormEvent, KeyboardEvent, ReactNode } from "react";
 import { FORM_GROUP_GAP } from "./FormRows";
@@ -43,6 +43,7 @@ export function CreateLayout({
                 {status}
             </p>
             <Button type="button" variant="outline" className="ml-auto" onClick={onCancel}>
+                <X aria-hidden="true" />
                 Cancel
             </Button>
             <Button type="submit" disabled={disabled}>
