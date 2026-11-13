@@ -40,6 +40,7 @@ import {
     ModelVersionPage,
     OldModelLink,
 } from "./pages/models/detail/ModelPage";
+import { TrainPage } from "./pages/models/detail/train/TrainPage";
 import { AccountsSettingsPage } from "./pages/settings/AccountsSettingsPage";
 import { AuditLogPage } from "./pages/settings/AuditLogPage";
 import { ConnectionsSettingsPage } from "./pages/settings/ConnectionsSettingsPage";
@@ -141,6 +142,7 @@ const routeTree = rootRoute.addChildren([
     globalPage("/models/custom/$slug/versions/$number/card", OldModelLink),
     globalPage("/models/$name", ModelPage),
     globalPage("/models/$name/compare", ModelComparePage),
+    globalPage("/models/$name/train", guarded("builder", TrainPage)),
     globalPage("/models/$name/versions/$number", ModelVersionPage),
     globalPage("/models/$name/versions/$number/card", ModelCardPage),
     globalPage("/models/$name/$tab", ModelPage),

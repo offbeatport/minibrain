@@ -146,7 +146,11 @@ export function PickSelect({
             disabled={disabled}
             onValueChange={(next) => next !== null && onChange(String(next))}
         >
-            <SelectTrigger id={id} aria-labelledby={id.replace("-select", "")} className="w-full">
+            <SelectTrigger
+                id={id}
+                aria-labelledby={id.replace("-select", "")}
+                className="w-full max-sm:[&_[data-pick-meta]]:hidden"
+            >
                 <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -156,7 +160,10 @@ export function PickSelect({
                         <SelectItem value={option.value} disabled={option.disabled}>
                             <span className="truncate">{option.label}</span>
                             {option.meta && (
-                                <span className="ml-auto truncate pl-4 text-sm text-muted-foreground tabular-nums">
+                                <span
+                                    data-pick-meta
+                                    className="ml-auto truncate pl-4 text-sm text-muted-foreground tabular-nums"
+                                >
                                     {option.meta}
                                 </span>
                             )}
@@ -203,6 +210,49 @@ export function MemoryGaugeFooter({
                     </span>
                 ))}
             </p>
+        </div>
+    );
+}
+
+export function MemorySummary({
+    option,
+    memoryLabel,
+}: {
+    option: OptionInfo;
+    memoryLabel: string;
+}) {
+    const ok = fits(option);
+    const parts = partsOf(option);
+    const available = option.available_bytes ?? option.peak_bytes;
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">Memory</span>
+                <span className={cn("tabular-nums", !ok && "text-destructive")}>
+                    {`${gigabytes(option.peak_bytes)} of ${gigabytes(available)}`}
+                </span>
+            </div>
+            <ResourceBar
+                label={`${memoryLabel} for training`}
+                total={Math.max(available, option.peak_bytes)}
+                segments={SEGMENTS.map((segment) => ({
+                    id: segment.key,
+                    value: parts[segment.key],
+                    fill: ok ? segment.fill : segment.danger,
+                }))}
+            />
+            <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground tabular-nums">
+                {SEGMENTS.map((segment) => (
+                    <li key={segment.key} className="flex items-center gap-2">
+                        <span
+                            aria-hidden
+                            className={cn("size-2 rounded-xs", ok ? segment.fill : segment.danger)}
+                        />
+                        <span className="flex-1">{segment.label}</span>
+                        <span>{gigabytes(parts[segment.key])}</span>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }

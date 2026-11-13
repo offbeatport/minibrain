@@ -246,8 +246,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Pick or map the dataset a model trains on.
   UI: Models › model › Training › Training data · API: PUT /api/models/{name}/dataset, PUT /api/models/{name}/mapping, POST /api/models/{name}/query, GET /api/models/{name}/preview
 - **LoRA training** · shipped · product, ml
-  Train a LoRA version on a picked dataset version.
-  UI: Models › model › Training › Train · API: POST /api/models/{name}/versions
+  Train a LoRA version, fresh or from an earlier version's settings.
+  UI: Models › model › Train, Versions › Train again · API: POST /api/models/{name}/versions
 - **Training list** · shipped · product, ml
   Every training run across models, filtered by model, status and method.
   UI: Training · API: GET /api/jobs, GET /api/jobs/facets
@@ -259,13 +259,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
-  UI: Models › model › Training › Train › Compute · API: GET /api/models/{name}/training-plan
+  UI: Models › model › Train › Compute · API: GET /api/models/{name}/training-plan
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
-  UI: Models › model › Training › Train · Roadmap: Training memory
+  UI: Models › model › Train · Roadmap: Training memory
 - **Training settings** · partial · ml
   Pick Fast, Balanced, Best or Custom to tune every trainer setting.
-  UI: Models › model › Training › Train › Parameters, Settings › General › Default training recipe · API: POST /api/models/{name}/versions, GET /api/settings · Roadmap: For ML engineers
+  UI: Models › model › Train › Parameters, Settings › General › Default training recipe · API: POST /api/models/{name}/versions, GET /api/settings · Roadmap: For ML engineers
 - **Training devices** · shipped · ml, admin
   Train on CUDA, ROCm, Intel XPU, Apple GPU or CPU, picked automatically.
   Config: MINIBRAIN_TRAIN_DEVICE

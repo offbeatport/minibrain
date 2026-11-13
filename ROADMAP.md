@@ -668,8 +668,10 @@ from. They have different endpoints and keys, so they are configured apart.
 - Cancel kills the process group. On start, the worker marks orphaned `running` jobs `failed`.
 - One install-wide default recipe (rank, alpha, learning rate, epochs), assistant-only loss, a small general instruction mix to
   limit forgetting. How it fits in memory is planned per run (Training memory).
-- The Train dialog starts from the model's last run: rank, epochs and learning rate prefill from it, selecting the
-  preset they match, else Custom; a model's first run starts from Balanced. There is no per-model default recipe.
+- The Train page (`/models/<slug>/train`) starts from the model's last run: rank, epochs and learning rate prefill
+  from it, selecting the preset they match, else Custom; a model's first run starts from Balanced. `?from=<n>` starts
+  from version n instead, its dataset version included (Versions › Train again), and `?data=<id>` picks the dataset
+  version. There is no per-model default recipe (2026-11-13).
 - The teacher can be a base model too: LoRA on the large model when prompting gets close but stays inconsistent
   (QLoRA keeps it on one GPU).
 
@@ -1147,7 +1149,7 @@ keys, and `/v1` stays key-only.
     the version it produced, status, held-out score, method ("SFT · LoRA r32"), duration and started. Model, status
     and method filters (`?method=sft`; DPO, continued pretraining and reinforcement learning show as coming soon),
     a search, ticks with bulk Cancel and Retry. A row opens the job's page; the old `?job=<id>` redirects there.
-    "Train a model" asks which model and opens `/models/<slug>/training?train=1`, the model page's Train dialog.
+    "Train a model" asks which model and opens `/models/<slug>/train`, the model's Train page.
     `/training/<slug>`, the old per-model workspace, redirects to `/models/<slug>/training`.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
@@ -1282,12 +1284,14 @@ keys, and `/v1` stays key-only.
   - Training: Score by version (the promotion rule as a dashed level, live marked) or Loss curves (the running job and
     the last three runs, by share of training done); the model's training and scoring jobs, each opening
     `/training/<job>`, with Train vN and Score prompt only; then training data, feedback and test examples.
-    `?train=1` opens the Train dialog: SFT (other methods Coming soon), Fast · Balanced · Higher quality presets each
-    with the planner's time, the dataset version with Change, Compute: Automatic with the planner's machine, a memory
-    bar, time, GPU-hours and the queue, Change listing every training machine by pool (one that does not fit is
-    disabled with the reason), Advanced (rank, alpha, learning rate, epochs, rows, batch, accumulation, sequence length,
-    LoRA or QLoRA, checkpointing, scoring steps, seed) re-planned live, Custom with a reset, and a summary over Train
-    vN. The plan comes from the real planner (`/training-plan` returns every machine, the time and the queue).
+    Train vN opens the Train page (`/models/<slug>/train`, Builders): on the left Method (SFT), Data (dataset version,
+    its rows, held out and difference against the deployed version), Training (Fast · Balanced · Best, each with rank,
+    epochs and the planner's time, or Custom) and Compute (Automatic, then every training machine by pool, one that
+    does not fit disabled with the reason); under them Parameters in two columns (adapter, optimisation, sequence,
+    memory, evaluation, seed), locked unless Custom, with a reset, re-planned live. On the right a sticky run summary:
+    the time, machine and pool, GPU-hours, the queue, the memory bar, rows, held out, the version it creates, planner
+    errors in red, and Train vN. Narrow screens stack it and keep Train vN in a bottom bar. The plan comes from the
+    real planner (`/training-plan` returns every machine, the time and the queue).
   - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1,000 against the period
     before, and the shared chart), Latency (p50, p95, p99), Errors (the rate against the usual one and a table by
     status linking to the request log), By version, Callers (API keys) and the latest requests, all from

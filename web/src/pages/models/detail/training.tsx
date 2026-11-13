@@ -36,9 +36,8 @@ import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusTe
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { jobDuration, useInvalidate } from "~/lib/jobs";
-import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
-import { jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
+import { jobHref, modelVersionHref, trainHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { TrainingData as DatasetChoice } from "../../data/TrainingData";
 import { ModelDataNotice } from "../../data/versionData";
@@ -46,7 +45,6 @@ import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
 import { Tip, isDeployed, nextVersion, trainBlock } from "./header";
 import { liveOf, versionLabel } from "./makeLive";
-import { TrainDialog } from "./train/TrainDialog";
 import { recipeText } from "./versions";
 
 type View = "scores" | "loss";
@@ -593,15 +591,6 @@ export function TrainingTab({
 }) {
     const router = useRouter();
     const jobs = useJobs(row.key);
-    const wanted = useSearchParam("train") === "1";
-    const [open, setOpen] = useState(false);
-    const shown = (open || wanted) && !trainBlock(row, detail);
-    const close = () => {
-        setOpen(false);
-        if (wanted) {
-            router.history.replace(modelPageHref(row.key, "training"));
-        }
-    };
     const list = jobs.data ?? [];
     return (
         <PanelSections>
@@ -613,7 +602,11 @@ export function TrainingTab({
                 actions={
                     <>
                         <ScoreButton row={row} detail={detail} />
-                        <TrainButton row={row} detail={detail} onTrain={() => setOpen(true)} />
+                        <TrainButton
+                            row={row}
+                            detail={detail}
+                            onTrain={() => router.history.push(trainHref(row.key))}
+                        />
                     </>
                 }
             />
@@ -636,13 +629,6 @@ export function TrainingTab({
             >
                 <TestExamples slug={row.key} />
             </PanelSection>
-            <TrainDialog
-                row={row}
-                detail={detail}
-                versions={versions}
-                open={shown}
-                onClose={close}
-            />
         </PanelSections>
     );
 }

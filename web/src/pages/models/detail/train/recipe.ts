@@ -197,3 +197,42 @@ export function rateText(value: number): string {
 export function strategyName(strategy: string | null | undefined): string {
     return strategy === "qlora" ? "QLoRA" : "LoRA";
 }
+
+export type Start = { basis: Quality; recipe: Recipe; custom: boolean };
+
+const BALANCED_START: Start = { basis: "balanced", recipe: PRESETS.balanced, custom: false };
+
+function nearestRate(value: number): number {
+    return LEARNING_RATES.reduce((best, item) =>
+        Math.abs(Math.log(item / value)) < Math.abs(Math.log(best / value)) ? item : best,
+    );
+}
+
+function positive(value: unknown): number | null {
+    const found = Number(value);
+    return Number.isFinite(found) && found > 0 ? found : null;
+}
+
+export function startFrom(stored: Record<string, unknown> | null | undefined): Start {
+    const rank = positive(stored?.rank);
+    const epochs = positive(stored?.epochs);
+    const learningRate = positive(stored?.learning_rate);
+    if (rank === null || epochs === null || learningRate === null) {
+        return BALANCED_START;
+    }
+    const recipe: Recipe = {
+        ...PRESETS.balanced,
+        rank: Math.round(rank),
+        epochs: Math.max(1, Math.round(epochs)),
+        learningRate: nearestRate(learningRate),
+    };
+    const matched = qualityOf(recipe);
+    return matched
+        ? { basis: matched, recipe: PRESETS[matched], custom: false }
+        : { basis: "balanced", recipe, custom: true };
+}
+
+export function hoursText(minutes: number): string {
+    const hours = minutes / 60;
+    return hours < 0.1 ? "< 0.1" : `≈ ${hours.toFixed(1)}`;
+}

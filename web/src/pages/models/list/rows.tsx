@@ -38,7 +38,7 @@ import { Sparkline } from "~/components/Sparkline";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { Requests } from "~/components/models/ModelMetrics";
 import type { Abilities } from "~/lib/access";
-import { modelCardHref, modelPageHref, playgroundHref, trainingHref } from "~/lib/modelLinks";
+import { modelCardHref, modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
 import { RETRY_LABELS, REVIEW_LABEL, busyTearingDown, needsReview } from "~/lib/teardown";
 import { bytes, relativeTime } from "~/lib/time";
 import type { Entry } from "../entries";
@@ -373,7 +373,7 @@ function CustomItems({ model, on, can }: { model: ListModel; on: Handlers; can: 
             <TrainItem
                 label="Train"
                 blocked={blocked}
-                onSelect={() => on.open(trainingHref(row.key))}
+                onSelect={() => on.open(trainHref(row.key))}
             />
             <DropdownMenuItem onSelect={() => on.switchBase(row, limit?.switch_to?.key ?? null)}>
                 <ArrowRightLeft />

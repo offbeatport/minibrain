@@ -7,8 +7,18 @@ export function trainingHref(slug: string): string {
     return `/models/${encodeURIComponent(slug)}/training`;
 }
 
-export function trainHref(slug: string): string {
-    return `${trainingHref(slug)}?train=1`;
+export type TrainFrom = { from?: number; data?: number };
+
+export function trainHref(slug: string, opts: TrainFrom = {}): string {
+    const search = new URLSearchParams();
+    if (opts.from !== undefined) {
+        search.set("from", String(opts.from));
+    }
+    if (opts.data !== undefined) {
+        search.set("data", String(opts.data));
+    }
+    const query = search.toString();
+    return `/models/${encodeURIComponent(slug)}/train${query ? `?${query}` : ""}`;
 }
 
 export function evaluationsHref(slug: string): string {

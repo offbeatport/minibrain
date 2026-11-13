@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Eye, GitCompare, History, Rocket, RotateCcw, Trash2, X } from "lucide-react";
+import { Eye, GitCompare, History, Repeat, Rocket, RotateCcw, Trash2, X } from "lucide-react";
 import {
     Badge,
     Button,
@@ -24,7 +24,7 @@ import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
-import { jobHref, modelCompareHref, modelVersionHref } from "~/lib/modelLinks";
+import { jobHref, modelCompareHref, modelVersionHref, trainHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed } from "./header";
@@ -216,6 +216,19 @@ function VersionRow({
                             Retry
                         </Button>
                     )}
+                    {can.build &&
+                        version.kind === "lora" &&
+                        version.status !== "training" &&
+                        version.status !== "evaluating" && (
+                            <Tip tip={`Train again with the settings of v${version.number}`}>
+                                <Button variant="outline" asChild>
+                                    <Link href={trainHref(row.key, { from: version.number })}>
+                                        <Repeat aria-hidden="true" />
+                                        Train again
+                                    </Link>
+                                </Button>
+                            </Tip>
+                        )}
                     {can.build && live && !blocked && (
                         <Button variant="outline" onClick={onLive}>
                             <Rocket aria-hidden="true" />
