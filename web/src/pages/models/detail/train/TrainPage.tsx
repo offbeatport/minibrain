@@ -1,6 +1,6 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { GraduationCap, Lock, ScrollText } from "lucide-react";
-import { Button, Card, ConfirmDialog, InfoTip, Textarea } from "obp-ui";
+import { GraduationCap, ScrollText } from "lucide-react";
+import { ConfirmDialog, Textarea } from "obp-ui";
 import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useModel, useVersions } from "~/api/queries";
@@ -16,11 +16,11 @@ import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted } from "~/lib/teardown";
 import { relativeTime } from "~/lib/time";
 import { ModelDataNotice } from "../../../data/versionData";
-import { Crumbs, modelCrumbs, nextVersion, trainBlock } from "../header";
-import { Advanced } from "./advanced";
-import { AUTO, HeldOutWarning, fitText, timeText } from "./parts";
-import { MIN_HELD_OUT, QUALITIES, duration, presetText, startFrom } from "./recipe";
+import { Crumbs, baseNameOf, isDeployed, modelCrumbs, nextVersion, trainBlock } from "../header";
+import { AUTO, HeldOutWarning, fitText } from "./parts";
+import { MIN_HELD_OUT, duration, startFrom } from "./recipe";
 import { RunSummary, problemsOf, statusOf } from "./summary";
+import { TrainingCard } from "./training";
 import { type TrainRun, type TrainStart, useTrainRun } from "./useTrainRun";
 
 const INSTRUCTIONS_ANCHOR = "instructions";
@@ -112,86 +112,40 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
     );
 }
 
-function firstLine(text: string): string {
-    return (
-        text
-            .split("\n")
-            .find((line) => line.trim())
-            ?.trim() ?? ""
-    );
-}
-
 function InstructionsRow({
     detail,
     text,
     onText,
-    open,
-    onOpen,
 }: {
     detail: ModelDetail;
     text: string;
     onText: (text: string) => void;
-    open: boolean;
-    onOpen?: (open: boolean) => void;
 }) {
-    const shown = text.trim() ? text : detail.default_instructions;
     const changed = text.trim() !== detail.instructions.trim();
     return (
         <FormRow
-            id={open ? "train-instructions" : undefined}
+            id="train-instructions"
             label="Instructions"
-            align={open ? "start" : "center"}
+            align="start"
             tip="The system prompt. The new version keeps its own copy, and later versions start from it."
         >
-            <FormControl width="full">
-                <div id={INSTRUCTIONS_ANCHOR} className="flex scroll-my-24 flex-col gap-2">
-                    {open ? (
-                        <>
-                            <Textarea
-                                id="train-instructions"
-                                className="min-h-40"
-                                value={text}
-                                placeholder={detail.default_instructions}
-                                onChange={(event) => onText(event.target.value)}
-                            />
-                            {(onOpen || changed) && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {onOpen && (
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => onOpen(false)}
-                                        >
-                                            Done
-                                        </Button>
-                                    )}
-                                    {changed && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() => onText(detail.instructions)}
-                                        >
-                                            Undo changes
-                                        </Button>
-                                    )}
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div className="flex min-w-0 items-center gap-3">
-                            <span className="min-w-0 truncate">
-                                {firstLine(shown) || "None"}
-                                {!text.trim() && (
-                                    <span className="text-muted-foreground"> (default)</span>
-                                )}
-                            </span>
-                            {changed && (
-                                <span className="text-sm text-muted-foreground">Changed</span>
-                            )}
-                            <Button type="button" variant="outline" onClick={() => onOpen?.(true)}>
-                                Edit
-                            </Button>
-                        </div>
+            <FormControl width="wide">
+                <div id={INSTRUCTIONS_ANCHOR} className="flex scroll-my-24 flex-col gap-1.5">
+                    <Textarea
+                        id="train-instructions"
+                        className="max-h-[calc(12lh+0.875rem)] min-h-[calc(4lh+0.875rem)]"
+                        value={text}
+                        placeholder={detail.default_instructions}
+                        onChange={(event) => onText(event.target.value)}
+                    />
+                    {changed && (
+                        <button
+                            type="button"
+                            className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            onClick={() => onText(detail.instructions)}
+                        >
+                            Reset to current
+                        </button>
                     )}
                 </div>
             </FormControl>
@@ -199,33 +153,67 @@ function InstructionsRow({
     );
 }
 
-function ParametersHeader({ run }: { run: TrainRun }) {
+function ComputeRow({ run }: { run: TrainRun }) {
     return (
-        <div className="flex h-12 items-center justify-between gap-3 border-b px-panel">
-            <h2 id="train-parameters" className="font-medium">
-                Parameters
-            </h2>
-            {run.custom ? (
-                run.changed > 0 && (
-                    <button
-                        type="button"
-                        className="rounded-sm text-sm text-primary tabular-nums hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        onClick={run.reset}
-                    >
-                        {`${run.changed} changed · Reset`}
-                    </button>
-                )
-            ) : (
-                <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <Lock aria-hidden="true" className="size-3.5" />
-                    Locked
-                    <InfoTip label="Locked parameters">
-                        Choose Custom under Training to change them.
-                    </InfoTip>
-                </span>
-            )}
-        </div>
+        <FormRow id="train-compute" label="Compute">
+            <FormControl>
+                <PickSelect
+                    id="train-compute"
+                    value={run.compute}
+                    onChange={run.setCompute}
+                    options={[
+                        {
+                            value: AUTO,
+                            label: "Automatic",
+                            meta: run.pools.some((item) => item.best)
+                                ? "any pool that fits"
+                                : "nothing fits",
+                        },
+                        ...run.pools.map((item, index) => ({
+                            value: item.name,
+                            label: item.label,
+                            meta: item.best
+                                ? `${fitText(item.best.chosen)} · ≈ ${duration(item.best.minutes)}`
+                                : item.reason,
+                            disabled: !item.best && item.name !== run.compute,
+                            separated: index === 0,
+                        })),
+                    ]}
+                />
+            </FormControl>
+        </FormRow>
     );
+}
+
+function againstOf(row: ModelRow, versions: VersionInfo[]): string | null {
+    if (isDeployed(row) && row.current_version !== null && row.current_version !== undefined) {
+        return `deployed v${row.current_version}`;
+    }
+    const scored = versions
+        .filter((version) => version.score !== null && version.score !== undefined)
+        .reduce<number | null>(
+            (best, version) => (best === null || version.number > best ? version.number : best),
+            null,
+        );
+    return scored === null ? null : `v${scored}`;
+}
+
+function captionOf(
+    method: TrainMethod,
+    row: ModelRow,
+    detail: ModelDetail,
+    versions: VersionInfo[],
+    run: TrainRun,
+    base: string,
+): string {
+    const against = againstOf(row, versions);
+    const scored = `${count(run.heldOut)} held-out rows${against ? ` against ${against}` : ""}`;
+    if (method === "instructions") {
+        return `Saves new instructions on ${base} and scores them on ${scored}.`;
+    }
+    const dataset = detail.dataset_name ?? detail.dataset ?? "the dataset";
+    const data = run.chosen ? `${dataset} v${run.chosen.number ?? "–"}` : dataset;
+    return `Fine-tunes ${base} on ${data}, then scores it on ${scored}.`;
 }
 
 function blockFor(method: TrainMethod, row: ModelRow, detail: ModelDetail): string | null {
@@ -242,6 +230,8 @@ function TrainForm({
     start,
     method,
     onMethod,
+    title,
+    base,
 }: {
     row: ModelRow;
     detail: ModelDetail;
@@ -249,11 +239,11 @@ function TrainForm({
     start: TrainStart;
     method: TrainMethod;
     onMethod: (method: TrainMethod) => void;
+    title: string;
+    base: string;
 }) {
     const router = useRouter();
-    const hash = useRouterState({ select: (state) => state.location.hash });
     const [text, setText] = useState(detail.instructions);
-    const [editing, setEditing] = useState(hash.replace(/^#/, "") === INSTRUCTIONS_ANCHOR);
     const changed = text.trim() !== detail.instructions.trim();
     const blocked = blockFor(method, row, detail);
     const back = () => router.history.push(modelPageHref(row.key, "versions"));
@@ -305,90 +295,30 @@ function TrainForm({
                             />
                         </FormControl>
                     </FormRow>
-                    <InstructionsRow
-                        detail={detail}
-                        text={text}
-                        onText={setText}
-                        open={editing || !training}
-                        onOpen={training ? setEditing : undefined}
-                    />
                     <DataRow row={row} detail={detail} run={run} />
-                    {training && (
-                        <FormRow id="train-quality" label="Training">
-                            <FormControl>
-                                <PickSelect
-                                    id="train-quality"
-                                    value={run.level}
-                                    onChange={(next) => run.choose(next as typeof run.level)}
-                                    options={[
-                                        ...QUALITIES.map((item) => ({
-                                            value: item.id,
-                                            label: item.label,
-                                            meta: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
-                                        })),
-                                        {
-                                            value: "custom",
-                                            label: "Custom",
-                                            meta: "set each parameter",
-                                            separated: true,
-                                        },
-                                    ]}
-                                />
-                            </FormControl>
-                        </FormRow>
-                    )}
-                    {training && (
-                        <FormRow id="train-compute" label="Compute">
-                            <FormControl>
-                                <PickSelect
-                                    id="train-compute"
-                                    value={run.compute}
-                                    onChange={run.setCompute}
-                                    options={[
-                                        {
-                                            value: AUTO,
-                                            label: "Automatic",
-                                            meta: run.fastest
-                                                ? `fastest that fits · ${run.fastest.name}`
-                                                : "nothing fits",
-                                        },
-                                        ...(run.info?.machines ?? []).map((item, index) => ({
-                                            value: item.name,
-                                            label: `${item.name} · ${item.pool}`,
-                                            meta: item.chosen
-                                                ? `${fitText(item.chosen)} · ≈ ${duration(item.minutes)}`
-                                                : (item.reason ?? "does not fit"),
-                                            disabled: !item.chosen,
-                                            separated: index === 0,
-                                        })),
-                                    ]}
-                                />
-                            </FormControl>
-                        </FormRow>
+                    {training ? (
+                        <ComputeRow run={run} />
+                    ) : (
+                        <InstructionsRow detail={detail} text={text} onText={setText} />
                     )}
                 </FormGroup>
             </FormCard>
+            {training && <TrainingCard run={run} />}
             {training && (
-                <Card aria-labelledby="train-parameters" className="gap-0 py-0">
-                    <ParametersHeader run={run} />
-                    <div className="p-panel">
-                        <Advanced
-                            disabled={!run.custom}
-                            recipe={run.recipe}
-                            onChange={run.change}
-                            plan={run.info}
-                            available={run.available}
-                            heldOut={run.heldOut}
-                            issues={run.issues}
-                            next={run.number}
-                        />
-                    </div>
-                </Card>
+                <FormCard>
+                    <FormGroup>
+                        <InstructionsRow detail={detail} text={text} onText={setText} />
+                    </FormGroup>
+                </FormCard>
             )}
         </>
     );
     return (
         <>
+            <PageHeader
+                title={title}
+                caption={captionOf(method, row, detail, versions, run, base)}
+            />
             <CreateLayout
                 form={form}
                 summary={<RunSummary run={run} blocked={blocked} changed={changed} />}
@@ -426,10 +356,14 @@ function Loaded({
     row,
     method,
     onMethod,
+    title,
+    base,
 }: {
     row: ModelRow;
     method: TrainMethod;
     onMethod: (method: TrainMethod) => void;
+    title: string;
+    base: string;
 }) {
     const detail = useModel(row.key);
     const versions = useVersions(row.key);
@@ -446,10 +380,16 @@ function Loaded({
                     start={start}
                     method={method}
                     onMethod={onMethod}
+                    title={title}
+                    base={base}
                 />
             ) : (
-                !detail.error &&
-                !versions.error && <p className="text-muted-foreground">Loading…</p>
+                <>
+                    <PageHeader title={title} />
+                    {!detail.error && !versions.error && (
+                        <p className="text-muted-foreground">Loading…</p>
+                    )}
+                </>
             )}
         </>
     );
@@ -487,9 +427,15 @@ export function TrainPage() {
             : `New version v${nextVersion(row)} of ${row.name}`;
     return (
         <Page>
-            <Crumbs items={modelCrumbs(row, [{ label: "Train" }])} />
-            <PageHeader title={title} />
-            <Loaded key={row.key} row={row} method={method} onMethod={setMethod} />
+            <Crumbs items={modelCrumbs(row, [{ label: `Train v${nextVersion(row)}` }])} />
+            <Loaded
+                key={row.key}
+                row={row}
+                method={method}
+                onMethod={setMethod}
+                title={title}
+                base={baseNameOf(models.data, row.base_model)}
+            />
         </Page>
     );
 }

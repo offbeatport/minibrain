@@ -16,9 +16,9 @@ import { jobSeconds } from "~/lib/jobs";
 import { type TrainMethod, jobHref, modelVersionHref } from "~/lib/modelLinks";
 import { nextVersion } from "../header";
 import { AUTO } from "./parts";
+import { poolsOf } from "./pools";
 import {
     type Level,
-    type MachinePlan,
     type PlanInfo,
     type PlanQuery,
     QUALITIES,
@@ -46,16 +46,6 @@ function trainRows(version: DatasetVersionInfo | undefined): number {
         return 0;
     }
     return (version.counts.train ?? 0) + (version.feedback_rows ?? 0);
-}
-
-function fastestOf(plan: PlanInfo | undefined): MachinePlan | null {
-    return (plan?.machines ?? [])
-        .filter((item) => item.chosen)
-        .reduce<MachinePlan | null>(
-            (best, item) =>
-                best === null || (item.minutes ?? 0) < (best.minutes ?? 0) ? item : best,
-            null,
-        );
 }
 
 export type TrainStart = Start & { data: number | null };
@@ -109,15 +99,16 @@ export function useTrainRun({
     const [picked, setPicked] = useState<number | null>(start.data);
     const [basis, setBasis] = useState<Quality>(start.basis);
     const [recipe, setRecipe] = useState<Recipe>(start.recipe);
-    const [compute, setCompute] = useState<string>(AUTO);
+    const [compute, setPool] = useState<string>(AUTO);
     const [custom, setCustom] = useState(start.custom);
+    const [open, setOpen] = useState(start.custom);
     const [breaking, setBreaking] = useState<string | null>(null);
     const chosen =
         saved.find((item) => item.id === picked) ?? saved[0] ?? detail.dataset_version ?? undefined;
     const available = trainRows(chosen);
-    const machine = compute === AUTO ? null : compute;
+    const pool = compute === AUTO ? null : compute;
     const datasetVersion = chosen?.id ?? null;
-    const query = planQuery(recipe, available, machine, datasetVersion);
+    const query = planQuery(recipe, available, pool, datasetVersion);
     const plan = useQuery({
         queryKey: planKey(row.key, query),
         queryFn: () => fetchPlan(row.key, query),
@@ -128,9 +119,9 @@ export function useTrainRun({
     const presets = useQueries({
         queries: QUALITIES.map((item) => {
             const presetQuery = planQuery(
-                presetRecipe(item.id),
+                { ...presetRecipe(item.id), machine: recipe.machine },
                 available,
-                machine,
+                pool,
                 datasetVersion,
             );
             return {
@@ -155,6 +146,11 @@ export function useTrainRun({
         }),
     ) as Record<Quality, number | null | undefined>;
     const info: PlanInfo | undefined = plan.data;
+    const pools = poolsOf(info);
+    const poolMachines =
+        pool === null
+            ? (info?.machines ?? [])
+            : (pools.find((item) => item.name === pool)?.machines ?? []);
     const planError = plan.error
         ? (errorMessage(plan.error) ?? "The planner refused these settings.")
         : null;
@@ -230,11 +226,19 @@ export function useTrainRun({
     const choose = (next: Level) => {
         if (next === "custom") {
             setCustom(true);
+            setOpen(true);
             return;
         }
         setCustom(false);
         setBasis(next);
         setRecipe(presetRecipe(next));
+    };
+    const setCompute = (next: string) => {
+        setPool(next);
+        const pinned = (info?.machines ?? []).find((item) => item.name === recipe.machine);
+        if (next !== AUTO && pinned && pinned.pool !== next) {
+            setRecipe((current) => ({ ...current, machine: "auto" }));
+        }
     };
     const submit = () => {
         if (ready && !create.isPending) {
@@ -257,13 +261,16 @@ export function useTrainRun({
         reset: () => setRecipe(presetRecipe(basis)),
         compute,
         setCompute,
+        pools,
+        poolMachines,
+        open,
+        setOpen,
         minutes,
         info,
         planning: plan.isFetching,
         issues,
         option,
         pickedMachine,
-        fastest: fastestOf(info),
         number,
         ready,
         training,

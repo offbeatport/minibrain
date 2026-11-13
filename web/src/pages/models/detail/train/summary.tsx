@@ -49,6 +49,26 @@ export function problemsOf(run: TrainRun, blocked: string | null): string[] {
     return [...(run.failure ? [run.failure] : []), ...shown.map((issue) => issue.text)];
 }
 
+function PoolFact({ run }: { run: TrainRun }) {
+    const machine = run.pickedMachine;
+    const chosen = run.pools.find((item) => item.name === run.compute);
+    const pool = chosen?.label ?? machine?.pool_label;
+    if (!pool) {
+        return "–";
+    }
+    const pinned = run.recipe.machine !== "auto";
+    return (
+        <>
+            {pool}
+            {machine && (
+                <span className="block truncate text-sm text-muted-foreground">
+                    {pinned ? machine.name : `likely ${machine.name}`}
+                </span>
+            )}
+        </>
+    );
+}
+
 function scoreTime(run: TrainRun): string {
     return run.scoreSeconds === null ? "–" : `≈ ${durationText(run.scoreSeconds)}`;
 }
@@ -116,8 +136,8 @@ export function RunSummary({
                     <SummaryFact icon={Timer} label="Time">
                         {estimateOf(run, blocked)}
                     </SummaryFact>
-                    <SummaryFact icon={Server} label="Machine">
-                        {machine ? `${machine.name} · ${machine.pool}` : (info?.machine ?? "–")}
+                    <SummaryFact icon={Server} label="Pool">
+                        <PoolFact run={run} />
                     </SummaryFact>
                     <SummaryFact
                         icon={Cpu}

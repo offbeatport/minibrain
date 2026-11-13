@@ -22,6 +22,7 @@ export type Recipe = {
     checkpointing: Auto<boolean>;
     evalEvery: Auto<number>;
     seed: number;
+    machine: Auto<string>;
 };
 
 export type Quality = "fast" | "balanced" | "quality";
@@ -50,6 +51,7 @@ const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs"> = {
     checkpointing: "auto",
     evalEvery: "auto",
     seed: 7,
+    machine: "auto",
 };
 
 const PRESETS: Record<Quality, Recipe> = {
@@ -103,13 +105,14 @@ export type PlanQuery = {
     eval_every?: number;
     seed: number;
     machine?: string;
+    pool?: string;
     dataset_version_id?: number;
 };
 
 export function planQuery(
     recipe: Recipe,
     available: number,
-    machine: string | null,
+    pool: string | null,
     datasetVersion: number | null,
 ): PlanQuery {
     const query: PlanQuery = {
@@ -125,7 +128,8 @@ export function planQuery(
         checkpointing: auto(recipe.checkpointing),
         eval_every: auto(recipe.evalEvery),
         seed: recipe.seed,
-        machine: machine ?? undefined,
+        machine: auto(recipe.machine),
+        pool: pool ?? undefined,
         dataset_version_id: datasetVersion ?? undefined,
     };
     return Object.fromEntries(
@@ -192,6 +196,20 @@ export function gigabytes(bytes: number | null | undefined): string {
 
 export function rateText(value: number): string {
     return value.toExponential(0).replace("e-", "e-");
+}
+
+export function recipeText(recipe: Recipe): string {
+    const alpha = recipe.alpha === "auto" ? recipe.rank * 2 : recipe.alpha;
+    const rows = recipe.maxRows === "all" ? "all rows" : `${recipe.maxRows.toLocaleString()} rows`;
+    const epochs = `${recipe.epochs} ${recipe.epochs === 1 ? "epoch" : "epochs"}`;
+    return [
+        `rank ${recipe.rank}`,
+        `alpha ${alpha}`,
+        `lr ${rateText(recipe.learningRate)}`,
+        epochs,
+        rows,
+        ...(recipe.machine === "auto" ? [] : [`on ${recipe.machine}`]),
+    ].join(" · ");
 }
 
 export function strategyName(strategy: string | null | undefined): string {

@@ -7,8 +7,10 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    cn,
 } from "obp-ui";
 import type { ReactNode } from "react";
+import { FORM_GROUP_GAP, FORM_ROW_GAP } from "~/components/FormRows";
 import { count } from "~/lib/format";
 import {
     ACCUM_CHOICES,
@@ -17,6 +19,7 @@ import {
     LEARNING_RATES,
     MAX_RANK,
     MICRO_CHOICES,
+    type MachinePlan,
     type PlanInfo,
     type Recipe,
     type Strategy,
@@ -37,7 +40,7 @@ function Group({ id, label, children }: { id: string; label: string; children: R
             <h4 id={id} className="text-sm text-muted-foreground">
                 {label}
             </h4>
-            <div className="flex flex-col gap-panel-gap">{children}</div>
+            <div className={cn("flex flex-col", FORM_ROW_GAP)}>{children}</div>
         </section>
     );
 }
@@ -130,9 +133,11 @@ export function Advanced({
     heldOut,
     issues,
     next,
+    machines,
     disabled,
 }: {
     disabled: boolean;
+    machines: MachinePlan[];
     recipe: Recipe;
     onChange: Change;
     plan: PlanInfo | undefined;
@@ -152,8 +157,8 @@ export function Advanced({
     const checks = evalEvery ? Math.floor(Math.max(steps - 1, 0) / evalEvery) + 1 : null;
     return (
         <div className="@container">
-            <div className="grid gap-field @xl:grid-cols-2">
-                <div className="flex flex-col gap-field">
+            <div className={cn("grid @xl:grid-cols-2", FORM_GROUP_GAP)}>
+                <div className={cn("flex flex-col", FORM_GROUP_GAP)}>
                     <Group id="train-group-adapter" label="Adapter">
                         <Field
                             id="train-rank"
@@ -376,7 +381,7 @@ export function Advanced({
                         </Field>
                     </Group>
                 </div>
-                <div className="flex flex-col gap-field">
+                <div className={cn("flex flex-col", FORM_GROUP_GAP)}>
                     <Group id="train-group-sequence" label="Sequence">
                         <Field
                             id="train-seq"
@@ -411,6 +416,29 @@ export function Advanced({
                         </Field>
                     </Group>
                     <Group id="train-group-memory" label="Memory">
+                        <Field
+                            id="train-machine"
+                            label={
+                                <Tipped
+                                    label="Machine"
+                                    tip="Plans batch and memory for this machine. Any plans for the best machine in the pool."
+                                />
+                            }
+                        >
+                            <ChoiceSelect<string>
+                                disabled={disabled}
+                                id="train-machine"
+                                value={recipe.machine}
+                                choices={[
+                                    { value: "auto", label: "Any" },
+                                    ...machines.map((item) => ({
+                                        value: item.name,
+                                        label: item.name,
+                                    })),
+                                ]}
+                                onChange={(value) => onChange({ machine: value })}
+                            />
+                        </Field>
                         <Field
                             id="train-strategy"
                             label={
