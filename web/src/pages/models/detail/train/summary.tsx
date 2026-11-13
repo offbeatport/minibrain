@@ -124,9 +124,9 @@ function PoolFact({ run }: { run: TrainRun }) {
                     {name}
                 </Link>
             )}
-            {machine && (
+            {machine && pinned && (
                 <span className="block truncate text-sm text-muted-foreground">
-                    {pinned ? machine.name : `likely ${machine.name}`}
+                    {machine.name}
                 </span>
             )}
         </>
