@@ -521,114 +521,109 @@ export function ModelsList() {
                 }
                 chips={<FilterChips models={models} filters={filters} onFilters={setFilters} />}
                 actions={
-                    <>
-                        {can.build && (
-                            <Button asChild>
-                                <Link href="/models/new">
-                                    <CubePlus />
-                                    Add model
-                                </Link>
-                            </Button>
-                        )}
-                        <ViewOptions
-                            pool={pool}
-                            models={models}
-                            filters={filters}
-                            onFilters={setFilters}
-                            sort={sort}
-                            onSort={(value) =>
-                                update({ sort: value === DEFAULT_SORT ? "" : value })
-                            }
-                            onReset={() => {
-                                update({ ...filterSearch(NO_FILTERS), sort: "" });
-                                setNested(false);
-                                setColumns(DEFAULT_COLUMNS);
-                            }}
-                            pristine={
-                                activeCount(filters) === 0 &&
-                                sort === DEFAULT_SORT &&
-                                !nested &&
-                                sameColumns(shownColumns, DEFAULT_COLUMNS)
-                            }
-                            nested={nested}
-                            onNested={(value) => {
-                                setNested(value);
-                                if (!value) {
-                                    clear();
-                                }
-                            }}
-                            columns={shownColumns}
-                            onColumns={setColumns}
-                        />
-                    </>
+                    can.build && (
+                        <Button asChild>
+                            <Link href="/models/new">
+                                <CubePlus />
+                                Add model
+                            </Link>
+                        </Button>
+                    )
                 }
             />
         );
     const empty = rows.length === 0;
+    const viewOptions = (
+        <ViewOptions
+            pool={pool}
+            models={models}
+            filters={filters}
+            onFilters={setFilters}
+            sort={sort}
+            onSort={(value) => update({ sort: value === DEFAULT_SORT ? "" : value })}
+            onReset={() => {
+                update({ ...filterSearch(NO_FILTERS), sort: "" });
+                setNested(false);
+                setColumns(DEFAULT_COLUMNS);
+            }}
+            pristine={
+                activeCount(filters) === 0 &&
+                sort === DEFAULT_SORT &&
+                !nested &&
+                sameColumns(shownColumns, DEFAULT_COLUMNS)
+            }
+            nested={nested}
+            onNested={(value) => {
+                setNested(value);
+                if (!value) {
+                    clear();
+                }
+            }}
+            columns={shownColumns}
+            onColumns={setColumns}
+        />
+    );
+    const body = all.isLoading ? (
+        <p className="col-span-full px-4 py-6 text-muted-foreground">Loading models…</p>
+    ) : all.error ? (
+        <div className="col-span-full flex items-center gap-2 px-4 py-6">
+            <ErrorLine error={all.error} />
+            <Button variant="outline" onClick={() => all.refetch()}>
+                Try again
+            </Button>
+        </div>
+    ) : empty ? (
+        <div className="col-span-full flex min-h-72 flex-col items-center justify-center gap-3 px-4 text-center">
+            <ModelsEmpty />
+        </div>
+    ) : groups.length === 0 ? (
+        <div className="col-span-full flex min-h-40 flex-wrap items-center justify-center gap-3 text-muted-foreground">
+            No models, versions or variants match.
+            <Button variant="outline" onClick={() => update(clearedSearch())}>
+                Clear filters
+            </Button>
+        </div>
+    ) : (
+        groups.map((group) => (
+            <section
+                key={group.kind}
+                aria-labelledby={`models-group-${group.kind}`}
+                className="col-span-full grid grid-cols-subgrid"
+            >
+                <GroupBand group={group} />
+                <ul
+                    aria-labelledby={`models-group-${group.kind}`}
+                    className="col-span-full grid grid-cols-subgrid divide-y"
+                >
+                    {group.lines.map(render)}
+                </ul>
+            </section>
+        ))
+    );
     return (
         <div className="flex flex-col gap-3">
             {toolbar}
-            {all.isLoading ? (
-                <p className="text-muted-foreground">Loading models…</p>
-            ) : all.error ? (
-                <div className="flex items-center gap-2">
-                    <ErrorLine error={all.error} />
-                    <Button variant="outline" onClick={() => all.refetch()}>
-                        Try again
-                    </Button>
-                </div>
-            ) : empty ? (
-                <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-lg border bg-card px-4 text-center">
-                    <ModelsEmpty />
-                </div>
-            ) : (
+            <div
+                className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card lg:overflow-x-clip"
+                style={{ gridTemplateColumns: gridTemplate(shownColumns) }}
+            >
                 <div
-                    className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card lg:overflow-x-clip"
-                    style={{ gridTemplateColumns: gridTemplate(shownColumns) }}
-                >
-                    <div
-                        className={cn(
-                            ROW_GRID,
-                            "sticky top-0 z-[15] h-9 border-b bg-secondary font-medium text-muted-foreground",
-                        )}
-                    >
-                        <span className={nested ? "pl-8" : undefined}>Model</span>
-                        {COLUMNS.filter((column) => shownColumns.includes(column.id)).map(
-                            (column) => (
-                                <span key={column.id} className="whitespace-nowrap">
-                                    {column.label}
-                                </span>
-                            ),
-                        )}
-                        <span>Status</span>
-                        <span className="sr-only">Actions</span>
-                    </div>
-                    {groups.length === 0 ? (
-                        <div className="col-span-full flex min-h-40 flex-wrap items-center justify-center gap-3 text-muted-foreground">
-                            No models, versions or variants match.
-                            <Button variant="outline" onClick={() => update(clearedSearch())}>
-                                Clear filters
-                            </Button>
-                        </div>
-                    ) : (
-                        groups.map((group) => (
-                            <section
-                                key={group.kind}
-                                aria-labelledby={`models-group-${group.kind}`}
-                                className="col-span-full grid grid-cols-subgrid"
-                            >
-                                <GroupBand group={group} />
-                                <ul
-                                    aria-labelledby={`models-group-${group.kind}`}
-                                    className="col-span-full grid grid-cols-subgrid divide-y"
-                                >
-                                    {group.lines.map(render)}
-                                </ul>
-                            </section>
-                        ))
+                    className={cn(
+                        ROW_GRID,
+                        "sticky top-0 z-[15] h-10 border-b bg-secondary font-medium text-muted-foreground",
                     )}
+                >
+                    <span className={nested ? "pl-8" : undefined}>Model</span>
+                    {COLUMNS.filter((column) => shownColumns.includes(column.id)).map((column) => (
+                        <span key={column.id} className="whitespace-nowrap">
+                            {column.label}
+                        </span>
+                    ))}
+                    <span>Status</span>
+                    <span className="flex justify-end">{viewOptions}</span>
                 </div>
-            )}
+                {body}
+            </div>
             <QuickLook
                 model={peekModel}
                 on={on}
