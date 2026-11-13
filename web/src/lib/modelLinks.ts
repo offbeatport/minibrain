@@ -60,11 +60,24 @@ export function jobHref(job: { id: number; kind: string }): string {
     return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
-export type ModelTab = "overview" | "versions" | "monitoring" | "api" | "settings" | "files";
+export type ModelTab =
+    | "overview"
+    | "versions"
+    | "evaluation"
+    | "monitoring"
+    | "api"
+    | "settings"
+    | "files";
 
 export function modelPageHref(name: string, tab: ModelTab = "overview"): string {
     const page = `/models/${encodeURIComponent(name)}`;
     return tab === "overview" ? page : `${page}/${tab}`;
+}
+
+export type EvaluationPart = "scores" | "failures" | "tested-on" | "test-examples" | "scoring";
+
+export function evaluationHref(name: string, part: EvaluationPart = "scoring"): string {
+    return `${modelPageHref(name, "evaluation")}#${part}`;
 }
 
 export function modelVersionHref(name: string, number: number): string {

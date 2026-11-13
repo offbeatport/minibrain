@@ -154,3 +154,20 @@ def test_a_saved_test_example_is_held_out_in_the_next_dataset_version(harness: H
     [example] = [example for example in held_out if example.expected == "billing" and len(example.turns) == 3]
     assert example.messages() == messages
     assert all(len(row.turns) == 1 for name in ("train", "golden", "shots") for row in read_split(location, name))
+
+
+def test_a_removed_test_example_leaves_the_held_out_rows(harness: Harness) -> None:
+    create_with_dataset(harness)
+    body = {"messages": [{"role": "user", "content": "Charged twice in March"}], "expected": "billing"}
+    item = harness.client.post(EXAMPLES, json=body).json()
+    assert harness.person(Role.VIEWER).delete(f"{EXAMPLES}/{item['id']}").status_code == 403
+    assert harness.client.delete(f"{EXAMPLES}/999").status_code == 404
+    assert harness.client.delete(f"{EXAMPLES}/{item['id']}").status_code == 204
+    assert harness.client.get(EXAMPLES).json() == []
+    assert harness.client.delete(f"{EXAMPLES}/{item['id']}").status_code == 422
+    assert harness.client.get(f"/api/models/{SLUG}/feedback/summary").json()["examples"] == 0
+    with harness.sessions() as session:
+        event = session.scalars(select(AuditEvent).where(AuditEvent.action == "feedback.example_remove")).one()
+        assert event.target == f"{SLUG}/feedback/{item['id']}"
+        stored = session.get(Feedback, item["id"])
+        assert stored is not None and stored.status == "rejected"

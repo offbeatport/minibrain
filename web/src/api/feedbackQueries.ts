@@ -5,7 +5,7 @@ import {
     useQuery,
     useQueryClient,
 } from "@tanstack/react-query";
-import { api, unwrap } from "./client";
+import { api, succeed, unwrap } from "./client";
 import { keys } from "./queries";
 import type { components } from "./schema";
 
@@ -178,6 +178,23 @@ export function useSaveTestExample(slug: string) {
                 api.POST("/api/models/{name}/test-examples", {
                     params: { path: { name: slug } },
                     body,
+                }),
+            ),
+        onSuccess: () => {
+            refresh();
+            client.invalidateQueries({ queryKey: keys.datasets });
+        },
+    });
+}
+
+export function useRemoveTestExample(slug: string) {
+    const client = useQueryClient();
+    const refresh = useRefreshFeedback();
+    return useMutation({
+        mutationFn: (id: number) =>
+            succeed(
+                api.DELETE("/api/models/{name}/test-examples/{feedback_id}", {
+                    params: { path: { name: slug, feedback_id: id } },
                 }),
             ),
         onSuccess: () => {

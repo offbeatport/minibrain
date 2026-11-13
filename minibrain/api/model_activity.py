@@ -153,6 +153,7 @@ def feedback_said(event: AuditEvent) -> Said:
         "feedback.fix": f"corrected {row}",
         "feedback.reject": f"rejected {row}",
         "feedback.example": f"added {row} to the examples",
+        "feedback.example_remove": f"removed {row} from the examples",
         "feedback.assign": f"assigned {row}",
         "feedback.unassign": f"unassigned {row}",
     }

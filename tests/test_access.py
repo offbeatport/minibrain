@@ -171,6 +171,7 @@ ROUTE_ROLES = {
     ("GET", "/api/models/{name}/feedback/summary"): "viewer",
     ("POST", "/api/models/{name}/test-examples"): "builder",
     ("GET", "/api/models/{name}/test-examples"): "builder",
+    ("DELETE", "/api/models/{name}/test-examples/{feedback_id}"): "builder",
     ("GET", "/api/keys"): "builder",
     ("POST", "/api/keys"): "builder",
     ("PUT", "/api/keys/{key_id}/models"): "builder",

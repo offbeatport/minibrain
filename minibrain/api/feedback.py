@@ -368,6 +368,25 @@ def save_test_example(name: str, body: SaveExampleBody, session: SessionDep) -> 
     return feedback_info(item)
 
 
+@router.delete(
+    "/models/{name}/test-examples/{feedback_id}",
+    status_code=204,
+    dependencies=[Depends(builder)],
+    summary="Remove a test example",
+    description=(
+        "Rejects the test example, so the next version's held-out rows leave it out; versions already scored keep "
+        "their rows. Audited as feedback.example_remove."
+    ),
+)
+def remove_test_example(name: str, feedback_id: int, session: SessionDep) -> None:
+    model = get_model(session, name)
+    item = get_feedback(session, feedback_id)
+    if item.model_id != model.id:
+        raise NotFoundError(f"No test example {feedback_id} on {model.name}")
+    store.remove_example(session, item, current_actor())
+    session.commit()
+
+
 @router.get("/models/{name}/test-examples", dependencies=[Depends(builder)], summary="List test examples")
 def list_test_examples(name: str, session: SessionDep) -> list[FeedbackInfo]:
     return [feedback_info(item) for item in store.saved_examples(session, get_model(session, name))]

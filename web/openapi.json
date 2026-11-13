@@ -7587,6 +7587,51 @@
         }
       }
     },
+    "/api/models/{name}/test-examples/{feedback_id}": {
+      "delete": {
+        "tags": [
+          "Feedback"
+        ],
+        "summary": "Remove a test example",
+        "description": "Rejects the test example, so the next version's held-out rows leave it out; versions already scored keep their rows. Audited as feedback.example_remove.",
+        "operationId": "remove_test_example_api_models__name__test_examples__feedback_id__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          },
+          {
+            "name": "feedback_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Feedback Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/keys": {
       "get": {
         "tags": [

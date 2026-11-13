@@ -19,6 +19,7 @@ import { About, BaseAbout, BaseDetails, Details } from "./about";
 import { ActivityPanel } from "./activity";
 import { CompareView } from "./compare";
 import { ModelActions } from "./deploy";
+import { EvaluationTab } from "./evaluation/EvaluationTab";
 import { BaseFiles, CustomFiles, FilesSheet, adapterText, verifiedText } from "./files";
 import { Crumbs, ModelHeader, baseNameOf, modelCrumbs } from "./header";
 import { KeysTab } from "./keys";
@@ -297,11 +298,12 @@ function Loaded({ row }: { row: ModelRow }) {
                 {tab === "versions" && (
                     <VersionsTab row={row} detail={modelDetail} versions={list} />
                 )}
+                {tab === "evaluation" && (
+                    <EvaluationTab row={row} detail={modelDetail} versions={list} />
+                )}
                 {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
                 {tab === "api" && <KeysTab row={row} detail={modelDetail} />}
-                {tab === "settings" && (
-                    <SettingsTab row={row} detail={modelDetail} versions={list} />
-                )}
+                {tab === "settings" && <SettingsTab row={row} detail={modelDetail} />}
             </div>
             <Files row={row} open={tab === "files"} base={base.data} versions={list} />
         </Page>

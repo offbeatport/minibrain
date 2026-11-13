@@ -6,6 +6,7 @@ import { type ModelTab, modelPageHref } from "~/lib/modelLinks";
 export const TAB_LABELS: Record<ModelTab, string> = {
     overview: "Overview",
     versions: "Versions",
+    evaluation: "Evaluation",
     monitoring: "Monitoring",
     api: "API keys",
     settings: "Settings",
@@ -25,8 +26,8 @@ export function tabsFor(row: ModelRow, builder: boolean): ModelTab[] {
             : ["overview", "monitoring", "api"];
     }
     return builder
-        ? ["overview", "versions", "monitoring", "api", "settings"]
-        : ["overview", "versions", "monitoring", "api"];
+        ? ["overview", "versions", "evaluation", "monitoring", "api", "settings"]
+        : ["overview", "versions", "evaluation", "monitoring", "api"];
 }
 
 export function useModelTab(row: ModelRow | undefined, builder: boolean): ModelTab {

@@ -34,6 +34,7 @@ const ACTIONS: Record<string, string> = {
     "encryption.retire": "Encryption key retired",
     "encryption.rotate": "Encryption key rotated",
     "feedback.example": "Feedback added to test examples",
+    "feedback.example_remove": "Test example removed",
     "job.delete": "Job deleted",
     "model.contract": "Output format changed",
     "model.create": "Model created",

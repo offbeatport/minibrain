@@ -204,7 +204,7 @@ function Answered({
     );
 }
 
-function inputOf(answer: ExampleAnswer): string {
+export function inputOf(answer: ExampleAnswer): string {
     return answer.messages.filter((turn) => turn.role === "user").at(-1)?.content ?? "";
 }
 

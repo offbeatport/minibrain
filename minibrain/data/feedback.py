@@ -330,6 +330,20 @@ def save_example(session: Session, model: Model, saved: SavedExample, actor: str
     return item
 
 
+def remove_example(session: Session, item: Feedback, actor: str) -> Feedback:
+    if item.status != FeedbackStatus.ACCEPTED or item.split != HELD_OUT:
+        raise FeedbackError("This feedback is not a test example.")
+    moment = now()
+    item.status = FeedbackStatus.REJECTED
+    item.label = None
+    item.reviewed_by = actor
+    item.reviewed_at = moment
+    item.updated_at = moment
+    audit(session, item, actor, "feedback.example_remove", {"split": HELD_OUT})
+    refresh_group(session, item.model_id, item.input_key)
+    return item
+
+
 def saved_examples(session: Session, model: Model) -> list[Feedback]:
     query = select(Feedback).where(*held_out_examples([model.id]))
     return list(session.scalars(query.order_by(Feedback.reviewed_at.desc(), Feedback.id.desc())))

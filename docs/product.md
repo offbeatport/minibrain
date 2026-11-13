@@ -199,11 +199,11 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Free a deleted model's API name from Settings, with a warning.
   Roadmap: v2
 - **Model settings** · shipped · product, ml
-  Rename, re-avatar, set scoring, undeploy, duplicate or delete in one tab.
+  Rename, re-avatar, undeploy, switch base, duplicate or delete in one tab.
   UI: Models › model › Settings · API: PATCH /api/models/{name}, PUT /api/models/{name}/avatar
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
-  UI: Models › model › Settings › Evaluation › Answers, Evaluations › version · API: GET /api/presets
+  UI: Models › model › Evaluation › How it's scored, Evaluations › version · API: GET /api/presets
 - **Label proposal** · shipped · product, ml
   Offer to restrict a chat assistant to labels found in its data.
   UI: Models › model · API: PUT /api/models/{name}/label-proposal/dismissal, PUT /api/models/{name}/contract
@@ -215,22 +215,22 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **General preset** · partial · product, ml
   A chat assistant in the organisation's language, formats and policies.
-  UI: Models › Add model, Models › model › Settings › Evaluation, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
+  UI: Models › Add model, Models › model › Evaluation › How it's scored, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
 - **Text-to-SQL preset** · planned · ml
   Answer questions with SQL on your own schema.
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › model › Settings › Evaluation › Answers · API: PUT /api/models/{name}/graders
+  UI: Models › model › Evaluation › How it's scored · API: PUT /api/models/{name}/graders
 - **Instructions** · shipped · product, ml
   Edit the system prompt with each new version, which keeps its copy.
   UI: Models › model › Train › Instructions · API: POST /api/models/{name}/versions, PUT /api/models/{name}/instructions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  UI: Models › model › Settings › Evaluation
+  UI: Models › model › Evaluation › How it's scored
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema; breaking changes confirmed once live.
-  UI: Models › model › Settings › Evaluation › Answers · API: POST /api/models/{name}/contract/check, PUT /api/models/{name}/contract
+  UI: Models › model › Evaluation › How it's scored · API: POST /api/models/{name}/contract/check, PUT /api/models/{name}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -321,16 +321,19 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Eval and promote
 - **Re-score on grader change** · shipped · ml
   Re-score every version when the graders or judge change.
-  UI: Models › model › Settings › Evaluation · API: POST /api/models/{name}/rescore
+  UI: Models › model › Evaluation › How it's scored · API: POST /api/models/{name}/rescore
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
-  UI: Models › model › Settings › Evaluation, Evaluations › version · Roadmap: Task types
+  UI: Models › model › Evaluation › How it's scored, Evaluations › version · Roadmap: Task types
 - **Judge model** · shipped · ml, admin
   Pick the base that judges free-text answers, per install or model.
-  UI: Settings › General › Judge model, Models › model › Settings › Evaluation · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{name}/judge
+  UI: Settings › General › Judge model, Models › model › Evaluation › How it's scored · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{name}/judge
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › Settings › Evaluation, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › Evaluation › How it's scored, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
+- **Evaluation tab** · shipped · product, ml
+  Score by version against the rule, failing rows, test set and scoring.
+  UI: Models › model › Evaluation · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers
 - **Score diff** · shipped · product, ml
   Compare two versions' scores, settings and held-out answers.
   UI: Models › model › Versions › Compare · API: GET /api/models/{name}/versions/{number}/answers
@@ -427,9 +430,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Review queue** · partial · product
   Accept, fix or reject feedback by keyboard, disagreements first.
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
-- **Playground test examples** · shipped · product, ml
-  Turn a wrong Playground answer into a test the next version faces.
-  UI: Playground › Save as test example, Models › model › Settings › Test examples, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples
+- **Test examples** · shipped · product, ml
+  Tests the next version faces, added by hand or from the Playground.
+  UI: Playground › Save as test example, Models › model › Evaluation › Test examples, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples, DELETE /api/models/{name}/test-examples/{feedback_id}
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
   UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary

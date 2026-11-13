@@ -3,8 +3,8 @@ import type { ModelDetail } from "~/api/client";
 import { usePresets } from "~/api/queries";
 import { useCan } from "~/lib/access";
 import { metricName } from "~/lib/metrics";
+import { evaluationHref } from "~/lib/modelLinks";
 import { Inline } from "./header";
-import { settingsHref } from "./settings";
 
 const JUDGE = "judge";
 
@@ -38,10 +38,10 @@ export function ScoredBy({ detail }: { detail: ModelDetail | undefined }) {
                     can.build && (
                         <Link
                             key="change"
-                            href={settingsHref(detail.slug)}
+                            href={evaluationHref(detail.slug)}
                             className="text-primary hover:underline"
                         >
-                            Change in Settings
+                            Change in Evaluation
                         </Link>
                     ),
                 ]}
