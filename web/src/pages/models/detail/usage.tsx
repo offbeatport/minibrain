@@ -3,6 +3,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "o
 import { useState, useSyncExternalStore } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
+import { PoolPlaces } from "~/components/PoolLink";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
 import {
@@ -167,14 +168,26 @@ export function TrafficChart({
     );
 }
 
-function footerText(row: ModelRow, report: TrafficReport | undefined): string {
+function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefined }) {
     const replicas = report?.replicas ?? [];
-    const hosts = [...new Set(replicas.map((item) => item.host))];
-    const serving = `${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}${hosts.length > 0 ? ` on ${hosts.join(", ")}` : ""}`;
-    if (!report || report.totals.requests === 0) {
-        return isDeployed(row) ? `No traffic · ${serving}` : "No traffic";
+    const quiet = !report || report.totals.requests === 0;
+    if (quiet && !isDeployed(row)) {
+        return "No traffic";
     }
-    return `p95 ${ms(report.totals.p95_ms)} · ${rate(report.totals.error_rate ?? 0)} errors · ${serving}`;
+    const lead = quiet
+        ? "No traffic"
+        : `p95 ${ms(report.totals.p95_ms)} · ${rate(report.totals.error_rate ?? 0)} errors`;
+    return (
+        <>
+            {`${lead} · ${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}`}
+            {replicas.length > 0 && (
+                <>
+                    {" in "}
+                    <PoolPlaces places={replicas} />
+                </>
+            )}
+        </>
+    );
 }
 
 export function UsagePanel({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
@@ -209,7 +222,7 @@ export function UsagePanel({ row, versions }: { row: ModelRow; versions: Version
                 />
                 <ErrorLine error={traffic.error} />
                 <p className="text-sm text-muted-foreground tabular-nums">
-                    {footerText(row, traffic.data)}
+                    <Footer row={row} report={traffic.data} />
                 </p>
             </div>
         </PanelSection>

@@ -222,11 +222,11 @@ def test_undeploy_shows_stopping_until_every_gateway_and_engine_confirms(harness
     assert found["deployment"]["state"] == "stopping"
     assert found["teardown"]["waiting"] == [
         f"the gateway on edge-1 to stop routing {SLUG}",
-        "the engine on gpu-1 to finish 2 requests in flight",
+        "the engine in pool local (gpu-1) to finish 2 requests in flight",
     ]
     report_gateway(harness, [f"{SLUG}@1"])
     harness.app.state.teardowns.run_once()
-    assert shown(harness, SLUG)["teardown"]["waiting"] == [f"the engine on gpu-1 to unload {SLUG}-v1"]
+    assert shown(harness, SLUG)["teardown"]["waiting"] == [f"the engine in pool local (gpu-1) to unload {SLUG}-v1"]
     harness.app.state.teardowns.run_once()
     found = shown(harness, SLUG)
     assert found["teardown"] is None and found["deployment"]["state"] == "not_deployed"
@@ -372,7 +372,7 @@ def test_released_engines_stop_once_nothing_routes_their_base(harness: Harness) 
     harness.app.state.gateway_config.engines = spawn
     assert harness.client.post(f"/api/models/{BASE}/deploy", json={"deployed": False}).status_code == 202
     harness.app.state.teardowns.run_once()
-    assert shown(harness, BASE, "base")["teardown"]["waiting"] == ["the engine on gpu-1 to stop"]
+    assert shown(harness, BASE, "base")["teardown"]["waiting"] == ["the engine in pool local (gpu-1) to stop"]
     harness.app.state.teardowns.run_once()
     assert frozenset({BASE}) in released
     register_engine(harness, BASE, managed=True, state="stopped")

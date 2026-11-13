@@ -756,7 +756,12 @@ export const INSTALL = {
         ]),
     }),
     locations: section("Locations", {
-        server: setting("Server", "The host name of this server.", ["hostname", "host", "machine"]),
+        server: setting("Server", "The pool and host name of the main server.", [
+            "hostname",
+            "host",
+            "machine",
+            "pool",
+        ]),
         home: setting("Home folder", "Settings, secrets, the database and model files.", [
             "minibrain_home",
             "data directory",

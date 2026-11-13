@@ -11,6 +11,7 @@ import {
 import { useState } from "react";
 import type { CatalogEntry, CatalogResponse } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { PoolLink } from "~/components/PoolLink";
 import { StatusText } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
 import { PathResult, type SourcePlan } from "./BaseSource";
@@ -103,15 +104,17 @@ function PoolFit({
     const found = catalog.data?.entries.find((item) => item.id === entry.id);
     const fit = found?.variants.find((item) => item.id === variant)?.fit.level;
     if (!fit) {
-        return <li className="text-muted-foreground">{`Checking ${pool.label}…`}</li>;
+        return <li className="text-muted-foreground">{`Checking pool ${pool.name}…`}</li>;
     }
     const fits = runnable(fit);
     return (
         <li>
             <StatusText tone={fits ? "success" : "neutral"} className="whitespace-normal">
-                {fits
-                    ? `Fits the ${pool.label} pool: train and serve it there.`
-                    : `Does not fit the ${pool.label} pool either.`}
+                <span>
+                    {fits ? "Runs on " : "Too large for "}
+                    <PoolLink name={pool.name} />
+                    {fits ? ": train and serve it there." : " too."}
+                </span>
             </StatusText>
         </li>
     );

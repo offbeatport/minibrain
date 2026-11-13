@@ -58,6 +58,7 @@ import {
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
+import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -387,13 +388,24 @@ function jobText(job: JobInfo): string {
     return `${job.kind === "train" ? "Training" : "Scoring"} job #${job.id}${took ? ` · ${took}` : ""} →`;
 }
 
-function machineText(version: VersionInfo, job: JobDetail | undefined): string | null {
+type RanOn = { pool: string | null; machine: string | null };
+
+function ranOn(version: VersionInfo, job: JobDetail | undefined): RanOn | null {
     const parts = [job?.host, job?.device].filter(Boolean);
     if (parts.length > 0) {
-        return parts.join(" · ");
+        return { pool: job?.pool ?? null, machine: parts.join(" · ") };
     }
-    const plan = (version.recipe as { plan?: { machine?: unknown } }).plan;
-    return typeof plan?.machine === "string" ? plan.machine : null;
+    const plan = (version.recipe as { plan?: { machine?: unknown; pool?: unknown } }).plan;
+    const machine = typeof plan?.machine === "string" ? plan.machine : null;
+    const pool = typeof plan?.pool === "string" && plan.pool ? plan.pool : null;
+    return machine || pool ? { pool, machine } : null;
+}
+
+function RanOnText({ place }: { place: RanOn }) {
+    if (!place.pool) {
+        return <span className="font-mono text-sm">{place.machine}</span>;
+    }
+    return <PoolLink name={place.pool} machine={place.machine} />;
 }
 
 function MadeFrom({
@@ -447,14 +459,9 @@ function MadeFrom({
     if (version.kind !== "prompt") {
         parts.push(["Settings", <span key="settings">{settingsText(version)}</span>]);
     }
-    const machine = machineText(version, detail);
-    if (machine) {
-        parts.push([
-            "Machine",
-            <span key="machine" className="font-mono text-sm">
-                {machine}
-            </span>,
-        ]);
+    const place = ranOn(version, detail);
+    if (place) {
+        parts.push(["Pool", <RanOnText key="pool" place={place} />]);
     }
     if (version.duplicated_from) {
         parts.push([

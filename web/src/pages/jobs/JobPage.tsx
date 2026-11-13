@@ -21,6 +21,7 @@ import { JobLogsSection } from "~/components/JobLogs";
 import { canCancel, canRetry } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
+import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -230,6 +231,20 @@ function Summary({ job }: { job: JobDetail }) {
             <Stat label="Kind" value={kindNoun(job.kind)} />
             <Stat label="Status" value={<JobState job={job} />} />
             <Stat label="Attempt" value={`${Math.max(1, job.attempt)} of ${job.max_attempts}`} />
+            {(job.pool || job.host) && (
+                <Stat
+                    label={job.status === "running" ? "Runs on" : "Ran on"}
+                    value={
+                        <span className="font-normal">
+                            {job.pool ? (
+                                <PoolLink name={job.pool} machine={job.host} />
+                            ) : (
+                                <span className="font-mono">{job.host}</span>
+                            )}
+                        </span>
+                    }
+                />
+            )}
             {job.device && (
                 <Stat
                     label="Device"

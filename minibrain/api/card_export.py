@@ -259,6 +259,7 @@ def run_rows(run: CardRun | None) -> Facts:
         ("Finished", when(run.finished_at)),
         ("Duration", duration(run.duration_seconds)),
         ("Device", run.device),
+        ("Pool", run.pool),
         ("Machine", run.machine),
     ]
 

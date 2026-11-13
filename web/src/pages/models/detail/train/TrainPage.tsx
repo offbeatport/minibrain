@@ -167,11 +167,11 @@ function ComputeRow({ run }: { run: TrainRun }) {
                             label: "Automatic",
                             meta: run.pools.some((item) => item.best)
                                 ? "any pool that fits"
-                                : "nothing fits",
+                                : "too large for every pool",
                         },
                         ...run.pools.map((item, index) => ({
                             value: item.name,
-                            label: item.label,
+                            label: item.name,
                             meta: item.best
                                 ? `${fitText(item.best.chosen)} · ≈ ${duration(item.best.minutes)}`
                                 : item.reason,

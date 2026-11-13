@@ -248,8 +248,8 @@ def test_adapter_refuses_a_base_whose_files_changed(harness: Harness, hub: Path,
 def test_engine_load_failures_become_a_state_with_a_way_out(harness: Harness, hub: Path) -> None:
     installed(harness)
     spec = BaseModelSpec("tiny", REPO, REVISION, "apache-2.0")
-    oom = load_failure(MemoryError("CUDA out of memory"), spec, "gpu-01")
-    assert oom["code"] == "no_memory" and "gpu-01" in oom["error"]
+    oom = load_failure(MemoryError("CUDA out of memory"), spec, "pool gpu (gpu-01)")
+    assert oom["code"] == "no_memory" and "in pool gpu (gpu-01)" in oom["error"]
     assert load_failure(NoEngineError("GGUF weights need llama.cpp"), spec, "h")["code"] == "cant_run"
     missing = ModuleNotFoundError("No module named 'llama_cpp'", name="llama_cpp")
     assert "minibrain[llamacpp]" in load_failure(missing, spec, "h")["error"]

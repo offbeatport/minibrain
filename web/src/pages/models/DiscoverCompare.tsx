@@ -144,7 +144,7 @@ function sizedVariants(entry: CatalogEntry, value: (variant: Variant) => number)
 
 const needed = (variant: Variant) => variant.fit.needed_bytes;
 
-function TrainFigure({ entry }: { entry: CatalogEntry }) {
+function TrainFigure({ entry, pool }: { entry: CatalogEntry; pool: string }) {
     const least = leastTrainMemory(entry);
     if (least === null) {
         return <span className="text-muted-foreground">Serve only</span>;
@@ -153,7 +153,7 @@ function TrainFigure({ entry }: { entry: CatalogEntry }) {
     return (
         <div className="flex flex-col">
             <span className="tabular-nums">{bytes(least)}</span>
-            {here && <span className="text-muted-foreground">Trains on your compute</span>}
+            {here && <span className="text-muted-foreground">{`Trains on ${pool}`}</span>}
         </div>
     );
 }
@@ -212,7 +212,7 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                     amount: (entry) => leastTrainMemory(entry) ?? Number.POSITIVE_INFINITY,
                     formatDelta: bytes,
                     better: "lower",
-                    render: (entry) => <TrainFigure entry={entry} />,
+                    render: (entry) => <TrainFigure entry={entry} pool={catalog.pool} />,
                 },
                 {
                     id: "download",
@@ -232,7 +232,7 @@ function groups(catalog: CatalogResponse, pool?: string): Group[] {
                 },
                 {
                     id: "runtimes",
-                    label: "Runs on",
+                    label: "Engines",
                     key: (entry) =>
                         [...new Set(entry.variants.flatMap((variant) => variant.runtimes))]
                             .sort()

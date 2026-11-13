@@ -49,7 +49,7 @@ def test_each_node_picks_its_engine_from_hardware_and_format() -> None:
     assert choose_engine(with_engines(MAC, "mlx", "transformers"), "safetensors", "transformers") == "transformers"
     with pytest.raises(NoEngineError, match=r"llama\.cpp"):
         choose_engine(with_engines(MAC, "mlx", "transformers"), "gguf")
-    with pytest.raises(NoEngineError, match="not available"):
+    with pytest.raises(NoEngineError, match="not installed on"):
         choose_engine(with_engines(MAC, "mlx", "transformers"), "safetensors", "sglang")
     with pytest.raises(NoEngineError, match="cannot serve"):
         choose_engine(with_engines(CPU, "transformers", "llamacpp"), "safetensors", "llamacpp")
@@ -236,7 +236,7 @@ def test_an_engine_fetches_its_weights_before_it_loads_and_says_so(
     with TestClient(app) as engine:
         waiting = engine.get("/health")
         assert waiting.status_code == 503 and waiting.json()["detail"]["state"] == FETCHING
-        assert "fetching its weights on cpu-01: 1.0 of 4.0 GB" in waiting.json()["detail"]["message"]
+        assert "fetching its weights in pool local (cpu-01): 1.0 of 4.0 GB" in waiting.json()["detail"]["message"]
         assert engine.post("/generate", json={"messages": []}).json()["detail"]["state"] == FETCHING
         manager = EngineManager(harness.settings, "http://main")
         manager.engines[QWEN3_0_6B.key] = ("http://testserver", Supervisor("engine", [], {}))
@@ -264,7 +264,10 @@ def test_a_failed_fetch_is_reported_and_nothing_loads(tmp_path: Path, monkeypatc
     with TestClient(app) as engine:
         assert wait_until(lambda: engine.get("/health").status_code == 500)
         detail = engine.get("/health").json()["detail"]
-        assert detail == "cpu-01 could not fetch qwen3-0.6b: the bucket answered 403 for model.safetensors."
+        assert (
+            detail
+            == "Could not fetch qwen3-0.6b in pool local (cpu-01): the bucket answered 403 for model.safetensors."
+        )
 
 
 @pytest.mark.usefixtures("hub")

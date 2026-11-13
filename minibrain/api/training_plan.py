@@ -158,7 +158,7 @@ def defaults_of(found: Plan) -> TrainingDefaults:
 
 
 def unreported(machine: Machine) -> str:
-    return f"{machine.name} has not reported its {machine.memory_label} yet."
+    return f"{machine.place} has not reported its {machine.memory_label} yet."
 
 
 def machine_info(found: Plan, picked: Machine | None, held_out: int) -> MachinePlanInfo | None:
@@ -294,5 +294,5 @@ def base_train_fit(base: Base, machines: list[Machine]) -> TrainFitInfo:
         qlora_bytes=smallest.peak_bytes,
         available_bytes=found.chosen.available_bytes,
         label=found.chosen.label,
-        basis=f"{need} {found.machine.name if found.machine else 'This pool'} trains it: {found.basis}.",
+        basis=f"{need} {found.machine.place if found.machine else 'This pool'} trains it: {found.basis}.",
     )

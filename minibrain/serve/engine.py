@@ -45,9 +45,13 @@ PROGRESS_SECONDS = 30.0
 Fetch = Callable[[Progress], Any]
 
 
-def fetching_detail(base: str, host: str, progress: Progress) -> dict[str, Any]:
+def place_of(pool: str, host: str) -> str:
+    return f"pool {pool} ({host})"
+
+
+def fetching_detail(base: str, where: str, progress: Progress) -> dict[str, Any]:
     share = f"{progress.done / GIB:.1f} of {progress.total / GIB:.1f} GB" if progress.total else "checking its files"
-    message = f"{base} is fetching its weights on {host}: {share}; try again when it finishes"
+    message = f"{base} is fetching its weights in {where}: {share}; try again when it finishes"
     return {"state": FETCHING, "done": progress.done, "total": progress.total, "message": message}
 
 
@@ -192,10 +196,10 @@ log = logging.getLogger("minibrain.engine")
 
 
 INSTALL_HINTS = {
-    "llama_cpp": "install minibrain[llamacpp] on this machine",
-    "mlx_lm": "install minibrain[mlx] on this machine",
-    "sglang": "install SGLang on this machine or set MINIBRAIN_SGLANG_PYTHON",
-    "vllm": "install vLLM on this machine or set MINIBRAIN_VLLM_PYTHON",
+    "llama_cpp": "install minibrain[llamacpp] on that machine",
+    "mlx_lm": "install minibrain[mlx] on that machine",
+    "sglang": "install SGLang on that machine or set MINIBRAIN_SGLANG_PYTHON",
+    "vllm": "install vLLM on that machine or set MINIBRAIN_VLLM_PYTHON",
 }
 
 
@@ -204,17 +208,18 @@ def out_of_memory(error: BaseException) -> bool:
     return isinstance(error, MemoryError) or type(error).__name__ == "OutOfMemoryError" or "out of memory" in text
 
 
-def load_failure(error: BaseException, spec: BaseModelSpec, host: str) -> dict[str, str]:
+def load_failure(error: BaseException, spec: BaseModelSpec, where: str) -> dict[str, str]:
     if out_of_memory(error):
-        message = f"Ran out of memory loading {spec.key} on {host}: {str(error).splitlines()[0][:200]}."
+        message = f"Ran out of memory loading {spec.key} in {where}: {str(error).splitlines()[0][:200]}."
         return {"code": NO_MEMORY, "error": message}
     if isinstance(error, ModuleNotFoundError) and error.name:
         hint = INSTALL_HINTS.get(error.name.split(".")[0], f"install the Python package {error.name}")
-        return {"code": CANT_RUN, "error": f"{host} cannot load {spec.key}: {error.name} is not installed; {hint}."}
+        message = f"Cannot load {spec.key} in {where}: {error.name} is not installed; {hint}."
+        return {"code": CANT_RUN, "error": message}
     if isinstance(error, NoEngineError):
-        return {"code": CANT_RUN, "error": f"{error}."}
+        return {"code": CANT_RUN, "error": f"Cannot serve {spec.key} in {where}: {error}."}
     first = str(error).splitlines()[0][:300] if str(error) else type(error).__name__
-    return {"code": CANT_RUN, "error": f"{host} could not load {spec.key}: {first}."}
+    return {"code": CANT_RUN, "error": f"Could not load {spec.key} in {where}: {first}."}
 
 
 class Announcer:
@@ -361,7 +366,12 @@ def create_engine_app(
     flights = Flights()
     progress = Progress()
     phase = {"now": FETCHING if fetch is not None else LOADING}
-    current: dict[str, Any] = {"engine": requested or "transformers", "backend": backend, "failure": None, "host": ""}
+    current: dict[str, Any] = {
+        "engine": requested or "transformers",
+        "backend": backend,
+        "failure": None,
+        "host": f"pool {pool}",
+    }
 
     def announced() -> dict[str, Any]:
         return {"engine": current["engine"]} | (current["failure"] or {})
@@ -383,7 +393,8 @@ def create_engine_app(
             except Exception as error:
                 log.exception("could not fetch the weights of %s", spec.key)
                 first = str(error).splitlines()[0][:300] if str(error) else type(error).__name__
-                fail({"code": FETCH_FAILED, "error": f"{hardware.host} could not fetch {spec.key}: {first}."})
+                where = place_of(pool, hardware.host)
+                fail({"code": FETCH_FAILED, "error": f"Could not fetch {spec.key} in {where}: {first}."})
                 return
             finally:
                 fetched.set()
@@ -394,7 +405,7 @@ def create_engine_app(
                 current["engine"], current["backend"] = load_backend(spec, hardware, requested, materialize)
             except Exception as error:
                 log.exception("could not load %s", spec.key)
-                fail(load_failure(error, spec, hardware.host))
+                fail(load_failure(error, spec, place_of(pool, hardware.host)))
                 return
         ready.set()
 
@@ -403,7 +414,7 @@ def create_engine_app(
         configure_logging()
         stop = threading.Event()
         hardware = node or report()
-        current["host"] = hardware.host
+        current["host"] = place_of(pool, hardware.host)
         if current["backend"] is None:
             current["engine"] = choose_engine(hardware, spec.format, requested)
         announcer: Announcer | None = None

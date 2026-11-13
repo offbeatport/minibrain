@@ -31,6 +31,7 @@ import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MemoryGauge } from "./ResourceGauges";
 import { type BaseOption, trainableVariant } from "./baseOptions";
 import { formatName, formatUse, scheme, trainable } from "./formats";
+import { usePoolFits } from "./runsHere";
 
 function variantLabel(variant: CatalogVariantInfo): string {
     const name = variant.format === "gguf" ? `GGUF ${scheme(variant)}` : scheme(variant);
@@ -282,10 +283,10 @@ export function AddModelSummary({
     const trainFit = local ? null : (variant?.train_fit ?? found?.train_fit ?? null);
     const servesOnly = servesOnlyOf(option, plan);
     const storage = need?.size ?? onDisk ?? (found?.size_bytes || null);
-    const pool = catalog?.pools.find((item) => item.name === catalog.pool)?.label ?? null;
     const compute = catalog
-        ? { memoryLabel: catalog.hardware.memory_label, machine: catalog.hardware.machine, pool }
+        ? { memoryLabel: catalog.hardware.memory_label, pool: catalog.pool }
         : null;
+    const fits = usePoolFits(catalog, local ? null : entry?.id, local ? null : variant?.id);
     return (
         <SummaryCard>
             <SummarySection title="System requirements">
@@ -297,8 +298,13 @@ export function AddModelSummary({
                     download={need ? need.size : null}
                 />
             </SummarySection>
-            <SummarySection title="Memory on your compute">
-                <MemoryGauge fit={fit} trainFit={servesOnly ? null : trainFit} compute={compute} />
+            <SummarySection title="Memory">
+                <MemoryGauge
+                    fit={fit}
+                    trainFit={servesOnly ? null : trainFit}
+                    compute={compute}
+                    fits={entry && variant && !local ? fits : null}
+                />
                 {variant?.fit.level === "insufficient" && option && catalog && (
                     <ComputeHelp
                         option={{ ...option, variant }}
@@ -307,7 +313,7 @@ export function AddModelSummary({
                     />
                 )}
             </SummarySection>
-            <SummarySection title="Storage on your compute">
+            <SummarySection title="Storage">
                 <DiskGauge
                     need={need}
                     free={free}

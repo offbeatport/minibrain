@@ -2,6 +2,7 @@ import { MemoryStick } from "lucide-react";
 import { cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { SummaryLine } from "~/components/CreateLayout";
+import { PoolLink } from "~/components/PoolLink";
 import { count } from "~/lib/format";
 import { ResourceBar } from "../../ResourceGauges";
 import { type OptionInfo, duration, gigabytes } from "./recipe";
@@ -100,9 +101,11 @@ export function HeldOutWarning({ heldOut }: { heldOut: number }) {
 export function MemorySummary({
     option,
     memoryLabel,
+    pool,
 }: {
     option: OptionInfo;
     memoryLabel: string;
+    pool: string | null;
 }) {
     const ok = fits(option);
     const parts = partsOf(option);
@@ -125,6 +128,12 @@ export function MemorySummary({
                 {ok
                     ? `${gigabytes(option.peak_bytes)} of ${gigabytes(available)} ${memoryLabel}`
                     : `${gigabytes(option.peak_bytes)} needed · only ${gigabytes(available)} ${memoryLabel}`}
+                {pool && (
+                    <>
+                        {" in "}
+                        <PoolLink name={pool} align="end" />
+                    </>
+                )}
             </SummaryLine>
             <ul className="flex flex-col gap-0.5 text-muted-foreground tabular-nums">
                 {SEGMENTS.map((segment) => (

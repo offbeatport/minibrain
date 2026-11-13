@@ -8,6 +8,7 @@ import { useCatalog } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
@@ -26,7 +27,7 @@ import {
 } from "./Discover";
 import { useModelsRefresh } from "./dialogs";
 import { FormatHelp, formatName, formatUse } from "./formats";
-import { TRAIN_MEMORY_INFO, trainMemory } from "./runsHere";
+import { TRAIN_MEMORY_INFO, runnable, trainMemory } from "./runsHere";
 
 const DOWNLOADS = new Intl.NumberFormat(undefined, {
     notation: "compact",
@@ -97,6 +98,7 @@ function About({ entry, catalog }: { entry: CatalogEntry; catalog: CatalogRespon
 
 function variantColumns(
     allowed: boolean,
+    pool: string,
     onDownload: (variant: CatalogVariantInfo) => void,
 ): ColumnDef<CatalogVariantInfo, unknown>[] {
     return [
@@ -117,7 +119,19 @@ function variantColumns(
             id: "memory",
             header: "Memory to run",
             accessorFn: (variant) => variant.fit.needed_bytes,
-            cell: ({ row }) => bytes(row.original.fit.needed_bytes),
+            cell: ({ row }) => (
+                <span className="inline-flex items-center gap-2">
+                    {bytes(row.original.fit.needed_bytes)}
+                    {runnable(row.original.fit.level) && (
+                        <StatusText tone="success">
+                            <span>
+                                {"Runs on "}
+                                <PoolLink name={pool} />
+                            </span>
+                        </StatusText>
+                    )}
+                </span>
+            ),
         },
         {
             id: "train",
@@ -132,7 +146,12 @@ function variantColumns(
                     <span className="inline-flex items-center gap-2">
                         {bytes(value)}
                         {row.original.train_fit.level === "fits" && (
-                            <StatusText tone="success">Trains on your compute</StatusText>
+                            <StatusText tone="success">
+                                <span>
+                                    {"Trains on "}
+                                    <PoolLink name={pool} />
+                                </span>
+                            </StatusText>
                         )}
                     </span>
                 );
@@ -140,7 +159,7 @@ function variantColumns(
         },
         {
             id: "runtimes",
-            header: "Runs on",
+            header: "Engines",
             accessorFn: (variant) => variant.runtimes.join(", "),
         },
         {
@@ -200,12 +219,12 @@ export function DiscoverModelPage() {
     const blocked = !can.admin || !on.online || Boolean(entry?.gated && !on.tokenConfigured);
     const table = useMemo(
         () =>
-            variantColumns(!blocked, (variant) => {
+            variantColumns(!blocked, data?.pool ?? "local", (variant) => {
                 if (entry) {
                     router.history.push(addModelHref(entry, variant.id));
                 }
             }),
-        [blocked, entry, router],
+        [blocked, entry, router, data?.pool],
     );
     return (
         <Page>

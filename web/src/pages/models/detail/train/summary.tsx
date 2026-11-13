@@ -9,7 +9,6 @@ import {
     Server,
     Timer,
 } from "lucide-react";
-import { Link, Popover, PopoverContent, PopoverTrigger } from "obp-ui";
 import {
     BlockedReasons,
     SummaryCard,
@@ -18,6 +17,7 @@ import {
     SummaryLine,
     SummarySection,
 } from "~/components/CreateLayout";
+import { PoolLink } from "~/components/PoolLink";
 import { count } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { MemorySummary } from "./parts";
@@ -51,41 +51,29 @@ export function problemsOf(run: TrainRun, blocked: string | null): string[] {
     return [...(run.failure ? [run.failure] : []), ...shown.map((issue) => issue.text)];
 }
 
-function poolHref(name: string): string {
-    return `/infrastructure#pool-${encodeURIComponent(name)}`;
-}
-
-function PoolCard({ pool }: { pool: PoolPlan }) {
+function MachineFits({ pool }: { pool: PoolPlan }) {
     return (
-        <div className="flex w-72 flex-col gap-2">
-            <div className="flex items-baseline justify-between gap-3">
-                <span className="font-medium">{pool.label}</span>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                    {`${count(pool.machines.length)} ${pool.machines.length === 1 ? "machine" : "machines"}`}
-                </span>
-            </div>
-            <ul className="flex flex-col gap-1.5">
+        <>
+            <span className="text-muted-foreground">Training fit</span>
+            <ul className="flex flex-col gap-1">
                 {pool.machines.map((item) => (
                     <li key={item.name} className="flex items-baseline justify-between gap-3">
                         <span className="min-w-0 truncate">{item.name}</span>
                         <span
                             className={
                                 item.chosen
-                                    ? "shrink-0 text-sm text-muted-foreground tabular-nums"
-                                    : "shrink-0 text-sm text-destructive"
+                                    ? "shrink-0 text-muted-foreground tabular-nums"
+                                    : "shrink-0 text-destructive"
                             }
                         >
                             {item.chosen
-                                ? `${gigabytes(item.available_bytes)} ${item.memory_label} · ≈ ${duration(item.minutes)}`
+                                ? `${gigabytes(item.available_bytes)} · ≈ ${duration(item.minutes)}`
                                 : (item.reason ?? "does not fit")}
                         </span>
                     </li>
                 ))}
             </ul>
-            <Link href={poolHref(pool.name)} className="text-sm text-primary hover:underline">
-                Open in Infrastructure →
-            </Link>
-        </div>
+        </>
     );
 }
 
@@ -100,34 +88,12 @@ function PoolFact({ run }: { run: TrainRun }) {
     }
     const pinned = run.recipe.machine !== "auto";
     return (
-        <>
-            {chosen ? (
-                <Popover>
-                    <PopoverTrigger
-                        openOnHover
-                        delay={150}
-                        render={
-                            <Link
-                                href={poolHref(name)}
-                                className="text-primary underline-offset-2 hover:underline"
-                            />
-                        }
-                    >
-                        {name}
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-auto">
-                        <PoolCard pool={chosen} />
-                    </PopoverContent>
-                </Popover>
-            ) : (
-                <Link href={poolHref(name)} className="text-primary hover:underline">
-                    {name}
-                </Link>
-            )}
-            {machine && pinned && (
-                <span className="block truncate text-muted-foreground">{machine.name}</span>
-            )}
-        </>
+        <PoolLink
+            name={name}
+            align="end"
+            machine={machine && pinned ? machine.name : null}
+            details={chosen ? <MachineFits pool={chosen} /> : undefined}
+        />
     );
 }
 
@@ -216,9 +182,13 @@ export function RunSummary({
                     </SummaryFact>
                 </SummaryFacts>
             </SummarySection>
-            <SummarySection title="Memory on your compute">
+            <SummarySection title="Memory">
                 {run.option && !blocked ? (
-                    <MemorySummary option={run.option} memoryLabel={memoryLabel} />
+                    <MemorySummary
+                        option={run.option}
+                        memoryLabel={memoryLabel}
+                        pool={run.pickedMachine?.pool ?? null}
+                    />
                 ) : (
                     <SummaryLine icon={MemoryStick} className="text-muted-foreground">
                         {run.planning ? "Planning…" : "Not planned yet"}

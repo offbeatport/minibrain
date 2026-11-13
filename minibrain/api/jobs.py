@@ -31,6 +31,7 @@ from minibrain.jobs.metrics import device_of
 from minibrain.jobs.output import SOURCES, level_of
 from minibrain.jobs.queue import JobStateError, SqlJobQueue, add_state
 from minibrain.jobs.removal import DeleteRefused, Leftovers, active_refusal, kept_by, remove_job
+from minibrain.registry.compute import pool_of_host
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
     FINAL_JOB_STATUSES,
@@ -204,12 +205,12 @@ def serving(job: Job) -> bool:
     return model is not None and version is not None and model.deployed and model.current_version == version.number
 
 
-def worker_host(session: Session, job: Job) -> str | None:
+def worker_place(session: Session, job: Job) -> dict[str, str | None]:
     attempt = max(job.attempts, key=lambda item: item.number, default=None)
-    if attempt is None:
-        return None
-    worker = session.get(Worker, attempt.worker)
-    return worker.host if worker is not None else None
+    worker = session.get(Worker, attempt.worker) if attempt is not None else None
+    if worker is None:
+        return {"host": None, "pool": None}
+    return {"host": worker.host, "pool": pool_of_host(session, worker.host)}
 
 
 @router.get("/jobs/{job_id}", dependencies=[Depends(viewer)], summary="Read a job")
@@ -217,7 +218,7 @@ def read_job(job_id: int, session: SessionDep) -> JobDetail:
     job = get_job(session, job_id)
     context = {
         "device": device_of(session, job.id),
-        "host": worker_host(session, job),
+        **worker_place(session, job),
         "live": serving(job),
         "setup": job_setup(session, job),
     }

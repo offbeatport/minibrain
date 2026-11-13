@@ -3577,6 +3577,8 @@ export interface components {
             device: string | null;
             /** Machine */
             machine: string | null;
+            /** Pool */
+            pool?: string | null;
         };
         /** CardScore */
         CardScore: {
@@ -5783,6 +5785,8 @@ export interface components {
             device?: string | null;
             /** Host */
             host?: string | null;
+            /** Pool */
+            pool?: string | null;
             /**
              * Live
              * @default false
@@ -8618,6 +8622,8 @@ export interface components {
         TrafficReplica: {
             /** Host */
             host: string;
+            /** Pool */
+            pool: string;
             /** Engine */
             engine: string;
             /** State */

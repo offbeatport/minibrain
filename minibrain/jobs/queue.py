@@ -247,7 +247,7 @@ class SqlJobQueue:
                 raise JobStateError(f"job {claimed} vanished during claim")
             session.refresh(job)
             session.add(JobAttempt(job_id=job.id, number=job.attempt, worker=worker.id, started_at=moment))
-            add_state(session, job, f"attempt {job.attempt} started on {worker.host}")
+            add_state(session, job, f"attempt {job.attempt} started in pool {worker.pool} ({worker.host})")
             session.commit()
             return Claim(
                 job_id=job.id,

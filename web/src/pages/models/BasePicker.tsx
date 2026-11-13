@@ -120,18 +120,18 @@ function Amount({
     );
 }
 
-function trainHelp(option: BaseOption): string {
+function trainHelp(option: BaseOption, pool: string | undefined): string {
     const level = option.variant?.train_fit.level;
     const where =
-        level === "fits"
-            ? " Trains on your compute."
-            : level === "insufficient"
-              ? " Too large to train."
+        level === "fits" && pool
+            ? ` Trains on pool ${pool}.`
+            : level === "insufficient" && pool
+              ? ` Too large to train on pool ${pool}.`
               : "";
     return `Memory to train (QLoRA): GPU memory it takes to train with QLoRA 4-bit.${where}`;
 }
 
-function Resources({ option }: { option: BaseOption }) {
+function Resources({ option, pool }: { option: BaseOption; pool?: string }) {
     const local = option.kind === "local";
     const memory = local ? null : option.variant?.fit.needed_bytes;
     const training = local ? null : trainMemory(option.variant);
@@ -153,7 +153,7 @@ function Resources({ option }: { option: BaseOption }) {
                 <Amount
                     icon={GraduationCap}
                     label="Memory to train (QLoRA)"
-                    help={trainHelp(option)}
+                    help={trainHelp(option, pool)}
                     bytes={training}
                 />
             ) : null}
@@ -208,10 +208,12 @@ function OptionRow({
     option,
     recommended,
     deleting,
+    pool,
 }: {
     option: BaseOption;
     recommended?: boolean;
     deleting?: boolean;
+    pool?: string;
 }) {
     const facts = factsOf(option);
     const description = descriptionOf(option);
@@ -237,7 +239,7 @@ function OptionRow({
             </span>
             <span className="flex shrink-0 flex-col items-end gap-1.5 pt-0.5">
                 <Availability option={option} deleting={deleting} />
-                <Resources option={option} />
+                <Resources option={option} pool={pool} />
             </span>
         </span>
     );
@@ -612,6 +614,7 @@ export function BasePicker({
                             option={row.option}
                             recommended={row.recommended}
                             deleting={beingDeleted(row.option)}
+                            pool={catalog?.pool}
                         />
                     )}
                     currentKey={value.option?.key}

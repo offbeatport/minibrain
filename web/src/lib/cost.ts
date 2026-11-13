@@ -66,7 +66,7 @@ export function priced(cost: EvalCost | null | undefined): boolean {
 export function measuredOn(
     cost: Pick<FullCost, "device_name" | "pool" | "requests" | "batch_size">,
 ): string {
-    const where = cost.pool === "local" ? "this machine" : `pool ${cost.pool}`;
+    const where = `pool ${cost.pool}`;
     const rows = cost.requests.toLocaleString();
     return `Measured on ${cost.device_name} (${where}): ${rows} held-out requests in batches of ${cost.batch_size ?? 1}.`;
 }

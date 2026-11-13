@@ -2,9 +2,11 @@ import { GraduationCap, HardDrive, type LucideIcon, MemoryStick, Play, Server } 
 import type { ReactNode } from "react";
 import type { FitInfo, TrainFitInfo } from "~/api/client";
 import { SummaryLine } from "~/components/CreateLayout";
+import { PoolLink, PoolList } from "~/components/PoolLink";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import type { DiskNeed } from "./BaseSummary";
+import { type PoolFits, runnable } from "./runsHere";
 
 const LOW_SPACE = 5 * 1024 ** 3;
 const TICKS = [25, 50, 75];
@@ -84,6 +86,17 @@ export type WeightsStore = {
     stagingFree: number | null | undefined;
 };
 
+export const MAIN_POOL = "local";
+
+function FolderPlace({ label }: { label: string }) {
+    return (
+        <Where>
+            {`${label} in `}
+            <PoolLink name={MAIN_POOL} />
+        </Where>
+    );
+}
+
 export function DiskGauge({
     need,
     free,
@@ -115,7 +128,7 @@ export function DiskGauge({
         return (
             <>
                 <Figures icon={HardDrive}>{`${amount} · free space unknown`}</Figures>
-                <Where>{store.label}</Where>
+                <FolderPlace label={store.label} />
             </>
         );
     }
@@ -127,7 +140,7 @@ export function DiskGauge({
     return (
         <>
             <ResourceBar
-                label="Storage on your compute"
+                label="Storage for model files"
                 total={total}
                 segments={[
                     { id: "used", value: others, fill: "bg-faint" },
@@ -141,38 +154,109 @@ export function DiskGauge({
             <Figures
                 icon={HardDrive}
             >{`${amount} · ${bytes(free)} free of ${bytes(total)}`}</Figures>
-            <Where>{store.label}</Where>
+            <FolderPlace label={store.label} />
         </>
     );
 }
 
-const SERVE_STATUS: Record<
-    FitInfo["level"],
-    { tone: "success" | "destructive"; text: string } | null
-> = {
-    fits: { tone: "success", text: "Fits your compute" },
-    limited: { tone: "success", text: "Fits your compute" },
-    insufficient: { tone: "destructive", text: "Too large to serve on your compute" },
-    unknown: null,
-};
+export type ComputeInfo = { memoryLabel: string; pool: string };
 
-const TRAIN_STATUS: Partial<
-    Record<TrainFitInfo["level"], { tone: "success" | "destructive"; text: string }>
-> = {
-    fits: { tone: "success", text: "Trains on your compute" },
-    insufficient: { tone: "destructive", text: "Too large to train" },
-};
+function servePools(fit: FitInfo, compute: ComputeInfo | null, fits: PoolFits | null): string[] {
+    if (fits) {
+        return fits.serve;
+    }
+    return compute && runnable(fit.level) ? [compute.pool] : [];
+}
 
-export type ComputeInfo = { memoryLabel: string; machine: string; pool: string | null };
+function trainPools(
+    trainFit: TrainFitInfo,
+    compute: ComputeInfo | null,
+    fits: PoolFits | null,
+): string[] {
+    if (fits) {
+        return fits.train;
+    }
+    return compute && trainFit.level === "fits" ? [compute.pool] : [];
+}
+
+function ServeStatus({
+    fit,
+    compute,
+    fits,
+}: {
+    fit: FitInfo;
+    compute: ComputeInfo | null;
+    fits: PoolFits | null;
+}) {
+    const pools = servePools(fit, compute, fits);
+    if (pools.length > 0) {
+        return (
+            <SummaryLine icon={Play}>
+                <StatusText tone="success" className="whitespace-normal">
+                    <span>
+                        {"Runs on "}
+                        <PoolList names={pools} />
+                    </span>
+                </StatusText>
+            </SummaryLine>
+        );
+    }
+    if (fit.level !== "insufficient" || (fits && !fits.checked)) {
+        return null;
+    }
+    return (
+        <SummaryLine icon={Play}>
+            <StatusText tone="destructive" className="whitespace-normal">
+                Too large for every pool
+            </StatusText>
+        </SummaryLine>
+    );
+}
+
+function TrainStatus({
+    trainFit,
+    compute,
+    fits,
+}: {
+    trainFit: TrainFitInfo;
+    compute: ComputeInfo | null;
+    fits: PoolFits | null;
+}) {
+    const pools = trainPools(trainFit, compute, fits);
+    if (pools.length > 0) {
+        return (
+            <SummaryLine icon={GraduationCap}>
+                <StatusText tone="success" className="whitespace-normal">
+                    <span>
+                        {"Trains on "}
+                        <PoolList names={pools} />
+                    </span>
+                </StatusText>
+            </SummaryLine>
+        );
+    }
+    if (trainFit.level !== "insufficient" || (fits && !fits.checked)) {
+        return null;
+    }
+    return (
+        <SummaryLine icon={GraduationCap}>
+            <StatusText tone="destructive" className="whitespace-normal">
+                Too large to train in every pool
+            </StatusText>
+        </SummaryLine>
+    );
+}
 
 export function MemoryGauge({
     fit,
     trainFit,
     compute,
+    fits,
 }: {
     fit: FitInfo | null;
     trainFit: TrainFitInfo | null;
     compute: ComputeInfo | null;
+    fits: PoolFits | null;
 }) {
     const available = fit?.available_bytes;
     if (!fit || !available || fit.level === "unknown") {
@@ -185,17 +269,11 @@ export function MemoryGauge({
     const needed = fit.needed_bytes;
     const short = needed > available;
     const tone: Tone = short ? "destructive" : fit.level === "limited" ? "warning" : "normal";
-    const serve = SERVE_STATUS[fit.level];
-    const train = trainFit ? TRAIN_STATUS[trainFit.level] : undefined;
-    const where = compute
-        ? [`${compute.memoryLabel} on ${compute.machine}`, compute.pool && `Pool: ${compute.pool}`]
-              .filter(Boolean)
-              .join(" · ")
-        : null;
+    const label = compute?.memoryLabel ?? "memory";
     return (
         <>
             <ResourceBar
-                label="Memory on your compute"
+                label={compute ? `${label} in pool ${compute.pool}` : label}
                 total={available}
                 segments={[
                     { id: "needs", value: Math.min(needed, available), fill: TONE_FILL[tone] },
@@ -203,28 +281,19 @@ export function MemoryGauge({
             />
             <Figures icon={MemoryStick}>
                 {short
-                    ? `${bytes(needed)} needed · only ${bytes(available)} available`
-                    : `${bytes(needed)} of ${bytes(available)} available`}
+                    ? `${bytes(needed)} needed · only ${bytes(available)} ${label}`
+                    : `${bytes(needed)} of ${bytes(available)} ${label}`}
+                {compute && (
+                    <>
+                        {" in "}
+                        <PoolLink name={compute.pool} />
+                    </>
+                )}
             </Figures>
-            {where && <Where>{where}</Where>}
-            {(serve || train) && (
-                <span className="flex flex-col gap-1">
-                    {serve && (
-                        <SummaryLine icon={Play}>
-                            <StatusText tone={serve.tone} className="whitespace-normal">
-                                {serve.text}
-                            </StatusText>
-                        </SummaryLine>
-                    )}
-                    {train && (
-                        <SummaryLine icon={GraduationCap}>
-                            <StatusText tone={train.tone} className="whitespace-normal">
-                                {train.text}
-                            </StatusText>
-                        </SummaryLine>
-                    )}
-                </span>
-            )}
+            <span className="flex flex-col gap-1">
+                <ServeStatus fit={fit} compute={compute} fits={fits} />
+                {trainFit && <TrainStatus trainFit={trainFit} compute={compute} fits={fits} />}
+            </span>
         </>
     );
 }

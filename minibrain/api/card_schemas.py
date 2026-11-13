@@ -99,6 +99,7 @@ class CardRun(BaseModel):
     duration_seconds: float | None
     device: str | None
     machine: str | None
+    pool: str | None = None
 
 
 class CardRecipe(BaseModel):

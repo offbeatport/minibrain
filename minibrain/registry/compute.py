@@ -58,11 +58,16 @@ class Pool:
     engines: list[EngineReplica]
 
     def machines(self) -> list[Hardware]:
-        return [node.report.hardware() for node in self.nodes if node.online]
+        return [node.report.hardware(self.name) for node in self.nodes if node.online]
 
 
 def node_id(pool: str, host: str) -> str:
     return f"{pool}/{host}"
+
+
+def pool_of_host(session: Session, host: str) -> str:
+    found = select(Node.pool).where(Node.host == host).order_by(Node.seen_at.desc()).limit(1)
+    return session.scalar(found) or LOCAL_POOL
 
 
 def pool_label(name: str) -> str:

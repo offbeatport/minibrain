@@ -106,7 +106,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Compare candidate base models side by side, by link.
   UI: Discover › Compare
 - **Fit per pool** · shipped · ml, admin
-  See which models run on which compute pool before downloading.
+  See which named pools run a model before downloading it.
   UI: Discover, Models › Add model
 - **Memory to train** · shipped · ml, admin
   See the QLoRA training memory and whether a pool's workers train it.
@@ -447,6 +447,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Compute pools** · shipped · admin
   See pools, machines, GPUs, workers and engines in one place.
   UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
+- **Pool links** · shipped · product, ml, admin
+  Where things run or are stored is named by pool, with details.
+  UI: Models › Add model, Models › model › Train, Models › model › Overview, Jobs › job · API: GET /api/compute/pools
 - **Remote workers** · shipped · admin
   Join GPU machines that run training and scoring jobs.
   CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_WORKER_TOKEN

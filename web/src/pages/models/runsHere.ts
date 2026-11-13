@@ -68,3 +68,42 @@ export function useRunsHere(catalog: CatalogResponse | undefined): RunsHere {
 export function useTrainsHere(catalog: CatalogResponse | undefined): RunsHere {
     return matching(usePoolEntries(catalog), trainsAnywhere);
 }
+
+export type PoolFits = { serve: string[]; train: string[]; checked: boolean };
+
+export function usePoolFits(
+    catalog: CatalogResponse | undefined,
+    entryId: string | null | undefined,
+    variantId: string | null | undefined,
+): PoolFits {
+    const others = (catalog?.pools ?? []).filter((pool) => pool.name !== catalog?.pool);
+    const lists = useQueries({
+        queries: others.map((pool) => ({
+            queryKey: [...keys.catalog, pool.name],
+            queryFn: () =>
+                unwrap(api.GET("/api/catalog", { params: { query: { pool: pool.name } } })),
+            enabled: Boolean(entryId),
+        })),
+        combine: (results) => results.map((result) => result.data?.entries ?? null),
+    });
+    const all = [
+        { name: catalog?.pool ?? "", entries: catalog?.entries ?? null },
+        ...others.map((pool, index) => ({ name: pool.name, entries: lists[index] ?? null })),
+    ];
+    const variants = all.map((pool) => ({
+        name: pool.name,
+        variant: pool.entries
+            ?.find((entry) => entry.id === entryId)
+            ?.variants.find((variant) => variant.id === variantId),
+        checked: pool.entries !== null,
+    }));
+    return {
+        serve: variants
+            .filter((item) => item.variant && runnable(item.variant.fit.level))
+            .map((item) => item.name),
+        train: variants
+            .filter((item) => item.variant?.train_fit.level === "fits")
+            .map((item) => item.name),
+        checked: variants.every((item) => item.checked),
+    };
+}

@@ -93,7 +93,7 @@ def fitted_recipe(spec: JobSpec, recipe: dict[str, Any], encoded: list[Encoded],
     machine = machine_here(device)
     found, replanned = fit_here(base_of(spec), machine, recipe, encoded)
     if found.chosen is None:
-        raise FinalError(found.refusal or f"{spec.base.key} does not fit for training on {machine.name}")
+        raise FinalError(found.refusal or f"{spec.base.key} does not fit for training on {machine.place}")
     planned = found.recipe()
     planned["overrides"] = list(recipe.get("overrides") or [])
     return (

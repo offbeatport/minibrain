@@ -233,7 +233,7 @@ def test_a_version_that_cannot_fit_is_refused_up_front(harness: Harness) -> None
     register(harness, worker_hardware(2 * GIB, accelerator="cpu"))
     response = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora"})
     assert response.status_code == 409
-    assert response.json()["detail"].startswith("Qwen3 0.6B does not fit for training on Test CPU")
+    assert response.json()["detail"].startswith("Qwen3 0.6B does not fit for training on Test CPU in pool local")
     assert harness.claim(["train"]) is None
 
 
@@ -451,7 +451,7 @@ def test_training_plan_lists_every_machine_the_time_and_the_queue(harness: Harne
     assert (gpu["fits"], gpu["picked"], gpu["pool"], gpu["kind"], gpu["reason"]) == (True, True, "local", "cuda", None)
     assert gpu["minutes"] == found["minutes"]
     assert (cpu["fits"], cpu["picked"], cpu["chosen"], cpu["minutes"]) == (False, False, None, None)
-    assert cpu["reason"].startswith("Qwen3 0.6B does not fit for training on Test CPU")
+    assert cpu["reason"].startswith("Qwen3 0.6B does not fit for training on Test CPU in pool local")
     assert cpu["smallest"]["peak_bytes"] > cpu["available_bytes"] * HEADROOM
     pinned = harness.client.get(url, params={"machine": "Test CPU"}).json()
     assert (pinned["level"], pinned["machine"], pinned["minutes"]) == ("insufficient", "Test CPU", None)

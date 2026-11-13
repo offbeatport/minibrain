@@ -166,6 +166,10 @@ class Machine:
         return MEMORY_LABELS.get(self.kind, "memory")
 
     @property
+    def place(self) -> str:
+        return f"{self.name} in pool {self.pool}" if self.pool else self.name
+
+    @property
     def available_bytes(self) -> int | None:
         return self.ram_bytes if self.device == "cpu" else self.gpu_bytes
 
@@ -322,6 +326,7 @@ class Plan:
             "optimizer": chosen.optimizer,
             "plan": {
                 "machine": self.machine.name if self.machine else None,
+                "pool": self.machine.pool if self.machine else None,
                 "peak_bytes": chosen.peak_bytes,
                 "available_bytes": chosen.available_bytes,
                 "label": chosen.label,
@@ -510,7 +515,7 @@ def refusal(base: Base, machine: Machine, options: list[Option], settings: Setti
     supported = [option for option in options if option.supported]
     note = missed(options, None)
     if not supported:
-        return f"{base.name} cannot train on {machine.name}: {note or 'no strategy runs there.'}"
+        return f"{base.name} cannot train on {machine.place}: {note or 'no strategy runs there.'}"
     smallest = min(supported, key=lambda option: option.peak_bytes)
     available = machine.available_bytes or 0
     rows = "1 row" if smallest.micro_batch == 1 else f"{smallest.micro_batch} rows"
@@ -518,7 +523,7 @@ def refusal(base: Base, machine: Machine, options: list[Option], settings: Setti
     if settings.overrides():
         fix = "Change the settings back to the defaults, or use a smaller base or a machine with more memory."
     return (
-        f"{base.name} does not fit for training on {machine.name}: the smallest plan, {smallest.label} at "
+        f"{base.name} does not fit for training on {machine.place}: the smallest plan, {smallest.label} at "
         f"{rows} of {seq:,} tokens, needs about {gigabytes(smallest.peak_bytes)}, and {machine.name} has "
         f"{gigabytes(available)} of {machine.memory_label} ({gigabytes(available * HEADROOM)} after "
         f"{round((1 - HEADROOM) * 100)}% headroom). {f'{note} ' if note else ''}{fix}"

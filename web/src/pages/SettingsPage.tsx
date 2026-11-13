@@ -199,7 +199,7 @@ function PoolPriceRow({ pool, currency }: { pool: PoolPrice; currency: string })
     return (
         <NumberSettingRow
             id={`price-${pool.pool}`}
-            label={pool.pool === "local" ? pool.label : `Pool ${pool.label}`}
+            label={`Pool ${pool.pool}`}
             description={poolDescription(pool)}
             value={pool.hourly_price ?? 0}
             min={0}

@@ -12597,6 +12597,17 @@
               }
             ],
             "title": "Machine"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
           }
         },
         "type": "object",
@@ -19162,6 +19173,17 @@
               }
             ],
             "title": "Host"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool"
           },
           "live": {
             "type": "boolean",
@@ -27643,6 +27665,10 @@
             "type": "string",
             "title": "Host"
           },
+          "pool": {
+            "type": "string",
+            "title": "Pool"
+          },
           "engine": {
             "type": "string",
             "title": "Engine"
@@ -27655,6 +27681,7 @@
         "type": "object",
         "required": [
           "host",
+          "pool",
           "engine",
           "state"
         ],

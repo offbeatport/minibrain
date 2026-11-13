@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
+import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SoftwareMark } from "~/components/SoftwareMark";
@@ -219,7 +220,7 @@ function Locations({ info }: { info: InstallInfo }) {
         >
             <SettingsGroup>
                 <Row text={LOCATIONS.server}>
-                    <Text>{places.host}</Text>
+                    <PoolLink name="local" machine={places.host} align="end" />
                 </Row>
                 <Row
                     text={LOCATIONS.home}
@@ -239,7 +240,9 @@ function Locations({ info }: { info: InstallInfo }) {
                 </Row>
                 <Row
                     text={LOCATIONS.artifactStorage}
-                    description={s3 ? "S3-compatible bucket" : "Local folder on this server"}
+                    description={
+                        s3 ? "S3-compatible bucket" : "Folder on main's disk, in pool local"
+                    }
                 >
                     <Path
                         value={s3 ? (places.storage_bucket ?? "") : places.storage_location}

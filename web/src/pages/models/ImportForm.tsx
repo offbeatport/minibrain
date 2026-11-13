@@ -19,8 +19,10 @@ import type {
     ImportCheck,
     TrainFitInfo,
 } from "~/api/client";
+import { useCatalog } from "~/api/queries";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { StatusText } from "~/components/models/StatusText";
 import { SECURITY_PATH } from "~/lib/requests";
 import { bytes } from "~/lib/time";
 import { GroupIcon } from "../data/icons";
@@ -176,34 +178,66 @@ function Fact({
     );
 }
 
-const SERVE: Record<FitInfo["level"], { tone: Tone; text: string }> = {
-    fits: { tone: "success", text: "Fits your compute" },
-    limited: { tone: "success", text: "Fits your compute, with little room to spare" },
-    insufficient: { tone: "warning", text: "Too large to serve on your compute" },
-    unknown: { tone: "neutral", text: "Not checked: no machine has reported its memory yet" },
+const UNKNOWN_SERVE = "Not checked: no machine has reported its memory yet";
+
+const TRAIN_NOTE: Partial<Record<TrainFitInfo["level"], string>> = {
+    unknown: "Training not checked: no trainer has reported yet",
+    unsupported: "Serve only: quantized weights can't be fine-tuned",
 };
 
-const TRAIN: Record<TrainFitInfo["level"], { tone: Tone; text: string }> = {
-    fits: { tone: "success", text: "Trains on your compute" },
-    insufficient: { tone: "warning", text: "Too large to train" },
-    unknown: { tone: "neutral", text: "Training not checked: no trainer has reported yet" },
-    unsupported: { tone: "neutral", text: "Serve only: quantized weights can't be fine-tuned" },
-};
+function OnPool({ lead, pool, after }: { lead: string; pool: string; after?: string }) {
+    return (
+        <span>
+            {lead}
+            <PoolLink name={pool} />
+            {after}
+        </span>
+    );
+}
 
 function Compute({ fit, train }: { fit?: FitInfo | null; train?: TrainFitInfo | null }) {
+    const pool = useCatalog().data?.pool ?? "local";
     if (!fit && !train) {
         return <span className="text-muted-foreground">Not checked</span>;
     }
+    const trainNote = train ? TRAIN_NOTE[train.level] : undefined;
     return (
         <span className="flex flex-col gap-1">
-            {fit && (
-                <StatusText tone={SERVE[fit.level].tone} className="whitespace-normal">
-                    {SERVE[fit.level].text}
+            {fit && fit.level === "unknown" && (
+                <StatusText tone="neutral" className="whitespace-normal">
+                    {UNKNOWN_SERVE}
                 </StatusText>
             )}
-            {train && (
-                <StatusText tone={TRAIN[train.level].tone} className="whitespace-normal">
-                    {TRAIN[train.level].text}
+            {fit && fit.level !== "unknown" && (
+                <StatusText
+                    tone={fit.level === "insufficient" ? "warning" : "success"}
+                    className="whitespace-normal"
+                >
+                    {fit.level === "insufficient" ? (
+                        <OnPool lead="Too large to serve on " pool={pool} />
+                    ) : (
+                        <OnPool
+                            lead="Runs on "
+                            pool={pool}
+                            after={fit.level === "limited" ? ", with little room to spare" : ""}
+                        />
+                    )}
+                </StatusText>
+            )}
+            {train && trainNote && (
+                <StatusText tone="neutral" className="whitespace-normal">
+                    {trainNote}
+                </StatusText>
+            )}
+            {train && !trainNote && (
+                <StatusText
+                    tone={train.level === "fits" ? "success" : "warning"}
+                    className="whitespace-normal"
+                >
+                    <OnPool
+                        lead={train.level === "fits" ? "Trains on " : "Too large to train on "}
+                        pool={pool}
+                    />
                 </StatusText>
             )}
         </span>
@@ -319,7 +353,7 @@ function CataloguePreview({
                 <span className="tabular-nums">{`${variant.files} files · ${sizeText(variant.size_bytes)}`}</span>
             </Fact>
             <Fact label="Format">{formatName(variant)}</Fact>
-            <Fact label="Compute">
+            <Fact label="Pool">
                 <Compute fit={variant.fit} train={variant.train_fit} />
             </Fact>
             <Fact label="Disk">
@@ -378,7 +412,7 @@ function PathPreview({
                     <span className="text-muted-foreground">Not stated in its README</span>
                 )}
             </Fact>
-            <Fact label="Compute">
+            <Fact label="Pool">
                 <Compute fit={found.fit} train={found.train_fit} />
             </Fact>
             <Fact label="Disk">
@@ -563,7 +597,7 @@ function Prompt({ kind }: { kind: SourceKind }) {
             </span>
             <span className="text-sm">
                 minibrain reads its files and checks them before anything is copied: name, size,
-                format, licence and whether it fits your compute show here.
+                format, licence and which pool it fits show here.
             </span>
         </div>
     );

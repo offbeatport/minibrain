@@ -24,6 +24,7 @@ import {
 import { useInfrastructure, usePools, useSystem } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { PageHeader } from "~/components/PageHeader";
+import { poolHref } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
@@ -203,8 +204,14 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
             bare
             icon={Server}
             anchor={`pool-${pool.name}`}
-            title={pool.name === "local" ? pool.label : `Pool ${pool.label}`}
-            description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
+            title={`Pool ${pool.name}`}
+            description={[
+                pool.label !== pool.name ? pool.label : null,
+                `${count(online)} of ${plural(pool.nodes.length, "machine")} online`,
+                `${plural(pool.engines.length, "engine")} serving`,
+            ]
+                .filter(Boolean)
+                .join(" · ")}
         >
             <div className="flex flex-col gap-3">
                 <DataGrid
@@ -260,20 +267,44 @@ const SETUPS: Record<InfrastructureInfo["setup"], { title: string; body: string 
     },
 };
 
-function hostsWith(pools: PoolInfo[], role: string): string[] {
-    const hosts = pools.flatMap((pool) =>
-        pool.nodes
-            .filter((node) => node.online && node.roles.includes(role))
-            .map((node) => node.host),
-    );
-    return [...new Set(hosts)];
+type Placed = { pool: string; hosts: string[] };
+
+function grouped(pairs: { pool: string; host: string }[]): Placed[] {
+    const groups = new Map<string, string[]>();
+    for (const { pool, host } of pairs) {
+        const hosts = groups.get(pool) ?? [];
+        groups.set(pool, hosts.includes(host) ? hosts : [...hosts, host]);
+    }
+    return [...groups.entries()].map(([pool, hosts]) => ({ pool, hosts }));
 }
 
-function Hosts({ hosts, none }: { hosts: string[]; none: string }) {
-    if (hosts.length === 0) {
+function hostsWith(pools: PoolInfo[], role: string): Placed[] {
+    return grouped(
+        pools.flatMap((pool) =>
+            pool.nodes
+                .filter((node) => node.online && node.roles.includes(role))
+                .map((node) => ({ pool: pool.name, host: node.host })),
+        ),
+    );
+}
+
+function Hosts({ places, none }: { places: Placed[]; none: string }) {
+    if (places.length === 0) {
         return <span className="text-muted-foreground">{none}</span>;
     }
-    return <span className="font-mono">{hosts.join(", ")}</span>;
+    return (
+        <span className="flex flex-col">
+            {places.map((place) => (
+                <span key={place.pool}>
+                    {`Pool ${place.pool}`}
+                    <span className="text-muted-foreground">
+                        {" · "}
+                        <span className="font-mono">{place.hosts.join(", ")}</span>
+                    </span>
+                </span>
+            ))}
+        </span>
+    );
 }
 
 function SetupSection({
@@ -287,7 +318,11 @@ function SetupSection({
 }) {
     const setup = info ? SETUPS[info.setup] : null;
     const replicas = pools.flatMap((pool) => pool.engines);
-    const engineHosts = [...new Set(replicas.map((replica) => replica.host))];
+    const engineHosts = grouped(
+        pools.flatMap((pool) =>
+            pool.engines.map((replica) => ({ pool: pool.name, host: replica.host })),
+        ),
+    );
     return (
         <PanelSection icon={Network} title="Setup">
             <div className="flex flex-col gap-4">
@@ -300,7 +335,13 @@ function SetupSection({
                         label="main"
                         value={
                             <span className="flex flex-col font-normal">
-                                <span className="font-mono">{info?.host ?? "–"}</span>
+                                <span>
+                                    {"Pool local"}
+                                    <span className="text-muted-foreground">
+                                        {" · "}
+                                        <span className="font-mono">{info?.host ?? "–"}</span>
+                                    </span>
+                                </span>
                                 <span className="text-sm text-muted-foreground">
                                     {LOOPS[loops ?? "single"]}
                                 </span>
@@ -315,7 +356,7 @@ function SetupSection({
                         label="Workers"
                         value={
                             <span className="font-normal">
-                                <Hosts hosts={hostsWith(pools, "worker")} none="None online" />
+                                <Hosts places={hostsWith(pools, "worker")} none="None online" />
                             </span>
                         }
                     />
@@ -323,7 +364,7 @@ function SetupSection({
                         label={`Engines · ${count(replicas.length)}`}
                         value={
                             <span className="font-normal">
-                                <Hosts hosts={engineHosts} none="None running" />
+                                <Hosts places={engineHosts} none="None running" />
                             </span>
                         }
                     />
@@ -468,7 +509,7 @@ function warningsFor(
     main: Record<string, string>,
     info: InfrastructureInfo | undefined,
 ): Warning[] {
-    const nodes = pools.flatMap((pool) => pool.nodes);
+    const nodes = pools.flatMap((pool) => pool.nodes.map((node) => ({ ...node, pool: pool.name })));
     const offline = nodes.filter((node) => !node.online);
     const drifting = nodes.filter(
         (node) => !node.roles.includes("main") && differences(node.versions ?? {}, main).length > 0,
@@ -483,12 +524,12 @@ function warningsFor(
     );
     return [
         ...offline.map((node) => ({
-            text: `${node.host} is offline (last seen ${node.seen_at ? relativeTime(node.seen_at) : "never"})`,
-            href: "/infrastructure/machines",
+            text: `Pool ${node.pool}: ${node.host} is offline (last seen ${node.seen_at ? relativeTime(node.seen_at) : "never"})`,
+            href: poolHref(node.pool),
         })),
         ...drifting.map((node) => ({
-            text: `${node.host} runs different library versions from main`,
-            href: "/infrastructure/machines",
+            text: `Pool ${node.pool}: ${node.host} runs different library versions from main`,
+            href: poolHref(node.pool),
         })),
         ...low.map((store) => ({
             text: `${store.name}: only ${bytes(store.free_bytes)} free on its disk`,

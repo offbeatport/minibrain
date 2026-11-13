@@ -421,7 +421,7 @@ export function Advanced({
                             label={
                                 <Tipped
                                     label="Machine"
-                                    tip="Plans batch and memory for this machine. Any plans for the best machine in the pool."
+                                    tip="Plans batch and memory for one machine in the pool. Any plans for the best machine there."
                                 />
                             }
                         >

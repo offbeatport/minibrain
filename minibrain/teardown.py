@@ -689,21 +689,21 @@ class Teardowns:
             if replica.base_model not in bases:
                 continue
             needed = self.needed(replica.base_model)
-            host = host_of(replica.node_id)
+            host = f"pool {replica.pool} ({host_of(replica.node_id)})"
             try:
                 report = drain_engine(self.http, replica.url, routes, adapters)
             except Exception as error:
-                waiting.append(f"the engine on {host} to answer ({short(error)})")
+                waiting.append(f"the engine in {host} to answer ({short(error)})")
                 continue
             if report.get("in_flight"):
-                waiting.append(f"the engine on {host} to finish {report['in_flight']} requests in flight")
+                waiting.append(f"the engine in {host} to finish {report['in_flight']} requests in flight")
             elif report.get("loaded"):
-                waiting.append(f"the engine on {host} to unload {names(list(report['loaded']))}")
+                waiting.append(f"the engine in {host} to unload {names(list(report['loaded']))}")
             elif replica.managed and not needed and report.get("total"):
-                waiting.append(f"the engine on {host} to finish {report['total']} requests in flight")
+                waiting.append(f"the engine in {host} to finish {report['total']} requests in flight")
             elif replica.managed and not needed:
                 released.add(replica.base_model)
-                waiting.append(f"the engine on {host} to stop")
+                waiting.append(f"the engine in {host} to stop")
         if released and not detail.get("release"):
             teardown.detail = {**teardown.detail, "release": sorted(released)}
         return waiting

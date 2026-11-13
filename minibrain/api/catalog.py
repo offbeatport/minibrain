@@ -55,7 +55,7 @@ log = logging.getLogger("minibrain.catalog")
 def pool_hardware(pool: Pool) -> Hardware:
     machines = [machine for machine in pool.machines() if machine.known]
     if not machines:
-        return Hardware(pool.label, "Not reported yet", "unknown", None, None, "memory")
+        return Hardware(pool.name, "Not reported yet", "unknown", None, None, "memory", pool=pool.name)
     return max(machines, key=lambda machine: machine.memory_bytes or 0)
 
 

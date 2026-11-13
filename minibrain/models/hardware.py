@@ -23,6 +23,11 @@ class Hardware:
     ram_bytes: int | None
     memory_label: str
     gpus: int = 0
+    pool: str = ""
+
+    @property
+    def place(self) -> str:
+        return f"pool {self.pool} ({self.machine})" if self.pool else self.machine
 
     @property
     def known(self) -> bool:
@@ -71,10 +76,17 @@ class NodeReport:
             versions={str(name): str(value) for name, value in (data.get("versions") or {}).items()},
         )
 
-    def hardware(self) -> Hardware:
+    def hardware(self, pool: str = "") -> Hardware:
         label = MEMORY_LABELS.get(self.accelerator, "RAM")
         return Hardware(
-            self.host, self.accelerator_name, self.accelerator, self.usable_bytes, self.ram_bytes, label, len(self.gpus)
+            self.host,
+            self.accelerator_name,
+            self.accelerator,
+            self.usable_bytes,
+            self.ram_bytes,
+            label,
+            len(self.gpus),
+            pool,
         )
 
 
@@ -155,7 +167,7 @@ def fit(weights_bytes: int, requires: dict[str, Any], hardware: Hardware | None)
         }
     available = hardware.memory_bytes
     level = "fits" if need <= available * FITS_SHARE else "limited" if need <= available else "insufficient"
-    detail = f"{basis} {hardware.machine} has {available / GIB:.1f} GB {hardware.memory_label}."
+    detail = f"{basis} {hardware.place} has {available / GIB:.1f} GB {hardware.memory_label}."
     return {"level": level, "needed_bytes": need, "available_bytes": available, "basis": detail}
 
 

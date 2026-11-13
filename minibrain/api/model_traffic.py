@@ -93,6 +93,7 @@ class TrafficCaller(BaseModel):
 
 class TrafficReplica(BaseModel):
     host: str
+    pool: str
     engine: str
     state: str
 
@@ -300,7 +301,9 @@ def callers_of(session: Session, where: Sequence[ColumnElement[bool]]) -> list[T
 
 def replicas_of(session: Session, base: str) -> list[TrafficReplica]:
     return [
-        TrafficReplica(host=replica.node_id.split("/", 1)[-1], engine=replica.engine, state=replica.state)
+        TrafficReplica(
+            host=replica.node_id.split("/", 1)[-1], pool=replica.pool, engine=replica.engine, state=replica.state
+        )
         for replica in live_engines(session)
         if replica.base_model == base
     ]

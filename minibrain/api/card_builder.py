@@ -38,6 +38,7 @@ from minibrain.data.dataset_versions import version_number
 from minibrain.data.splits import SPLITS, DatasetVersionError, read_split
 from minibrain.models.health import content_hash
 from minibrain.models.rules import LICENCES, licence_use, publisher_of
+from minibrain.registry.compute import pool_of_host
 from minibrain.registry.files import MissingArtifactError, dataset_version_location, store_for
 from minibrain.registry.models import (
     AttemptOutcome,
@@ -259,10 +260,15 @@ def machine_of(session: Session, job: Job) -> str | None:
     return worker.host if worker is not None else None
 
 
+def run_pool(session: Session, machine: str | None) -> str | None:
+    return pool_of_host(session, machine) if machine else None
+
+
 def run_card(session: Session, job: Job | None, device: Any) -> CardRun | None:
     if job is None:
         return None
     duration = None
+    machine = machine_of(session, job)
     if job.started_at is not None and job.finished_at is not None:
         duration = round((job.finished_at - job.started_at).total_seconds(), 1)
     return CardRun(
@@ -271,7 +277,8 @@ def run_card(session: Session, job: Job | None, device: Any) -> CardRun | None:
         finished_at=stamp(job.finished_at),
         duration_seconds=duration,
         device=str(device) if device else None,
-        machine=machine_of(session, job),
+        machine=machine,
+        pool=run_pool(session, machine),
     )
 
 

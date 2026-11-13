@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import type { BaseModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useVersionFiles } from "~/api/queries";
 import { Facts } from "~/components/Facts";
+import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -88,8 +89,11 @@ function storageFacts(model: BaseModelDetail): [string, ReactNode][] {
             model.store === "s3" ? (
                 model.store_label
             ) : (
-                <span key="storage" className="font-mono">
-                    {model.storage_path}
+                <span key="storage" className="flex min-w-0 flex-col">
+                    <PoolLink name="local" />
+                    <span className="truncate font-mono text-sm text-muted-foreground">
+                        {model.storage_path}
+                    </span>
                 </span>
             ),
         ],

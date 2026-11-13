@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
+import { PoolLink } from "~/components/PoolLink";
 import { PanelSection, Stat } from "~/components/Section";
 import { auditHref } from "~/lib/audit";
 import { costText, deviceTime, duration, headline, measuredOn, money, priced } from "~/lib/cost";
@@ -422,7 +423,16 @@ function runFacts(run: Run | null | undefined): [string, ReactNode][] {
         ["Finished", when(run.finished_at)],
         ["Duration", <Numeric key="duration" value={seconds(run.duration_seconds)} />],
         ["Device", run.device ?? NONE],
-        ["Machine", run.machine ? <Mono key="machine">{run.machine}</Mono> : NONE],
+        [
+            "Pool",
+            run.pool ? (
+                <PoolLink key="pool" name={run.pool} machine={run.machine} />
+            ) : run.machine ? (
+                <Mono key="machine">{run.machine}</Mono>
+            ) : (
+                NONE
+            ),
+        ],
         ["Job", <Mono key="job">{`#${run.job_id}`}</Mono>],
     ];
 }

@@ -587,6 +587,7 @@ class JobDetail(JobInfo):
     outputs: dict[str, str]
     device: str | None = None
     host: str | None = None
+    pool: str | None = None
     live: bool = False
     setup: JobSetup | None = None
 

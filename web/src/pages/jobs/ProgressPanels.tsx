@@ -138,7 +138,6 @@ export function ProgressSection({
                         ...facts,
                         ["Queued", <When key="queued" value={job.created_at} />],
                         ["Started", <When key="started" value={job.started_at} />],
-                        ["Worker", job.host ?? "–"],
                     ]}
                 />
             </div>

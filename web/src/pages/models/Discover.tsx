@@ -361,20 +361,20 @@ export function compareHref(ids: string[], pool?: string, onlyDifferences = fals
 
 const muted = (text: string) => <span className="text-muted-foreground">{text}</span>;
 
-function trainHint(entry: CatalogEntry): ReactNode {
+function trainHint(entry: CatalogEntry, pool: string): ReactNode {
     const levels = new Set(entry.variants.map((variant) => variant.train_fit.level));
     if (levels.has("fits")) {
-        return <StatusText tone="success">Trains on your compute</StatusText>;
+        return <StatusText tone="success">{`Trains on ${pool}`}</StatusText>;
     }
     if (levels.has("insufficient")) {
-        return <StatusText tone="neutral">Too large to train</StatusText>;
+        return <StatusText tone="neutral">{`Too large to train on ${pool}`}</StatusText>;
     }
     return null;
 }
 
-function MemoryCell({ entry }: { entry: CatalogEntry }) {
+function MemoryCell({ entry, pool }: { entry: CatalogEntry; pool: string }) {
     const train = leastTrainMemory(entry);
-    const hint = trainHint(entry);
+    const hint = trainHint(entry, pool);
     return (
         <span className="flex flex-col tabular-nums">
             <span>{`${memoryNeeded(entry)} to run`}</span>
@@ -388,12 +388,12 @@ function MemoryCell({ entry }: { entry: CatalogEntry }) {
     );
 }
 
-function TrainMemory({ entry }: { entry: CatalogEntry }) {
+function TrainMemory({ entry, pool }: { entry: CatalogEntry; pool: string }) {
     const least = leastTrainMemory(entry);
     if (least === null) {
         return muted("Serve only");
     }
-    const hint = trainHint(entry);
+    const hint = trainHint(entry, pool);
     return (
         <span className="flex flex-col">
             <span>{bytes(least)}</span>
@@ -418,7 +418,7 @@ const HIDDEN_COLUMNS = [
     "repo",
 ];
 
-function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[] {
+function columns(names: Map<string, string>, pool: string): ColumnDef<CatalogEntry, unknown>[] {
     return [
         {
             id: "model",
@@ -488,14 +488,14 @@ function columns(names: Map<string, string>): ColumnDef<CatalogEntry, unknown>[]
                 info: "Memory to run, in the smallest format, and to train, with QLoRA where it fits.",
             },
             accessorFn: leastMemory,
-            cell: ({ row }) => <MemoryCell entry={row.original} />,
+            cell: ({ row }) => <MemoryCell entry={row.original} pool={pool} />,
         },
         {
             id: "train",
             header: "To train",
             meta: { info: TRAIN_MEMORY_INFO },
             accessorFn: (entry) => leastTrainMemory(entry) ?? Number.POSITIVE_INFINITY,
-            cell: ({ row }) => <TrainMemory entry={row.original} />,
+            cell: ({ row }) => <TrainMemory entry={row.original} pool={pool} />,
         },
         {
             id: "size",
@@ -728,7 +728,8 @@ export function Discover({
         () => new Map((data?.entries ?? []).map((entry) => [entry.id, entry.name])),
         [data?.entries],
     );
-    const tableColumns = useMemo(() => columns(names), [names]);
+    const poolName = data?.pool ?? "local";
+    const tableColumns = useMemo(() => columns(names, poolName), [names, poolName]);
     const selected = useMemo(() => idList(search.selected), [search.selected]);
     if (catalog.isLoading) {
         return <DiscoverSkeleton columns={tableColumns} search={search} update={update} />;

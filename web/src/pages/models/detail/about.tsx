@@ -24,6 +24,7 @@ import {
 import { useFeedbackSummary, useTestExamples } from "~/api/feedbackQueries";
 import { useModelTraffic } from "~/api/modelPageQueries";
 import { useAllModels, useModelPage, usePresets, useVersionFiles } from "~/api/queries";
+import { type Place, PoolLink, PoolPlaces } from "~/components/PoolLink";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { TAGS_HINT, editableTags, isSystemTag } from "~/components/Tags";
 import { useCan } from "~/lib/access";
@@ -182,6 +183,24 @@ function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
+function Deployment({ replicas, href }: { replicas: Place[]; href: string }) {
+    return (
+        <span className="flex min-w-0 items-baseline gap-1">
+            <Clipped
+                text={`${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}`}
+                href={href}
+                className="shrink-0"
+            />
+            {replicas.length > 0 && (
+                <>
+                    <span className="shrink-0">in</span>
+                    <PoolPlaces places={replicas} machines={false} />
+                </>
+            )}
+        </span>
+    );
+}
+
 function taskText(detail: ModelDetail | undefined, presetLabel: string | undefined): string {
     const contract = detail?.contract;
     const labels = contract?.labels ?? [];
@@ -230,7 +249,6 @@ export function About({
     const preset = presets.data?.presets.find((item) => item.key === detail?.preset);
     const live = isDeployed(row) ? liveOf(versions) : undefined;
     const data = detail?.dataset_version;
-    const replicas = traffic.data?.replicas.length ?? 0;
     const tags = userTags(row);
     return (
         <AboutSection>
@@ -262,8 +280,8 @@ export function About({
             </Fact>
             <Fact label="Deployed">
                 {isDeployed(row) ? (
-                    <Clipped
-                        text={`${replicas} ${replicas === 1 ? "replica" : "replicas"}`}
+                    <Deployment
+                        replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
                     />
                 ) : (
@@ -344,7 +362,7 @@ export function Details({
     if (!detail) {
         return null;
     }
-    const hosts = [...new Set((traffic.data?.replicas ?? []).map((item) => item.host))];
+    const places = traffic.data?.replicas ?? [];
     const failed = versions.filter((version) => version.status === "failed").length;
     const copied = versions.find((version) => version.duplicated_from)?.duplicated_from;
     const switched =
@@ -416,12 +434,8 @@ export function Details({
                         href={`${modelPageHref(row.key, "api")}#request-bodies`}
                     />
                 </Row>
-                <Row label="Machines">
-                    {hosts.length > 0 ? (
-                        <Clipped text={hosts.join(", ")} className="font-mono text-sm" />
-                    ) : (
-                        <Muted>None</Muted>
-                    )}
+                <Row label="Pool">
+                    {places.length > 0 ? <PoolPlaces places={places} /> : <Muted>None</Muted>}
                 </Row>
             </Group>
             <Group title="Lineage">
@@ -480,7 +494,6 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
     const [range] = useTrafficRange();
     const traffic = useModelTraffic(row.key, range);
     const page = useModelPage(row.key);
-    const replicas = traffic.data?.replicas.length ?? 0;
     const size = [
         base?.parameters ? `${parametersText(base.parameters)} parameters` : null,
         base?.context_tokens ? `${count(base.context_tokens)}-token context` : null,
@@ -504,8 +517,8 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
             </Fact>
             <Fact label="Deployed">
                 {isDeployed(row) ? (
-                    <Clipped
-                        text={`${replicas} ${replicas === 1 ? "replica" : "replicas"}`}
+                    <Deployment
+                        replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
                     />
                 ) : (
@@ -552,7 +565,7 @@ export function BaseDetails({ row, base }: { row: ModelRow; base: BaseModelDetai
     if (!base) {
         return null;
     }
-    const hosts = [...new Set((traffic.data?.replicas ?? []).map((item) => item.host))];
+    const places = traffic.data?.replicas ?? [];
     const children = (models.data ?? []).filter(
         (item) => item.kind === "custom" && item.base_model === row.key,
     );
@@ -560,12 +573,8 @@ export function BaseDetails({ row, base }: { row: ModelRow; base: BaseModelDetai
     return (
         <DetailsSection>
             <Group title="Serving">
-                <Row label="Machines">
-                    {hosts.length > 0 ? (
-                        <Clipped text={hosts.join(", ")} className="font-mono text-sm" />
-                    ) : (
-                        <Muted>None</Muted>
-                    )}
+                <Row label="Pool">
+                    {places.length > 0 ? <PoolPlaces places={places} /> : <Muted>None</Muted>}
                 </Row>
                 <Row label="Training">
                     <Clipped text={serveOnly ? `Serve-only: ${serveOnly.reason}` : "LoRA, QLoRA"} />
@@ -585,7 +594,16 @@ export function BaseDetails({ row, base }: { row: ModelRow; base: BaseModelDetai
                     <Clipped text={sourceText(base)} className="font-mono text-sm" />
                 </Row>
                 <Row label="Stored in">
-                    <Clipped text={base.store_label ?? base.storage_path} />
+                    {base.store === "s3" ? (
+                        <Clipped text={base.store_label ?? base.storage_path} />
+                    ) : (
+                        <span className="flex min-w-0 items-baseline gap-1">
+                            <span className="shrink-0">
+                                {base.store_label ?? "Main server disk"} in
+                            </span>
+                            <PoolLink name="local" />
+                        </span>
+                    )}
                 </Row>
             </Group>
             {children.length > 0 && (

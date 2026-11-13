@@ -99,10 +99,9 @@ export function LiveStatus({
                         {replicas.length === 1 ? "Served on" : `${replicas.length} replicas on`}
                     </span>
                     {replicas.map((replica) => (
-                        <span key={`${replica.pool}/${replica.host}`} className="font-mono">
-                            {replica.pool === "local"
-                                ? replica.host
-                                : `${replica.pool} / ${replica.host}`}
+                        <span key={`${replica.pool}/${replica.host}`}>
+                            {`Pool ${replica.pool} · `}
+                            <span className="font-mono">{replica.host}</span>
                         </span>
                     ))}
                 </span>

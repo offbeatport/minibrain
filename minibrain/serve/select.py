@@ -50,12 +50,12 @@ def choose_engine(node: NodeReport, weights_format: str, requested: str | None =
     gguf = weights_format == "gguf"
     if requested and requested != "auto":
         if requested not in node.engines:
-            raise NoEngineError(f"{requested} is not available on {node.host}; it has {', '.join(node.engines)}")
+            raise NoEngineError(f"{requested} is not installed on {node.host}; it has {', '.join(node.engines)}")
         if gguf != (requested == "llamacpp"):
             raise NoEngineError(f"{requested} cannot serve {weights_format} weights")
         return requested
     if gguf:
         if "llamacpp" in node.engines:
             return "llamacpp"
-        raise NoEngineError(f"GGUF weights need llama.cpp; install minibrain[llamacpp] on {node.host}")
+        raise NoEngineError("GGUF weights need llama.cpp; install minibrain[llamacpp] on that machine")
     return next((engine for engine in PREFERRED if engine in node.engines), "transformers")

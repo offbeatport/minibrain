@@ -78,7 +78,7 @@ def test_discover_judges_fit_against_the_selected_pool(harness: Harness) -> None
     assert rack["pool"] == "rack" and rack["hardware"]["machine"] == "gpu-01" and rack["hardware"]["gpus"] == 4
     xl = min((e for e in rack["entries"] if e["tier"] == "XL"), key=lambda e: e["variants"][0]["weights_bytes"])
     assert xl["variants"][0]["fit"]["level"] in {"fits", "limited"}
-    assert "gpu-01 has 320.0 GB GPU memory" in xl["variants"][0]["fit"]["basis"]
+    assert "pool rack (gpu-01) has 320.0 GB GPU memory" in xl["variants"][0]["fit"]["basis"]
     local_xl = next(entry for entry in local["entries"] if entry["id"] == xl["id"])
     assert local_xl["variants"][0]["fit"]["level"] == "insufficient"
 
