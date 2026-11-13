@@ -1,19 +1,15 @@
-import { CircleDashed, Database, Upload } from "lucide-react";
+import { Database, Upload } from "lucide-react";
 import { useToast } from "obp-ui";
 import { count } from "~/lib/format";
 import { RichSelect } from "./flowSelect";
 import { useFlowState } from "./modelsFlowData";
 
-const LATER = "later";
-
 export function DatasetPicker({
     value,
     onChange,
-    later = false,
 }: {
     value: string | null;
     onChange: (slug: string | null) => void;
-    later?: boolean;
 }) {
     const state = useFlowState();
     const toast = useToast();
@@ -22,33 +18,20 @@ export function DatasetPicker({
             title: "Not in the prototype",
             description: "Would upload a CSV, JSONL or Parquet file as a new dataset.",
         });
-    const options = [
-        ...state.datasets.map((dataset) => ({
-            value: dataset.slug,
-            label: dataset.name,
-            meta: `${count(dataset.rows)} rows · v${dataset.version}`,
-            icon: <Database />,
-        })),
-        ...(later
-            ? [
-                  {
-                      value: LATER,
-                      label: "Add later",
-                      meta: "prompt-only v0",
-                      icon: <CircleDashed />,
-                      separated: true,
-                  },
-              ]
-            : []),
-    ];
+    const options = state.datasets.map((dataset) => ({
+        value: dataset.slug,
+        label: dataset.name,
+        meta: `${count(dataset.rows)} rows · v${dataset.version}`,
+        icon: <Database />,
+    }));
     return (
         <div className="flex flex-col gap-2">
             <RichSelect
                 id="dataset"
                 label="Dataset"
-                value={value ?? (later ? LATER : null)}
+                value={value}
                 options={options}
-                onChange={(next) => onChange(next === LATER ? null : next)}
+                onChange={onChange}
                 placeholder="Choose a dataset"
             />
             <button

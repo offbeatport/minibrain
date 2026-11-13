@@ -57,6 +57,21 @@ function shownMachine(plan: Plan, compute: ComputeChoice): MachinePlan | null {
         }, null);
 }
 
+function lastRunRecipe(model: FlowModel): Recipe {
+    const balanced = presetRecipe("balanced");
+    const last = model.recipe;
+    if (!last) {
+        return balanced;
+    }
+    return {
+        ...balanced,
+        rank: last.rank,
+        alpha: last.rank * 2,
+        epochs: last.epochs,
+        learningRate: last.learningRate,
+    };
+}
+
 export function useTrainer(model: FlowModel) {
     const router = useRouter();
     const toast = useToast();
@@ -66,8 +81,8 @@ export function useTrainer(model: FlowModel) {
     const dataset = bound ?? state.datasets.find((item) => item.slug === choice);
     const picks: DataPick[] = dataPicks(model, dataset);
     const [picked, setPicked] = useState(picks[0]?.number ?? 0);
-    const [custom, setCustom] = useState(false);
-    const [recipe, setRecipe] = useState<Recipe>(presetRecipe("balanced"));
+    const [recipe, setRecipe] = useState<Recipe>(() => lastRunRecipe(model));
+    const [custom, setCustom] = useState(() => qualityOf(lastRunRecipe(model)) === null);
     const [computeChoice, setCompute] = useState<ComputeChoice | null>(null);
 
     const base = baseOf(model);

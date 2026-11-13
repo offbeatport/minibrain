@@ -21,6 +21,7 @@ export type Confirm = {
     description: ReactNode;
     label: string;
     run: () => void;
+    primary?: boolean;
 };
 
 export function ConfirmDialog({
@@ -47,7 +48,7 @@ export function ConfirmDialog({
                         <Button variant="outline">Cancel</Button>
                     </DialogClose>
                     <Button
-                        variant="destructive"
+                        variant={confirm.primary ? "default" : "destructive"}
                         onClick={() => {
                             confirm.run();
                             onClose();

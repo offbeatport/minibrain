@@ -3,7 +3,6 @@ import {
     Button,
     Input,
     Label,
-    NumberField,
     Popover,
     PopoverContent,
     PopoverTrigger,
@@ -38,17 +37,19 @@ import {
     duration,
     editModel,
     fakeSha,
+    gradersOf,
     liveVersion,
     modelHref,
     newestFirst,
     pct,
     pendingFeedback,
+    scoredBy,
     shortAgo,
     useFlowState,
     versionHref,
 } from "./modelsFlowData";
 
-type EditKind = "description" | "tags" | "instructions" | "rule" | "safety";
+type EditKind = "description" | "tags" | "instructions" | "safety";
 
 const SAFETY_MODELS = ["Llama Guard 3 1B", "Qwen3Guard 0.6B"];
 const NONE = "none";
@@ -60,17 +61,10 @@ const SCHEMAS: Record<string, string[]> = {
 
 const LABEL_NOUNS: Record<string, string> = { "support-triage": "queues" };
 
-const GRADERS: Record<string, string> = {
-    Classify: "Exact label match",
-    Extract: "Field match, schema",
-    SQL: "Result match · judge",
-};
-
 const EDIT_TITLES: Record<EditKind, string> = {
     description: "Description",
     tags: "Tags",
     instructions: "Instructions",
-    rule: "Promotion rule",
     safety: "Safety model",
 };
 
@@ -149,7 +143,6 @@ function EditForm({
               ? model.instructions
               : model.description,
     );
-    const [floor, setFloor] = useState(Math.round(model.rule[0] * 100));
     const [safety, setSafety] = useState(model.safety ?? NONE);
     const id = `edit-${kind}`;
     const save = () => {
@@ -162,7 +155,6 @@ function EditForm({
                     .filter(Boolean),
             },
             instructions: { instructions: text.trim() },
-            rule: { rule: [floor / 100, model.rule[1]] },
             safety: { safety: safety === NONE ? null : safety },
         };
         editModel(model.slug, edits[kind]);
@@ -172,7 +164,7 @@ function EditForm({
     const hint =
         kind === "tags"
             ? "Separate tags with commas."
-            : kind === "instructions" || kind === "rule"
+            : kind === "instructions"
               ? "Applies to the next version you train and score."
               : kind === "safety"
                 ? "Checks each request and answer; flagged ones are refused."
@@ -186,9 +178,7 @@ function EditForm({
             }}
         >
             <div className="flex flex-col gap-label">
-                <Label htmlFor={id}>
-                    {kind === "rule" ? `${model.metrics[0]} at least` : EDIT_TITLES[kind]}
-                </Label>
+                <Label htmlFor={id}>{EDIT_TITLES[kind]}</Label>
                 {(kind === "description" || kind === "tags") && (
                     <Input
                         id={id}
@@ -204,18 +194,6 @@ function EditForm({
                         rows={5}
                         value={text}
                         onChange={(event) => setText(event.target.value)}
-                    />
-                )}
-                {kind === "rule" && (
-                    <NumberField
-                        id={id}
-                        value={floor}
-                        onValueChange={(value) => setFloor(value ?? floor)}
-                        min={0}
-                        max={100}
-                        step={1}
-                        unit="%"
-                        format={{ maximumFractionDigits: 0 }}
                     />
                 )}
                 {kind === "safety" && (
@@ -461,11 +439,11 @@ export function Details({ model }: { model: FlowModel }) {
                     )}
                 </Row>
                 <Row label="Graders">
-                    <Clipped text={GRADERS[model.task] ?? "Judge"} />
+                    <Clipped text={scoredBy(model)} />
                 </Row>
-                <Row label="Promotion rule" edit={edit("rule")}>
+                <Row label="Promotion rule">
                     <Clipped
-                        text={`${model.metrics[0]} ≥ ${Math.round(model.rule[0] * 100)}%, beats deployed`}
+                        text={`${gradersOf(model)[0]} ≥ ${Math.round(model.rule[0] * 100)}%, beats deployed`}
                     />
                 </Row>
             </Group>

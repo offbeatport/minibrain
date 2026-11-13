@@ -392,10 +392,11 @@ export function FlowAddModelPage() {
         .replace(/^-|-$/g, "");
     const create = (event: FormEvent) => {
         event.preventDefault();
-        const slug = createModel(display, base, identity.avatar);
-        if (dataset) {
-            attachDataset(slug, dataset);
+        if (!dataset) {
+            return;
         }
+        const slug = createModel(display, base, identity.avatar);
+        attachDataset(slug, dataset);
         markVisited("infra-add");
         router.history.push(modelHref(slug));
     };
@@ -433,11 +434,8 @@ export function FlowAddModelPage() {
                     </Link>
                 </fieldset>
                 <fieldset className="flex flex-col gap-label">
-                    <legend className="mb-2 font-medium">
-                        Dataset{" "}
-                        <span className="font-normal text-muted-foreground">· optional</span>
-                    </legend>
-                    <DatasetPicker value={dataset} onChange={setDataset} later />
+                    <legend className="mb-2 font-medium">Dataset</legend>
+                    <DatasetPicker value={dataset} onChange={setDataset} />
                 </fieldset>
                 <NameAvatarField
                     id="add-name"
@@ -450,7 +448,7 @@ export function FlowAddModelPage() {
                     </span>
                 </NameAvatarField>
                 <div>
-                    <Button type="submit" disabled={!identity.name.trim()}>
+                    <Button type="submit" disabled={!identity.name.trim() || !dataset}>
                         Add model
                     </Button>
                 </div>

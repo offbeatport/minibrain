@@ -108,6 +108,8 @@ export type FlowModel = {
     tags: string[];
     instructions: string;
     safety: string | null;
+    judge?: string | null;
+    graders?: string[];
 };
 
 const CLASSIFY: [string, string] = ["Label accuracy", "Macro F1"];
@@ -632,7 +634,10 @@ function complete(model: RawModel, index: number): FlowModel {
         variants: VARIANTS[model.slug] ?? [],
         autopilot: extra?.autopilot ?? null,
         canary: extra?.canary ?? null,
-        recipe: null,
+        recipe:
+            model.versions
+                .filter((version) => version.settings)
+                .sort((a, b) => b.number - a.number)[0]?.settings ?? null,
         pinned: false,
         recent: extra?.recent ?? BASE_RECENT,
         trainAt: 10,
@@ -1701,10 +1706,6 @@ export function setAutopilot(slug: string, autopilot: Autopilot | null) {
     update(slug, (model) => ({ ...model, autopilot }));
 }
 
-export function setRecipe(slug: string, recipe: TrainingSettings) {
-    update(slug, (model) => ({ ...model, recipe }));
-}
-
 export function baseModelSlug(name: string): string {
     const found = state.models.find(
         (model) =>
@@ -2102,8 +2103,75 @@ export function setTrainAt(slug: string, rows: number) {
 }
 
 export type ModelEdit = Partial<
-    Pick<FlowModel, "description" | "tags" | "instructions" | "safety" | "rule" | "avatar">
+    Pick<
+        FlowModel,
+        | "name"
+        | "description"
+        | "tags"
+        | "instructions"
+        | "safety"
+        | "rule"
+        | "avatar"
+        | "judge"
+        | "graders"
+    >
 >;
+
+export const JUDGES = ["Qwen3 8B", "Llama 3.1 70B", "Mistral Small 24B"];
+
+export const GRADER_CHOICES: Record<string, string[]> = {
+    Classify: ["Label accuracy", "Macro F1"],
+    Extract: ["Field accuracy", "Exact match", "Valid JSON"],
+    SQL: ["Result match", "Valid SQL"],
+};
+
+export function gradersOf(model: FlowModel): string[] {
+    return model.graders ?? [...model.metrics];
+}
+
+export function judgeOf(model: FlowModel): string | null {
+    return model.judge === undefined ? (model.task === "SQL" ? "Qwen3 8B" : null) : model.judge;
+}
+
+export function scoredBy(model: FlowModel): string {
+    const judge = judgeOf(model);
+    return `${gradersOf(model).join(", ")}${judge ? ` · judge ${judge}` : ""}`;
+}
+
+export function startRescore(mode: Mode, slug: string): number {
+    const id = newJobId();
+    addJob(mode, {
+        id,
+        kind: "score",
+        model: slug,
+        version: null,
+        status: "running",
+        progress: 0,
+        hoursAgo: 0,
+        atMs: Date.now(),
+        minutes: null,
+    });
+    const timer = window.setInterval(() => rescoreTick(mode, id, timer), TICK_MS);
+    return id;
+}
+
+function rescoreTick(mode: Mode, jobId: number, timer: number) {
+    const job = worlds[mode].jobs.find((item) => item.id === jobId);
+    if (!job || job.status !== "running") {
+        window.clearInterval(timer);
+        return;
+    }
+    const progress = Math.min(1, job.progress + TICK_MS / TRAIN_MS);
+    jobIn(mode, jobId, (item) => ({
+        ...item,
+        progress,
+        status: progress >= 1 ? "done" : "running",
+        minutes: progress >= 1 ? 2 : null,
+    }));
+    if (progress >= 1) {
+        window.clearInterval(timer);
+    }
+}
 
 export function editModel(slug: string, edit: ModelEdit) {
     update(slug, (model) => ({ ...model, ...edit }));
@@ -2894,7 +2962,7 @@ export const KIND_LABELS: Record<VersionKind, string> = {
     prompt: "Baseline",
 };
 
-export const BASELINE_HINT = "Prompt only, not fine-tuned";
+export const BASELINE_HINT = "Untrained: the base with your instructions";
 
 export function versionName(version: {
     number: number;
@@ -2905,7 +2973,14 @@ export function versionName(version: {
 
 export const FLOW = "/proto/flow";
 
-export type ModelTab = "overview" | "versions" | "training" | "monitoring" | "keys" | "variants";
+export type ModelTab =
+    | "overview"
+    | "versions"
+    | "training"
+    | "monitoring"
+    | "keys"
+    | "variants"
+    | "settings";
 
 export function modelHref(slug: string, tab: ModelTab = "overview"): string {
     return `${FLOW}/models/${slug}${tab === "overview" ? "" : `/${tab}`}`;

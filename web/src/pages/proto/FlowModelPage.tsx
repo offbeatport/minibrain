@@ -12,6 +12,7 @@ import { ModelHeader } from "./flowHeader";
 import { KeysTab, TrainingTab, VariantsTab, VersionsTab } from "./flowModelTabs";
 import { ModelMonitoring } from "./flowMonitoring";
 import { useCan } from "./flowOverlays";
+import { SettingsTab } from "./flowSettings";
 import { UsagePanel } from "./flowUsagePanel";
 import {
     type CatalogEntry,
@@ -33,6 +34,7 @@ const TAB_LABELS: Record<ModelTab, string> = {
     monitoring: "Monitoring",
     keys: "API keys",
     variants: "Variants",
+    settings: "Settings",
 };
 
 const ALIASES: Record<string, ModelTab> = { data: "training", api: "keys" };
@@ -100,10 +102,12 @@ function CatalogFacts({ entry, model }: { entry: CatalogEntry | undefined; model
 
 function tabsOf(model: FlowModel, builder: boolean): ModelTab[] {
     if (model.kind === "base") {
-        return ["overview", "variants", "monitoring", "keys"];
+        return builder
+            ? ["overview", "variants", "monitoring", "keys", "settings"]
+            : ["overview", "variants", "monitoring", "keys"];
     }
     return builder
-        ? ["overview", "versions", "training", "monitoring", "keys"]
+        ? ["overview", "versions", "training", "monitoring", "keys", "settings"]
         : ["overview", "versions", "monitoring", "keys"];
 }
 
@@ -215,6 +219,7 @@ export function FlowModelPage() {
                 {tab === "monitoring" && <ModelMonitoring model={model} />}
                 {tab === "keys" && <KeysTab model={model} />}
                 {tab === "variants" && <VariantsTab model={model} />}
+                {tab === "settings" && <SettingsTab key={model.slug} model={model} />}
             </div>
         </Page>
     );

@@ -593,7 +593,7 @@ function Inputs({
             kind === "judge"
                 ? "Judge model Qwen3 8B with the rubric on the Evaluations page"
                 : version.kind === "prompt"
-                  ? `${BASELINE_HINT}, scored only`
+                  ? BASELINE_HINT
                   : "Supervised fine-tuning (SFT)",
         ],
     ];

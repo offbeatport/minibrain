@@ -41,8 +41,11 @@ import {
     deleteVariantFiles,
     deleteVersions,
     deployVariants,
+    gradersOf,
     jobHref,
     jobOfVersion,
+    judgeOf,
+    modelHref,
     newestFirst,
     pct,
     pendingFeedback,
@@ -58,6 +61,38 @@ import {
 } from "./modelsFlowData";
 import { type Confirm, ConfirmDialog } from "./modelsFlowDialogs";
 import { MakeLiveButton, ScoreBadge, Tip, VersionName, openConnect } from "./modelsFlowParts";
+
+function ScoredBy({ model }: { model: FlowModel }) {
+    const can = useCan("builder");
+    const judge = judgeOf(model);
+    return (
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-muted-foreground">
+            <Inline
+                items={[
+                    <span key="graders">
+                        {"Scored by "}
+                        <span className="text-foreground">{gradersOf(model).join(", ")}</span>
+                    </span>,
+                    judge ? (
+                        <span key="judge">
+                            {"judge "}
+                            <span className="text-foreground">{judge}</span>
+                        </span>
+                    ) : null,
+                    can ? (
+                        <Link
+                            key="settings"
+                            href={modelHref(model.slug, "settings")}
+                            className="text-primary hover:underline"
+                        >
+                            Change in Settings
+                        </Link>
+                    ) : null,
+                ]}
+            />
+        </p>
+    );
+}
 
 export function TrainingTab({ model }: { model: FlowModel }) {
     const state = useFlowState();
@@ -102,6 +137,7 @@ export function TrainingTab({ model }: { model: FlowModel }) {
             <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-muted-foreground tabular-nums">
                 <Inline items={facts} />
             </p>
+            <ScoredBy model={model} />
             <PanelSections>
                 <TrainingChart model={model} />
                 <TrainingJobsList scope={model} actions={<TrainButton model={model} />} />
@@ -166,7 +202,7 @@ function VersionRow({
                     <span className="truncate text-sm text-muted-foreground">
                         {settings
                             ? `SFT · ${settings.adapter} r${settings.rank} · data v${version.data.number}`
-                            : `Prompt only · data v${version.data.number}`}
+                            : `Untrained · data v${version.data.number}`}
                     </span>
                 </span>
             </TableCell>
@@ -231,10 +267,7 @@ export function VersionsTab({ model }: { model: FlowModel }) {
         return (
             <PanelSections>
                 <PanelSection icon={History} title="Versions">
-                    <p className="text-muted-foreground">
-                        No versions yet. Attach data on the Data page and v0 Baseline is scored at
-                        once.
-                    </p>
+                    <p className="text-muted-foreground">No versions</p>
                 </PanelSection>
             </PanelSections>
         );
@@ -262,102 +295,107 @@ export function VersionsTab({ model }: { model: FlowModel }) {
             },
         });
     return (
-        <PanelSections>
-            <PanelSection
-                icon={History}
-                title="Versions"
-                actions={
-                    <>
-                        {picked.length > 0 && (
-                            <Button variant="outline" onClick={() => setPicked([])}>
-                                Clear
-                            </Button>
-                        )}
-                        <Tip
-                            tip={
-                                sorted.length === 2
-                                    ? null
-                                    : "Tick two scored versions to compare them."
-                            }
-                        >
-                            <Button
-                                variant="outline"
-                                disabled={sorted.length !== 2}
-                                onClick={() =>
-                                    router.history.push(
-                                        compareHref(model.slug, sorted[0], sorted[1]),
-                                    )
-                                }
-                            >
-                                {sorted.length === 2
-                                    ? `Compare v${sorted[0]} and v${sorted[1]}`
-                                    : "Compare"}
-                            </Button>
-                        </Tip>
-                        {can && (
+        <div className="flex flex-col gap-2">
+            <ScoredBy model={model} />
+            <PanelSections>
+                <PanelSection
+                    icon={History}
+                    title="Versions"
+                    actions={
+                        <>
+                            {picked.length > 0 && (
+                                <Button variant="outline" onClick={() => setPicked([])}>
+                                    Clear
+                                </Button>
+                            )}
                             <Tip
                                 tip={
-                                    picked.length === 0
-                                        ? "Tick the versions to delete."
-                                        : deletable.length === 0
-                                          ? "The deployed version cannot be deleted."
-                                          : null
+                                    sorted.length === 2
+                                        ? null
+                                        : "Tick two scored versions to compare them."
                                 }
                             >
                                 <Button
                                     variant="outline"
-                                    disabled={deletable.length === 0}
-                                    onClick={remove}
-                                >
-                                    {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
-                                </Button>
-                            </Tip>
-                        )}
-                    </>
-                }
-                flush
-            >
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-10 pl-4">
-                                <Checkbox
-                                    aria-label="Select every version"
-                                    checked={every}
-                                    onCheckedChange={(value) =>
-                                        setPicked(
-                                            value === true
-                                                ? ordered.map((version) => version.number)
-                                                : [],
+                                    disabled={sorted.length !== 2}
+                                    onClick={() =>
+                                        router.history.push(
+                                            compareHref(model.slug, sorted[0], sorted[1]),
                                         )
                                     }
+                                >
+                                    {sorted.length === 2
+                                        ? `Compare v${sorted[0]} and v${sorted[1]}`
+                                        : "Compare"}
+                                </Button>
+                            </Tip>
+                            {can && (
+                                <Tip
+                                    tip={
+                                        picked.length === 0
+                                            ? "Tick the versions to delete."
+                                            : deletable.length === 0
+                                              ? "The deployed version cannot be deleted."
+                                              : null
+                                    }
+                                >
+                                    <Button
+                                        variant="outline"
+                                        disabled={deletable.length === 0}
+                                        onClick={remove}
+                                    >
+                                        {deletable.length > 0
+                                            ? `Delete ${deletable.length}`
+                                            : "Delete"}
+                                    </Button>
+                                </Tip>
+                            )}
+                        </>
+                    }
+                    flush
+                >
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="w-10 pl-4">
+                                    <Checkbox
+                                        aria-label="Select every version"
+                                        checked={every}
+                                        onCheckedChange={(value) =>
+                                            setPicked(
+                                                value === true
+                                                    ? ordered.map((version) => version.number)
+                                                    : [],
+                                            )
+                                        }
+                                    />
+                                </TableHead>
+                                <TableHead>Version</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead className="text-right">{gradersOf(model)[0]}</TableHead>
+                                <TableHead>Against deployed</TableHead>
+                                <TableHead>Created</TableHead>
+                                <TableHead className="pr-4">
+                                    <span className="sr-only">Actions</span>
+                                </TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {ordered.map((version) => (
+                                <VersionRow
+                                    key={version.number}
+                                    model={model}
+                                    version={version}
+                                    picked={picked.includes(version.number)}
+                                    onPick={(on) => pick(version.number, on)}
                                 />
-                            </TableHead>
-                            <TableHead>Version</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">{model.metrics[0]}</TableHead>
-                            <TableHead>Against deployed</TableHead>
-                            <TableHead>Created</TableHead>
-                            <TableHead className="pr-4">
-                                <span className="sr-only">Actions</span>
-                            </TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {ordered.map((version) => (
-                            <VersionRow
-                                key={version.number}
-                                model={model}
-                                version={version}
-                                picked={picked.includes(version.number)}
-                                onPick={(on) => pick(version.number, on)}
-                            />
-                        ))}
-                    </TableBody>
-                </Table>
-                <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
-            </PanelSection>
-        </PanelSections>
+                            ))}
+                        </TableBody>
+                    </Table>
+                    <ConfirmDialog confirm={confirm} onClose={() => setConfirm(null)} />
+                </PanelSection>
+            </PanelSections>
+        </div>
     );
 }
 
