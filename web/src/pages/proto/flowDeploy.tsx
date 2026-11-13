@@ -1,18 +1,11 @@
 import { useRouter } from "@tanstack/react-router";
 import {
     Button,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
     Dialog,
     DialogClose,
     DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
     DialogTitle,
     Field,
-    FieldGroup,
     NumberField,
     RadioGroup,
     RadioGroupItem,
@@ -21,10 +14,14 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
     cn,
     useToast,
 } from "obp-ui";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import {
     type PoolFit,
     type Serve,
@@ -43,6 +40,7 @@ import {
     useNow,
 } from "./flowCompute";
 import { startDeploy, startVersionDeploy } from "./flowRollout";
+import { Stat } from "./flowTrainParts";
 import {
     DEFAULT_CONTEXT,
     type FlowModel,
@@ -122,6 +120,15 @@ function samePlacements(model: FlowModel, slots: Slot[]): boolean {
 
 const AUTOMATIC = "automatic";
 
+export const DEPLOY_DIALOG =
+    "flex h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0 sm:h-[min(38rem,calc(100dvh-2rem))] sm:max-w-[56rem]";
+
+const PANEL =
+    "flex min-h-0 flex-1 flex-col gap-field overflow-y-auto overscroll-contain px-5 py-5 sm:px-7";
+
+const OPTION =
+    "flex items-start gap-3 rounded-md border px-3 py-2 has-data-checked:border-primary has-data-checked:bg-accent";
+
 function initialTarget(model: FlowModel): string {
     if (model.kind === "custom") {
         return model.slug;
@@ -189,10 +196,10 @@ function PoolOption({ fit, value }: { fit: PoolFit; value: string }) {
         <label
             htmlFor={id}
             className={cn(
-                "flex items-start gap-3 rounded-md border px-3 py-2",
+                OPTION,
                 disabled
                     ? "cursor-not-allowed text-muted-foreground"
-                    : "cursor-pointer hover:bg-secondary has-data-checked:border-primary has-data-checked:bg-accent",
+                    : "cursor-pointer hover:bg-secondary",
             )}
         >
             <RadioGroupItem id={id} value={value} disabled={disabled} className="mt-1" />
@@ -229,10 +236,9 @@ export function DeployForm({
     const toast = useToast();
     const [target, setTarget] = useState(() => initialTarget(model));
     const [choice, setChoice] = useState(AUTOMATIC);
-    const [picking, setPicking] = useState(false);
     const [replicas, setReplicas] = useState(() => (model.deployed ? liveReplicas(model) : 1));
     const [context, setContext] = useState(DEFAULT_CONTEXT);
-    const [advanced, setAdvanced] = useState(false);
+    const [tab, setTab] = useState("general");
     const custom = model.kind === "custom" && deployable(model).length > 0;
     const [number, setNumber] = useState(() => initial ?? defaultVersion(model, mode));
     const router = useRouter();
@@ -284,156 +290,149 @@ export function DeployForm({
     if (!serve) {
         return null;
     }
+    const general = (
+        <>
+            {custom && (
+                <Field id="deploy-version" label="Version">
+                    <Select
+                        value={String(number)}
+                        onValueChange={(value) => setNumber(Number(value))}
+                    >
+                        <SelectTrigger id="deploy-version" className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {deployable(model).map((item) => (
+                                <SelectItem key={item.number} value={String(item.number)}>
+                                    {versionOption(model, item)}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+            )}
+            {model.kind === "base" && model.variants.length > 1 && (
+                <Field id="deploy-format" label="Format">
+                    <Select value={target} onValueChange={(value) => setTarget(String(value))}>
+                        <SelectTrigger id="deploy-format" className="w-full">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {model.variants.map((item) => (
+                                <SelectItem key={item.id} value={variantKey(model.slug, item.id)}>
+                                    {`${item.format} · ${item.size}${item.live ? " · deployed" : ""}`}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </Field>
+            )}
+            <Field id="deploy-pool" label="Pool">
+                <RadioGroup
+                    id="deploy-pool"
+                    value={choice}
+                    onValueChange={(value) => setChoice(String(value))}
+                    aria-label="Pool"
+                    className="grid gap-2 lg:grid-cols-2"
+                >
+                    <label
+                        htmlFor="deploy-pool-auto"
+                        className={cn(
+                            OPTION,
+                            automatic
+                                ? "cursor-pointer hover:bg-secondary"
+                                : "cursor-not-allowed text-muted-foreground",
+                        )}
+                    >
+                        <RadioGroupItem
+                            id="deploy-pool-auto"
+                            value={AUTOMATIC}
+                            disabled={!automatic}
+                            className="mt-1"
+                        />
+                        <span className="flex min-w-0 flex-col">
+                            <span>Automatic</span>
+                            <span className="text-sm text-muted-foreground">
+                                {automatic ? (
+                                    <span className="font-mono">{automatic.pool.name}</span>
+                                ) : (
+                                    "No pool has room"
+                                )}
+                            </span>
+                        </span>
+                    </label>
+                    {[...serving, ...jobsOnly].map((fit) => (
+                        <PoolOption key={fit.pool.name} fit={fit} value={fit.pool.name} />
+                    ))}
+                </RadioGroup>
+            </Field>
+            <Field
+                id="deploy-replicas"
+                label="Replicas"
+                hint={
+                    chosen
+                        ? `${capacity} ${capacity === 1 ? "fits" : "fit"} in ${chosen.pool.name}`
+                        : undefined
+                }
+            >
+                <NumberField
+                    id="deploy-replicas"
+                    value={count}
+                    onValueChange={(value) => setReplicas(value ?? 1)}
+                    min={1}
+                    max={Math.max(1, capacity)}
+                    step={1}
+                    unit={count === 1 ? "replica" : "replicas"}
+                    format={{ maximumFractionDigits: 0 }}
+                    disabled={capacity <= 1}
+                    className="w-44"
+                />
+            </Field>
+        </>
+    );
+    const rollout =
+        chosen && slots.length > 0
+            ? swap
+                ? `Same base, already loaded on ${joined(slots.map(slotName))}: fetches the v${number} adapter, attaches it, routes ${model.slug} to it and detaches v${model.live} · ~3 s`
+                : deploySummary(model, serve, slots, custom ? number : null)
+            : null;
+    const fit = chosen?.best
+        ? chosen.best.loaded
+            ? "Already loaded"
+            : `${round(chosen.need)} of ${round(chosen.best.free)} free`
+        : "–";
     return (
         <>
-            <DialogHeader>
-                <DialogTitle>{title}</DialogTitle>
-                <DialogDescription>
-                    {`An engine in a pool loads ${serve.label} and keeps it loaded. Calls to ${model.slug} on /v1 route to it.`}
-                </DialogDescription>
-            </DialogHeader>
-            <FieldGroup>
-                {custom && (
-                    <Field
-                        id="deploy-version"
-                        label="Version"
-                        hint={
-                            picked && direction(model, picked)
-                                ? direction(model, picked)
-                                : "The version that answers calls to its API name."
-                        }
+            <header className="border-b py-5 pr-14 pl-5 sm:pl-7">
+                <DialogTitle className="truncate pr-0">{title}</DialogTitle>
+            </header>
+            <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[minmax(0,1fr)_18rem] md:grid-rows-[minmax(0,1fr)]">
+                {serve.cpu ? (
+                    <div className={PANEL}>{general}</div>
+                ) : (
+                    <Tabs
+                        value={tab}
+                        onValueChange={(next) => setTab(String(next))}
+                        className="min-h-0 flex-1 gap-0"
                     >
-                        <Select
-                            value={String(number)}
-                            onValueChange={(value) => setNumber(Number(value))}
-                        >
-                            <SelectTrigger id="deploy-version" className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {deployable(model).map((item) => (
-                                    <SelectItem key={item.number} value={String(item.number)}>
-                                        {versionOption(model, item)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                )}
-                {model.kind === "base" && model.variants.length > 1 && (
-                    <Field id="deploy-format" label="Format">
-                        <Select value={target} onValueChange={(value) => setTarget(String(value))}>
-                            <SelectTrigger id="deploy-format" className="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {model.variants.map((item) => (
-                                    <SelectItem
-                                        key={item.id}
-                                        value={variantKey(model.slug, item.id)}
-                                    >
-                                        {`${item.format} · ${item.size}${item.live ? " · deployed" : ""}`}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </Field>
-                )}
-                <Field id="deploy-pool" label="Pool">
-                    {picking ? (
-                        <RadioGroup
-                            id="deploy-pool"
-                            value={choice}
-                            onValueChange={(value) => setChoice(String(value))}
-                            aria-label="Pool"
-                        >
-                            <label
-                                htmlFor="deploy-pool-auto"
-                                className="flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2 hover:bg-secondary has-data-checked:border-primary has-data-checked:bg-accent"
-                            >
-                                <RadioGroupItem
-                                    id="deploy-pool-auto"
-                                    value={AUTOMATIC}
-                                    disabled={!automatic}
-                                    className="mt-1"
-                                />
-                                <span className="flex flex-col">
-                                    <span>Automatic</span>
-                                    <span className="text-sm text-muted-foreground">
-                                        {automatic
-                                            ? `Picks ${automatic.pool.name}: a pool that allows serving, where it is already loaded or has the most room.`
-                                            : "No pool has room."}
-                                    </span>
-                                </span>
-                            </label>
-                            {[...serving, ...jobsOnly].map((fit) => (
-                                <PoolOption key={fit.pool.name} fit={fit} value={fit.pool.name} />
-                            ))}
-                        </RadioGroup>
-                    ) : (
-                        <div className="flex items-center gap-3 rounded-md border px-3 py-2">
-                            <span className="flex min-w-0 flex-1 flex-col">
-                                <span>
-                                    {choice === AUTOMATIC ? "Automatic" : "Chosen"}
-                                    {chosen && (
-                                        <>
-                                            <span className="text-muted-foreground"> · </span>
-                                            <span className="font-mono">{chosen.pool.name}</span>
-                                        </>
-                                    )}
-                                </span>
-                                <span className="text-sm text-muted-foreground tabular-nums">
-                                    {chosen ? chosen.text : "No pool that allows serving has room."}
-                                </span>
-                            </span>
-                            <Button variant="outline" onClick={() => setPicking(true)}>
-                                Change
-                            </Button>
+                        <div className="border-b px-5 py-3 sm:px-7">
+                            <TabsList aria-label="Settings">
+                                <TabsTrigger value="general">General</TabsTrigger>
+                                <TabsTrigger value="advanced">
+                                    {context === DEFAULT_CONTEXT
+                                        ? "Advanced"
+                                        : "Advanced · 1 changed"}
+                                </TabsTrigger>
+                            </TabsList>
                         </div>
-                    )}
-                </Field>
-                <Field
-                    id="deploy-replicas"
-                    label="Replicas"
-                    hint={
-                        chosen
-                            ? `Each replica takes one ${serve.cpu ? "machine with" : "GPU with"} ${round(chosen.need)} free; ${capacity} ${capacity === 1 ? "fits" : "fit"} in ${chosen.pool.name}.`
-                            : undefined
-                    }
-                >
-                    <NumberField
-                        id="deploy-replicas"
-                        value={count}
-                        onValueChange={(value) => setReplicas(value ?? 1)}
-                        min={1}
-                        max={Math.max(1, capacity)}
-                        step={1}
-                        unit={count === 1 ? "replica" : "replicas"}
-                        format={{ maximumFractionDigits: 0 }}
-                        disabled={capacity <= 1}
-                        className="w-44"
-                    />
-                </Field>
-                {chosen && slots.length > 0 && (
-                    <p className="rounded-md border bg-muted px-3 py-2 tabular-nums">
-                        {swap
-                            ? `Same base, already loaded on ${joined(slots.map(slotName))}: fetches the v${number} adapter, attaches it, routes ${model.slug} to it and detaches v${model.live} · ~3 s`
-                            : deploySummary(model, serve, slots, custom ? number : null)}
-                    </p>
-                )}
-                {!serve.cpu && (
-                    <Collapsible open={advanced} onOpenChange={setAdvanced}>
-                        <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1">
-                            <CollapsibleTrigger>Advanced</CollapsibleTrigger>
-                            <span className="text-sm text-muted-foreground tabular-nums">
-                                {`Context ${context.toLocaleString("en-US")} tokens`}
-                            </span>
-                        </div>
-                        <CollapsibleContent className="pt-4">
+                        <TabsContent value="general" className={PANEL}>
+                            {general}
+                        </TabsContent>
+                        <TabsContent value="advanced" className={PANEL}>
                             <Field
                                 id="deploy-context"
                                 label="Context length"
-                                hint="The longest prompt plus answer each request may use. Longer contexts reserve more GPU memory for the KV cache, which the pool estimate above does not count."
+                                hint="Longer contexts reserve GPU memory the fit does not count"
                             >
                                 <Select
                                     value={String(context)}
@@ -445,36 +444,84 @@ export function DeployForm({
                                     <SelectContent>
                                         {[DEFAULT_CONTEXT, 16384, LONG_CONTEXT].map((value) => (
                                             <SelectItem key={value} value={String(value)}>
-                                                {`${value.toLocaleString("en-US")} tokens`}
+                                                {tokens(value)}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </Field>
-                        </CollapsibleContent>
-                    </Collapsible>
+                        </TabsContent>
+                    </Tabs>
                 )}
-            </FieldGroup>
-            <DialogFooter>
-                <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button
-                    onClick={submit}
-                    disabled={
-                        !chosen ||
-                        slots.length === 0 ||
-                        (mode === "version" && number === model.live)
-                    }
+                <aside
+                    aria-label="Rollout"
+                    className="flex shrink-0 flex-col gap-4 border-t bg-muted px-5 py-4 sm:px-6 md:gap-5 md:border-t-0 md:border-l md:py-5"
                 >
-                    {mode === "change" && !swap && number === model.live
-                        ? "Move"
-                        : custom
-                          ? `Deploy v${number}`
-                          : "Deploy"}
-                </Button>
-            </DialogFooter>
+                    <Rollout text={rollout} delta={picked ? direction(model, picked) : ""}>
+                        {custom && <Stat label="Version">{`v${number}`}</Stat>}
+                        <Stat label="Pool">
+                            <span className="font-mono">{chosen?.pool.name ?? "–"}</span>
+                        </Stat>
+                        <Stat label="Replicas">
+                            {chosen ? `${slots.length} of ${capacity}` : "–"}
+                        </Stat>
+                        <Stat label="Memory">{fit}</Stat>
+                        {!serve.cpu && <Stat label="Context">{tokens(context)}</Stat>}
+                    </Rollout>
+                    <div className="mt-auto flex gap-2">
+                        <DialogClose asChild>
+                            <Button variant="outline">Cancel</Button>
+                        </DialogClose>
+                        <Button
+                            className="flex-1"
+                            onClick={submit}
+                            disabled={
+                                !chosen ||
+                                slots.length === 0 ||
+                                (mode === "version" && number === model.live)
+                            }
+                        >
+                            {mode === "change" && !swap && number === model.live
+                                ? "Move"
+                                : custom
+                                  ? `Deploy v${number}`
+                                  : "Deploy"}
+                        </Button>
+                    </div>
+                </aside>
+            </div>
         </>
+    );
+}
+
+function tokens(value: number): string {
+    return `${value.toLocaleString("en-US")} tokens`;
+}
+
+function Rollout({
+    text,
+    delta,
+    children,
+}: {
+    text: string | null;
+    delta: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="flex flex-col gap-4">
+            <div aria-live="polite" className="flex flex-col gap-1">
+                <span className="text-muted-foreground">Rollout</span>
+                {text ? (
+                    <p className="tabular-nums">{text}</p>
+                ) : (
+                    <p className="text-destructive">No pool that allows serving has room</p>
+                )}
+                {delta && (
+                    <span className="text-sm text-muted-foreground tabular-nums">{delta}</span>
+                )}
+            </div>
+            <dl className="hidden flex-col gap-2.5 border-t pt-4 md:flex">{children}</dl>
+        </div>
     );
 }
 
@@ -491,7 +538,7 @@ export function DeployDialog({
 }) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-xl [&>*]:min-w-0">
+            <DialogContent className={DEPLOY_DIALOG}>
                 {open && (
                     <DeployForm model={model} mode={mode} onClose={() => onOpenChange(false)} />
                 )}

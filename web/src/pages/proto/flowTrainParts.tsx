@@ -437,3 +437,12 @@ export function dataText(t: Trainer): string {
     }
     return `${t.dataset.slug} v${t.pick.number} · ${count(t.plan.rows)} rows`;
 }
+
+export function Stat({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="flex items-baseline justify-between gap-3">
+            <dt className="text-muted-foreground">{label}</dt>
+            <dd className="min-w-0 truncate text-right tabular-nums">{children}</dd>
+        </div>
+    );
+}

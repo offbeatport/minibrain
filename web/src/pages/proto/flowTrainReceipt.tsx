@@ -2,24 +2,25 @@ import { Cpu, Database, Gauge, Gem, type LucideIcon, Scale, Server, Zap } from "
 import {
     Badge,
     Button,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
     DialogClose,
     Label,
     RadioGroup,
     RadioGroupItem,
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
     cn,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { count } from "~/lib/format";
-import { Advanced } from "./flowTrainAdvanced";
+import { ComputeFields, DataFields, FieldGrid, QualityFields } from "./flowTrainAdvanced";
 import {
-    CustomNote,
     FOCUS_RING,
     HeldOutNote,
     MemoryTrack,
     Reason,
+    Stat,
     TrainButton,
     bestOf,
     memoryText,
@@ -36,7 +37,7 @@ import {
     hoursUnit,
     presetRecipe,
 } from "./flowTrainPlan";
-import { type Trainer, labelOf } from "./flowTrainState";
+import type { Trainer } from "./flowTrainState";
 import { shortAgo } from "./modelsFlowData";
 
 type Card<T extends string> = {
@@ -146,8 +147,7 @@ function plural(amount: number, word: string): string {
     return `${amount} ${word}${amount === 1 ? "" : "s"}`;
 }
 
-function Choices({ t }: { t: Trainer }) {
-    const [advanced, setAdvanced] = useState(false);
+function General({ t }: { t: Trainer }) {
     const auto = bestOf(t.plan, "auto");
     const qualityCards = QUALITIES.map((item) => {
         const preset = presetRecipe(item.id);
@@ -196,8 +196,8 @@ function Choices({ t }: { t: Trainer }) {
         })),
     ];
     return (
-        <div className="flex flex-col gap-5 px-5 py-5 sm:px-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain">
-            <Section id="train-quality" label="Quality" aside={<CustomNote t={t} />}>
+        <>
+            <Section id="train-quality" label="Quality">
                 <Cards<Quality>
                     label="Quality"
                     value={t.quality}
@@ -232,27 +232,65 @@ function Choices({ t }: { t: Trainer }) {
                     className="sm:grid-cols-4"
                 />
             </Section>
-            <Collapsible open={advanced} onOpenChange={setAdvanced} className="border-t pt-4">
-                <div className="flex items-center gap-3">
-                    <CollapsibleTrigger>Advanced</CollapsibleTrigger>
-                    <span className="text-sm text-muted-foreground">
-                        {t.quality ? labelOf(t.quality) : `${t.changed} changed`}
-                    </span>
-                </div>
-                <CollapsibleContent className="pt-4">
-                    <Advanced t={t} />
-                </CollapsibleContent>
-            </Collapsible>
-        </div>
+        </>
     );
 }
 
-function Stat({ label, children }: { label: string; children: ReactNode }) {
+function AdvancedGroups({ t }: { t: Trainer }) {
     return (
-        <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="min-w-0 truncate text-right tabular-nums">{children}</dd>
-        </div>
+        <>
+            <Section id="train-advanced-quality" label="Quality">
+                <FieldGrid>
+                    <QualityFields t={t} />
+                </FieldGrid>
+            </Section>
+            <Section id="train-advanced-data" label="Data">
+                <FieldGrid>
+                    <DataFields t={t} />
+                </FieldGrid>
+            </Section>
+            <Section id="train-advanced-compute" label="Compute">
+                <FieldGrid>
+                    <ComputeFields t={t} />
+                </FieldGrid>
+            </Section>
+        </>
+    );
+}
+
+type Tab = "general" | "advanced";
+
+const PANEL =
+    "flex min-h-0 flex-1 flex-col gap-field overflow-y-auto overscroll-contain px-5 py-5 sm:px-7";
+
+function Settings({ t }: { t: Trainer }) {
+    const [tab, setTab] = useState<Tab>("general");
+    return (
+        <Tabs
+            value={tab}
+            onValueChange={(next) => setTab(next as Tab)}
+            className="min-h-0 flex-1 gap-0"
+        >
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-5 py-3 sm:px-7">
+                <TabsList aria-label="Settings">
+                    <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="advanced" className="tabular-nums">
+                        {t.changed > 0 ? `Advanced · ${t.changed} changed` : "Advanced"}
+                    </TabsTrigger>
+                </TabsList>
+                {t.changed > 0 && (
+                    <Button type="button" variant="ghost" onClick={t.reset}>
+                        Reset
+                    </Button>
+                )}
+            </div>
+            <TabsContent value="general" className={PANEL}>
+                <General t={t} />
+            </TabsContent>
+            <TabsContent value="advanced" className={PANEL}>
+                <AdvancedGroups t={t} />
+            </TabsContent>
+        </Tabs>
     );
 }
 
@@ -271,11 +309,13 @@ function Receipt({ t }: { t: Trainer }) {
             <div aria-live="polite" className="flex flex-col gap-1">
                 <span className="text-muted-foreground">Estimate</span>
                 {pick ? (
-                    <span className="text-3xl font-medium tabular-nums">
+                    <span className="text-2xl font-medium md:text-3xl tabular-nums">
                         {approx(pick.minutes)}
                     </span>
                 ) : (
-                    <span className="text-3xl font-medium text-muted-foreground">–</span>
+                    <span className="text-2xl font-medium md:text-3xl text-muted-foreground">
+                        –
+                    </span>
                 )}
                 {t.blocker ? (
                     <>
@@ -294,7 +334,15 @@ function Receipt({ t }: { t: Trainer }) {
                     )
                 )}
             </div>
-            <dl className="flex flex-col gap-2.5 border-t pt-4">
+            <p className="text-sm text-muted-foreground tabular-nums md:hidden">
+                {[
+                    pick ? `${computeHours(pick)} ${hoursUnit(pick)}` : null,
+                    shown && option ? memoryText(option, shown.machine) : null,
+                ]
+                    .filter(Boolean)
+                    .join(" · ")}
+            </p>
+            <dl className="hidden flex-col gap-2.5 border-t pt-4 md:flex">
                 <Stat label={pick ? hoursUnit(pick) : "GPU-hours"}>
                     {pick ? computeHours(pick) : "–"}
                 </Stat>
@@ -323,11 +371,11 @@ function Receipt({ t }: { t: Trainer }) {
 
 export function TrainReceipt({ t }: { t: Trainer }) {
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain md:grid md:grid-cols-[minmax(0,1fr)_17rem] md:overflow-hidden">
-            <Choices t={t} />
+        <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[minmax(0,1fr)_17rem] md:grid-rows-[minmax(0,1fr)]">
+            <Settings t={t} />
             <aside
                 aria-label="Estimate"
-                className="flex flex-col gap-5 border-t bg-muted px-5 py-5 sm:px-6 md:border-t-0 md:border-l"
+                className="flex shrink-0 flex-col gap-3 border-t bg-muted px-5 py-4 sm:px-6 md:gap-5 md:border-t-0 md:border-l md:py-5"
             >
                 <Receipt t={t} />
                 <div className="mt-auto flex gap-2">

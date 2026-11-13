@@ -10,21 +10,21 @@ import { type FlowModel, useFlowState } from "./modelsFlowData";
 
 type Variant = "A" | "B" | "C";
 
-const VARIANT_KEY = "minibrain.proto.flow.trainVariant";
+const VARIANT_KEY = "minibrain.proto.flow.trainVariant.v2";
 const VARIANTS: Variant[] = ["A", "B", "C"];
 
 const WIDTH: Record<Variant, string> = {
     A: "sm:max-w-[36rem]",
     B: "sm:max-w-[48rem]",
-    C: "sm:max-w-[62rem]",
+    C: "h-[calc(100dvh-2rem)] sm:h-[min(40rem,calc(100dvh-2rem))] sm:max-w-[62rem]",
 };
 
 function readVariant(): Variant {
     try {
         const stored = window.localStorage.getItem(VARIANT_KEY);
-        return VARIANTS.find((item) => item === stored) ?? "A";
+        return VARIANTS.find((item) => item === stored) ?? "C";
     } catch {
-        return "A";
+        return "C";
     }
 }
 

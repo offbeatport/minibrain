@@ -23,7 +23,7 @@ import { PublisherLogo } from "~/components/PublisherLogo";
 import { AvatarTile } from "~/components/avatar/AvatarTile";
 import { choiceFor } from "~/components/avatar/avatarSvg";
 import { StatusText } from "~/components/models/StatusText";
-import { DeployForm, direction } from "./flowDeploy";
+import { DEPLOY_DIALOG, DeployForm, direction } from "./flowDeploy";
 import { useCan } from "./flowOverlays";
 import { startVersionDeploy } from "./flowRollout";
 import {
@@ -413,7 +413,7 @@ export function IntentDialogs() {
                         ? "sm:max-w-4xl"
                         : model?.deployed
                           ? "sm:max-w-lg"
-                          : "sm:max-w-xl [&>*]:min-w-0"
+                          : DEPLOY_DIALOG
                 }
             >
                 {intent?.kind === "make-live" && model && version && model.deployed && (
