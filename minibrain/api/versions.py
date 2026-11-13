@@ -32,6 +32,7 @@ from minibrain.gateway.errors import OpenAIError
 from minibrain.jobs.queue import enqueue
 from minibrain.jobs.specs import eval_params, train_params
 from minibrain.ml.completion import Completion
+from minibrain.ml.planner import Plan
 from minibrain.models.health import base_changed
 from minibrain.models.registry import base_hash, base_readiness, require_usable
 from minibrain.models.usage import touch
@@ -89,6 +90,7 @@ def start_version(
     dataset_version: DatasetVersion | None,
     recipe: dict[str, Any] | None = None,
     breaking: bool = False,
+    pool: str | None = None,
 ) -> Version:
     version = new_version(session, store, model, kind, dataset_version, recipe, breaking)
     audit_version(
@@ -104,7 +106,7 @@ def start_version(
     if kind == VersionKind.LORA:
         version.base_hash = base_hash(session, version.base_model)
         params = train_params(session, settings, version)
-        enqueue(session, JobKind.TRAIN, params, model.id, version.id, f"train:{version.id}")
+        enqueue(session, JobKind.TRAIN, params, model.id, version.id, f"train:{version.id}", pool=pool)
     elif version.status == VersionStatus.EVALUATING:
         if base_readiness(session, version.base_model) != "ready":
             version.status = VersionStatus.READY
@@ -112,6 +114,14 @@ def start_version(
         params = eval_params(session, settings, version)
         enqueue(session, JobKind.EVAL, params, model.id, version.id, f"eval:{version.id}")
     return version
+
+
+def job_pool(body: VersionCreate, found: Plan) -> str | None:
+    if body.pool is not None:
+        return body.pool
+    if body.machine is not None and found.machine is not None:
+        return found.machine.pool
+    return None
 
 
 def save_instructions(session: Session, model: Model, instructions: str | None) -> None:
@@ -219,11 +229,13 @@ def add_version(
     dataset_version = training_dataset_version(session, settings, model, body.dataset_version_id)
     require_splits(dataset_version)
     recipe: dict[str, Any] = {}
+    pool: str | None = None
     if kind == VersionKind.LORA:
         found, _ = training_plan(session, settings, node, model, dataset_version, body)
         refuse(found)
         recipe = found.recipe()
-    version = start_version(session, settings, store, model, kind, dataset_version, recipe, body.breaking)
+        pool = job_pool(body, found)
+    version = start_version(session, settings, store, model, kind, dataset_version, recipe, body.breaking, pool)
     session.commit()
     return version_info(model, version)
 

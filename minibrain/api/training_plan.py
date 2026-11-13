@@ -33,7 +33,7 @@ from minibrain.ml.planner import (
 )
 from minibrain.models.hardware import NodeReport
 from minibrain.models.train_facts import base_facts, catalogue_base, longest_example, trainer_machines
-from minibrain.registry.compute import pools
+from minibrain.registry.compute import pool_label, pools
 from minibrain.registry.files import dataset_version_location, store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -102,7 +102,8 @@ def training_plan(
     rows, longest = longest_example(location, chosen.max_rows)
     machines = trainer_machines(pools(session, node))
     try:
-        return plan(model_base(session, settings, model), machines, chosen, longest, rows, body.machine), longest
+        found = plan(model_base(session, settings, model), machines, chosen, longest, rows, body.machine, body.pool)
+        return found, longest
     except PlanError as error:
         raise ConflictError(str(error)) from error
 
@@ -168,6 +169,7 @@ def machine_info(found: Plan, picked: Machine | None, held_out: int) -> MachineP
     return MachinePlanInfo(
         name=machine.name,
         pool=machine.pool,
+        pool_label=pool_label(machine.pool),
         kind=machine.kind,
         memory_label=machine.memory_label,
         available_bytes=machine.available_bytes,
@@ -246,7 +248,7 @@ def get_training_plan(
     found, longest = training_plan(session, settings, node, model, dataset_version, query)
     default = found
     if found.settings.overrides():
-        plain = TrainingSettings(machine=query.machine)
+        plain = TrainingSettings(machine=query.machine, pool=query.pool)
         default, _ = training_plan(session, settings, node, model, dataset_version, plain)
     return plan_info(found, default, longest, held_out_rows(dataset_version), queue_info(session))
 

@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.jobs.output import EVENT, STATE
 from minibrain.jobs.policy import LEASE, backoff, policy
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.models import (
     FINAL_JOB_STATUSES,
     AttemptOutcome,
@@ -75,6 +76,7 @@ class WorkerInfo:
     host: str
     kinds: list[str] = field(default_factory=list)
     gpus: int = 1
+    pool: str = LOCAL_POOL
 
 
 def add_event(
@@ -107,6 +109,7 @@ def enqueue(
     priority: int = 0,
     retry_of: int | None = None,
     base_model_id: str | None = None,
+    pool: str | None = None,
 ) -> Job:
     if idempotency_key is not None:
         existing = session.scalar(
@@ -135,6 +138,7 @@ def enqueue(
         idempotency_key=idempotency_key,
         priority=priority,
         retry_of=retry_of,
+        pool=pool,
         outputs={},
     )
     session.add(job)
@@ -208,7 +212,10 @@ class SqlJobQueue:
                 )
             )
             candidate = select(Job.id).where(
-                Job.status == JobStatus.QUEUED, Job.run_after <= moment, Job.kind.in_(worker.kinds)
+                Job.status == JobStatus.QUEUED,
+                Job.run_after <= moment,
+                Job.kind.in_(worker.kinds),
+                or_(Job.pool.is_(None), Job.pool == worker.pool),
             )
             if (busy or 0) >= worker.gpus:
                 candidate = candidate.where(Job.needs_gpu.is_(False))
@@ -405,6 +412,7 @@ class SqlJobQueue:
             priority=job.priority,
             retry_of=job.id,
             base_model_id=job.base_model_id,
+            pool=job.pool,
         )
         self.effects.on_retry(session, again)
         return again

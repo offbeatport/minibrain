@@ -52,7 +52,7 @@ class WorkerBody(pydantic.BaseModel):
     hardware: dict[str, Any] = Field(default_factory=dict)
 
     def info(self) -> WorkerInfo:
-        return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus)
+        return WorkerInfo(id=self.id, host=self.host, kinds=self.kinds, gpus=self.gpus, pool=self.pool)
 
 
 class ClaimRequest(pydantic.BaseModel):

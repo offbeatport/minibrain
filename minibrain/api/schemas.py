@@ -936,6 +936,7 @@ class TrainingSettings(BaseModel):
     )
     seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
     machine: str | None = Field(default=None, description="Plan for this training machine, by name.")
+    pool: str | None = Field(default=None, description="Plan within this pool; the job runs only on its workers.")
 
 
 class VersionCreate(TrainingSettings):
@@ -988,6 +989,7 @@ class TrainingDefaults(BaseModel):
 class MachinePlanInfo(BaseModel):
     name: str
     pool: str
+    pool_label: str
     kind: str
     memory_label: str
     available_bytes: int | None

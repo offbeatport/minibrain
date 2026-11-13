@@ -119,8 +119,8 @@ class Harness:
         headers = {"Authorization": f"Bearer {self.token}"}
         return self.client.post(f"/internal/worker{path}", json=body, headers=headers)
 
-    def claim(self, kinds: list[str], worker_id: str = "test-worker") -> dict[str, Any] | None:
-        worker = {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1}
+    def claim(self, kinds: list[str], worker_id: str = "test-worker", pool: str = "local") -> dict[str, Any] | None:
+        worker = {"id": worker_id, "host": "test", "kinds": kinds, "gpus": 1, "pool": pool}
         body = {"worker": worker, "wait": 0}
         response = self.internal("/claim", body)
         return None if response.status_code == 204 else response.json()

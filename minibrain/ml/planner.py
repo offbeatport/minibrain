@@ -575,17 +575,21 @@ def plan(
     longest_tokens: int,
     rows: int | None = None,
     machine: str | None = None,
+    pool: str | None = None,
 ) -> Plan:
     validate(base, settings)
     seq = seq_len_for(base, settings, longest_tokens)
     count = min(rows if rows is not None else settings.max_rows, settings.max_rows)
     plans = [plan_of(base, item, settings, seq, count) for item in machines]
+    allowed = [found for found in plans if pool is None or (found.machine is not None and found.machine.pool == pool)]
+    if pool is not None and not allowed:
+        raise PlanError(f"No training machine in the {pool} pool")
     if machine is not None:
-        pinned = next((found for found in plans if found.machine is not None and found.machine.name == machine), None)
+        pinned = next((found for found in allowed if found.machine is not None and found.machine.name == machine), None)
         if pinned is None:
-            raise PlanError(f"No training machine called {machine}")
+            raise PlanError(f"No training machine called {machine}{f' in the {pool} pool' if pool else ''}")
         return replace(pinned, machines=plans)
-    found = fastest_plan(plans)
+    found = fastest_plan(allowed)
     if found is None:
         return Plan(base, None, settings, seq, count, None, [], machines=plans)
     return replace(found, machines=plans)

@@ -6178,6 +6178,8 @@ export interface components {
             name: string;
             /** Pool */
             pool: string;
+            /** Pool Label */
+            pool_label: string;
             /** Kind */
             kind: string;
             /** Memory Label */
@@ -8982,6 +8984,11 @@ export interface components {
              * @description Plan for this training machine, by name.
              */
             machine?: string | null;
+            /**
+             * Pool
+             * @description Plan within this pool; the job runs only on its workers.
+             */
+            pool?: string | null;
             /**
              * Kind
              * @enum {string}
@@ -13736,6 +13743,8 @@ export interface operations {
                 seed?: number | null;
                 /** @description Plan for this training machine, by name. */
                 machine?: string | null;
+                /** @description Plan within this pool; the job runs only on its workers. */
+                pool?: string | null;
                 dataset_version_id?: number | null;
             };
             header?: never;

@@ -6721,6 +6721,24 @@
             "description": "Plan for this training machine, by name."
           },
           {
+            "name": "pool",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Plan within this pool; the job runs only on its workers.",
+              "title": "Pool"
+            },
+            "description": "Plan within this pool; the job runs only on its workers."
+          },
+          {
             "name": "dataset_version_id",
             "in": "query",
             "required": false,
@@ -20348,6 +20366,10 @@
             "type": "string",
             "title": "Pool"
           },
+          "pool_label": {
+            "type": "string",
+            "title": "Pool Label"
+          },
           "kind": {
             "type": "string",
             "title": "Kind"
@@ -20433,6 +20455,7 @@
         "required": [
           "name",
           "pool",
+          "pool_label",
           "kind",
           "memory_label",
           "available_bytes",
@@ -29008,6 +29031,18 @@
             ],
             "title": "Machine",
             "description": "Plan for this training machine, by name."
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "Plan within this pool; the job runs only on its workers."
           },
           "kind": {
             "type": "string",

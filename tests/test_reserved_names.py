@@ -4,7 +4,7 @@ from typing import Any
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, insert, select
 from sqlalchemy.orm import sessionmaker
 
 from minibrain.gateway.logs import LogEntry, database_sink
@@ -202,11 +202,17 @@ def test_the_migration_reserves_names_that_history_still_mentions(tmp_path: Path
         kept = Model(slug="kept", name="Kept", preset="general", base_model="tiny")
         session.add(kept)
         session.flush()
+        done = {"kind": "train", "status": "succeeded"}
+        session.execute(
+            insert(Job),
+            [
+                done | {"created_at": seen, "model_slug": "gone", "model_name": "Gone"},
+                done | {"kind": "download", "created_at": seen, "base_model_key": "tiny"},
+                done | {"model_id": kept.id, "model_slug": "kept", "model_name": "Kept"},
+            ],
+        )
         session.add_all(
             [
-                Job(kind="train", status="succeeded", created_at=seen, model_slug="gone", model_name="Gone"),
-                Job(kind="download", status="succeeded", created_at=seen, base_model_key="tiny"),
-                Job(kind="train", status="succeeded", model_id=kept.id, model_slug="kept", model_name="Kept"),
                 RequestLog(at=seen, model="older", status=200, latency_ms=1.0, model_slug="older", model_name="Older"),
                 RequestLog(at=seen, model="old-base", status=200, latency_ms=1.0, model_name="Old base"),
                 RequestLog(at=seen, model="typo", status=404, latency_ms=1.0),

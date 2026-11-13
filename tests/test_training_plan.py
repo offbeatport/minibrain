@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -182,13 +183,13 @@ def worker_hardware(memory: int | None, accelerator: str = "cuda", libraries: tu
     return report.as_dict()
 
 
-def register(harness: Harness, hardware: dict[str, Any], host: str = "gpu-box") -> None:
+def register(harness: Harness, hardware: dict[str, Any], host: str = "gpu-box", pool: str = "local") -> None:
     body = {
         "id": f"worker-{host}",
         "host": host,
         "kinds": ["train", "eval"],
         "gpus": 1,
-        "pool": "local",
+        "pool": pool,
         "hardware": hardware,
     }
     assert harness.internal("/register", body).status_code == 204
@@ -382,6 +383,20 @@ def test_every_trainer_machine_is_planned_and_one_can_be_pinned() -> None:
         plan(eight, [A100], Settings(), 160, 3000, "H100")
 
 
+def test_a_pool_limits_the_machines_the_plan_chooses_from() -> None:
+    eight = base("qwen3-8b")
+    mac = replace(M1_PRO, pool="desk")
+    a100 = replace(A100, pool="gpu-pool")
+    found = plan(eight, [mac, a100], Settings(), 160, 3000, pool="desk")
+    assert (found.machine, found.chosen) == (mac, None)
+    assert [item.machine for item in found.machines] == [mac, a100]
+    assert plan(eight, [mac, a100], Settings(), 160, 3000, pool="gpu-pool").machine == a100
+    with pytest.raises(PlanError, match="No training machine called A100 80GB in the desk pool"):
+        plan(eight, [mac, a100], Settings(), 160, 3000, "A100 80GB", "desk")
+    with pytest.raises(PlanError, match="No training machine in the cloud pool"):
+        plan(eight, [mac, a100], Settings(), 160, 3000, pool="cloud")
+
+
 def test_alpha_accumulation_scoring_and_seed_reach_the_recipe() -> None:
     plain = plan(base("qwen3-0.6b"), [RTX_4090], Settings(rank=8), 160, 3000).recipe()
     assert (plain["alpha"], plain["seed"], plain["grad_accum"]) == (16, 7, 2)
@@ -460,3 +475,35 @@ def test_training_plan_lists_every_machine_the_time_and_the_queue(harness: Harne
     claim = harness.claim(["train"])
     assert claim is not None
     assert claim["params"]["recipe"]["seed"] == 5
+
+
+def test_a_pool_reaches_the_job_and_only_its_workers_claim_it(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    register(harness, worker_hardware(48 * GIB, libraries=("bitsandbytes",)), host="gpu-a10-1", pool="gpu-pool")
+    url = f"/api/models/{SLUG}/training-plan"
+    local = harness.client.get(url, params={"pool": "local"}).json()
+    assert (local["level"], local["machine"]) == ("fits", "Test GPU on gpu-box")
+    pooled = harness.client.get(url, params={"pool": "gpu-pool"}).json()
+    assert pooled["machine"] == "Test GPU on gpu-a10-1"
+    labels = {item["pool"]: item["pool_label"] for item in pooled["machines"]}
+    assert labels == {"local": "This machine", "gpu-pool": "gpu-pool"}
+    missing = harness.client.get(url, params={"pool": "cloud"})
+    assert (missing.status_code, missing.json()["detail"]) == (409, "No training machine in the cloud pool")
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "lora", "pool": "gpu-pool"})
+    assert version.status_code == 201, version.text
+    assert harness.claim(["train"]) is None
+    claim = harness.claim(["train"], worker_id="worker-gpu-a10-1", pool="gpu-pool")
+    assert claim is not None
+    assert claim["job_id"] == version.json()["job"]["id"]
+
+
+def test_a_pinned_machine_holds_the_job_to_its_pool(harness: Harness) -> None:
+    create_with_dataset(harness)
+    register(harness, worker_hardware(24 * GIB, libraries=("bitsandbytes",)))
+    register(harness, worker_hardware(48 * GIB, libraries=("bitsandbytes",)), host="gpu-a10-1", pool="gpu-pool")
+    body = {"kind": "lora", "machine": "Test GPU on gpu-a10-1"}
+    version = harness.client.post(f"/api/models/{SLUG}/versions", json=body)
+    assert version.status_code == 201, version.text
+    assert harness.claim(["train"]) is None
+    assert harness.claim(["train"], worker_id="worker-gpu-a10-1", pool="gpu-pool") is not None
