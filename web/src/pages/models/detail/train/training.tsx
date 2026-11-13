@@ -75,7 +75,7 @@ export function TrainingCard({ run }: { run: TrainRun }) {
                         <label htmlFor="train-quality">Training</label>
                     </h2>
                     <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-                        <div className="w-full sm:w-52">
+                        <div className="w-full sm:w-64">
                             <PresetSelect run={run} />
                         </div>
                         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">

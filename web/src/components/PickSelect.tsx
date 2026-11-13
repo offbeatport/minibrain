@@ -54,7 +54,7 @@ export function PickSelect({
                 aria-invalid={invalid || undefined}
                 className={cn(
                     "w-full",
-                    large && "h-10 px-3",
+                    large && "h-auto min-h-12 px-3 py-1.5",
                     compact ? "[&_[data-pick-meta]]:hidden" : "max-sm:[&_[data-pick-meta]]:hidden",
                 )}
             >
@@ -65,7 +65,14 @@ export function PickSelect({
                                 {selected.icon}
                             </span>
                         )}
-                        <span className="truncate">{selected.label}</span>
+                        <span className="flex min-w-0 flex-col items-start text-left">
+                            <span className="truncate">{selected.label}</span>
+                            {selected.description && (
+                                <span className="truncate text-sm text-muted-foreground">
+                                    {selected.description}
+                                </span>
+                            )}
+                        </span>
                     </span>
                 ) : (
                     <SelectValue placeholder={placeholder} />

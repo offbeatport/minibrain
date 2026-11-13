@@ -691,6 +691,16 @@ from. They have different endpoints and keys, so they are configured apart.
   version. There is no per-model default recipe (2026-11-13).
 - The teacher can be a base model too: LoRA on the large model when prompting gets close but stays inconsistent
   (QLoRA keeps it on one GPU).
+- Training from code (2026-11-13): retraining on a schedule or on new data, CI gates ("train, score, block the merge
+  if the score drops"), parameter sweeps, one model per customer or region, and pipelines (Airflow, Dagster) all start
+  runs without the UI. Three ways in:
+  - **API**: `POST /api/models/{name}/versions` documented and stable, callable with a builder API key, not only the
+    browser session; the same body as the Train page (method, dataset version, preset or parameters, pool,
+    instructions), returning the version and its job. `GET` the job to wait.
+  - **CLI**: `minibrain train <model> [--preset balanced] [--data v12] [--pool gpu-pool] [--from v3] [--wait]`, and
+    `minibrain deploy <model> v<n>`; exit code non-zero when the run fails or scores below the promotion rule, for CI.
+  - **Rules instead of scripts**: per model, in Settings: "Train when a new dataset version is saved" and "Deploy when
+    the new version passes the promotion rule", each run a job with the rule as its reason in Activity.
 
 ### Training memory
 
