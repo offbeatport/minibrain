@@ -59,7 +59,14 @@ export function jobHref(job: { id: number; kind: string }): string {
     return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
-export type ModelTab = "overview" | "versions" | "training" | "monitoring" | "api" | "files";
+export type ModelTab =
+    | "overview"
+    | "versions"
+    | "training"
+    | "monitoring"
+    | "api"
+    | "settings"
+    | "files";
 
 export function modelPageHref(name: string, tab: ModelTab = "overview"): string {
     const page = `/models/${encodeURIComponent(name)}`;

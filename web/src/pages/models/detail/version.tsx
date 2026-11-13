@@ -63,7 +63,14 @@ import {
 import { bytes, relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { CompactHeader, Crumbs, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
-import { MakeLiveDialog, canGoLive, liveBlock, liveOf, points, versionLabel } from "./makeLive";
+import {
+    DeployVersionDialog,
+    canGoLive,
+    liveBlock,
+    liveOf,
+    points,
+    versionLabel,
+} from "./makeLive";
 import { VersionStatus } from "./versions";
 
 export function useAnswers(slug: string, number: number, against: number | null, enabled: boolean) {
@@ -144,7 +151,7 @@ function ScoreSection({
         <PanelSection
             icon={Gauge}
             title="Score"
-            description={`${metricName(version.main_metric)} on ${count(held)} held-out rows it never trained on.`}
+            tip={`${metricName(version.main_metric)} on ${count(held)} held-out rows it never trained on.`}
         >
             <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
                 <span className="text-3xl tabular-nums">{percent(version.score)}</span>
@@ -269,7 +276,7 @@ function Differs({
         <PanelSection
             icon={GitCompare}
             title="Where it differs"
-            description={`Against ${reference.label}, on ${count(all.length)} held-out rows.`}
+            tip={`Against ${reference.label}, on ${count(all.length)} held-out rows.`}
         >
             <div className="flex flex-col gap-3">
                 <ErrorLine error={answers.error} />
@@ -305,7 +312,7 @@ function Progress({
         <PanelSection
             icon={Hourglass}
             title="Progress"
-            description={`Scored against ${live ? `live v${live.number} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
+            tip={`Scored against ${live ? `live v${live.number} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
         >
             <div className="flex flex-col gap-2">
                 <VersionStatus row={row} version={version} />
@@ -321,11 +328,7 @@ function Progress({
 
 function Failure({ version }: { version: VersionInfo }) {
     return (
-        <PanelSection
-            icon={Gauge}
-            title="Score"
-            description="Training failed, so it was never scored."
-        >
+        <PanelSection icon={Gauge} title="Score">
             <div className="flex flex-col gap-1 rounded-md border border-destructive/40 bg-destructive-soft px-3 py-2.5">
                 <span className="font-medium">Training failed</span>
                 <span className="text-sm">{version.job?.error ?? "No reason was recorded."}</span>
@@ -445,11 +448,7 @@ function MadeFrom({
         ]);
     }
     return (
-        <PanelSection
-            icon={SlidersHorizontal}
-            title="Made from"
-            description="The data, method and settings that built this version."
-        >
+        <PanelSection icon={SlidersHorizontal} title="Made from">
             <Facts items={parts} />
         </PanelSection>
     );
@@ -466,7 +465,7 @@ function Identifiers({ row, version }: { row: ModelRow; version: VersionInfo }) 
         <PanelSection
             icon={Fingerprint}
             title="Identifiers"
-            description="Call this version by its name; the short SHA-256 identifies its adapter."
+            tip="The short SHA-256 identifies its adapter."
         >
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span className="flex items-center gap-0.5">
@@ -501,12 +500,7 @@ function Exports({ row, version }: { row: ModelRow; version: VersionInfo }) {
         return null;
     }
     return (
-        <PanelSection
-            icon={Package}
-            title="Exports"
-            description="Files written from this version, each with a SHA-256 to check it where it runs."
-            flush
-        >
+        <PanelSection icon={Package} title="Exports" flush>
             <ul className="divide-y">
                 <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-panel py-3">
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -809,10 +803,10 @@ function LiveButton({
         <>
             <Tip tip={blocked}>
                 <Button disabled={Boolean(blocked)} onClick={() => setOpen(true)}>
-                    {`Make v${version.number} live`}
+                    {`Deploy v${version.number}`}
                 </Button>
             </Tip>
-            <MakeLiveDialog
+            <DeployVersionDialog
                 row={row}
                 versions={versions}
                 number={open ? version.number : null}

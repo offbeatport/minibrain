@@ -173,22 +173,22 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › Add model · API: GET /api/models, POST /api/models, GET /api/models/name, GET /api/models/{name}, PATCH /api/models/{name}, DELETE /api/models/{name}
 - **Duplicate models** · shipped · product, ml
   Copy a custom model's settings, data and live version, sharing its files.
-  UI: Models › Duplicate, Models › model › Duplicate · API: POST /api/models/{name}/duplicate
+  UI: Models › Duplicate, Models › model › Settings › Duplicate · API: POST /api/models/{name}/duplicate
 - **Model avatars** · shipped · product
   Give each custom model a generated name and an avatar.
-  UI: Models › Add model, Models › model › Change avatar · API: POST /api/models, PUT /api/models/{name}/avatar
+  UI: Models › Add model, Models › model › Settings › General · API: POST /api/models, PUT /api/models/{name}/avatar
 - **Serve-only bases** · shipped · product, ml
   Build on GGUF, AWQ or FP8 bases; Train explains why not.
   UI: Models › Add model, Models › model, Models · API: GET /api/models, GET /api/models/{name}/overview
 - **Switch base** · shipped · product, ml
   Move a model to another base without touching live traffic.
-  UI: Models › model › Switch base, Models › Switch base · API: GET /api/models/{name}/base-options, POST /api/models/{name}/base
+  UI: Models › model › Settings › Switch base, Models › Switch base · API: GET /api/models/{name}/base-options, POST /api/models/{name}/base
 - **Model teardown** · shipped · product, admin
   Delete or undeploy any model safely across restarts, with retry.
   UI: Models, Models › model
 - **Cancel jobs on delete** · shipped · product, ml, admin
   Delete dialogs list running jobs and cancel them before deleting.
-  UI: Models › Delete, Models › model › Delete · API: DELETE /api/models/{name}, DELETE /api/models/{name}/versions/{number}
+  UI: Models › Delete, Models › model › Settings › Delete · API: DELETE /api/models/{name}, DELETE /api/models/{name}/versions/{number}
 - **History outlives models** · shipped · product, admin
   Jobs and request logs of deleted models stay, marked deleted.
   UI: Training, Jobs, Monitoring › Requests, Monitoring › Overview, Jobs › job
@@ -198,9 +198,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Release reserved names** · planned · admin
   Free a deleted model's API name from Settings, with a warning.
   Roadmap: v2
-- **Model settings** · planned · product, ml
-  Rename, re-avatar, set scoring, duplicate or delete in one tab.
-  Roadmap: Concepts
+- **Model settings** · shipped · product, ml
+  Rename, re-avatar, set scoring, undeploy, duplicate or delete in one tab.
+  UI: Models › model › Settings · API: PATCH /api/models/{name}, PUT /api/models/{name}/avatar
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
   UI: Models › model › Training › How it's judged › Answers, Evaluations › version · API: GET /api/presets
@@ -316,26 +316,26 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Target score** · planned · product
   Say when the prompt-only version is good enough to skip training.
   Roadmap: Eval and promote
-- **Re-score on grader change** · planned · ml
+- **Re-score on grader change** · shipped · ml
   Re-score every version when the graders or judge change.
-  Roadmap: Eval and promote
+  UI: Models › model › Settings › Evaluation · API: POST /api/models/{name}/rescore
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
-  UI: Models › model › Training › How it's judged, Evaluations › version · Roadmap: Task types
+  UI: Models › model › Settings › Evaluation, Evaluations › version · Roadmap: Task types
 - **Judge model** · shipped · ml, admin
   Pick the base that judges free-text answers, per install or model.
-  UI: Settings › General › Judge model, Models › model › How it's judged · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{name}/judge
+  UI: Settings › General › Judge model, Models › model › Settings › Evaluation · API: GET /api/settings/judge, PUT /api/settings/judge, PUT /api/models/{name}/judge
 - **Promotion rule** · partial · ml, engineer
   Gate a version on thresholds over its grader scores, in CI.
-  UI: Models › model › Training › How it's judged, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
+  UI: Models › model › Settings › Evaluation, Evaluations › Deploy · API: PUT /api/models/{name}/promotion, POST /api/models/{name}/versions/{number}/promote · Roadmap: Config as code
 - **Score diff** · shipped · product, ml
   Compare two versions' scores, settings and held-out answers.
   UI: Models › model › Versions › Compare · API: GET /api/models/{name}/versions/{number}/answers
 
 ## Serving
 - **Deploy and roll back** · shipped · product, engineer
-  Make a passing version live, or an earlier one again.
-  UI: Models › model › version › Make live, Models › model › Deploy, Evaluations › Deploy · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote
+  Deploy a passing version, or an earlier one again.
+  UI: Models › model › Deploy, Models › model › version › Deploy, Evaluations › Deploy, Models › model › Settings › Undeploy · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
   UI: Models › model › Deploy · API: POST /api/models/{name}/deploy
@@ -368,7 +368,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: API keys · API: POST /api/keys, PUT /api/keys/{key_id}/models
 - **Harness configs** · shipped · engineer
   Copy ready config for curl, Python, LangChain, LiteLLM and more.
-  UI: Models › model › Connect
+  UI: Models › model › Use › API Connect
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions

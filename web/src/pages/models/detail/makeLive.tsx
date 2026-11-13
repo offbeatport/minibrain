@@ -7,12 +7,20 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Field,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
     useToast,
 } from "obp-ui";
+import { useState } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { api, unwrap } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
+import { percent } from "~/lib/format";
 import { isDeployed } from "./header";
 
 export function points(delta: number): string {
@@ -40,7 +48,7 @@ export function versionLabel(version: Pick<VersionInfo, "kind" | "number">): str
 
 export function liveBlock(row: ModelRow, version: VersionInfo): string | null {
     if (version.status !== "ready") {
-        return "Only a ready version can go live.";
+        return "Only a ready version can be deployed.";
     }
     if (version.base_refusal) {
         return version.base_refusal;
@@ -80,23 +88,76 @@ function direction(version: VersionInfo, live: VersionInfo | undefined): string 
         : `v${version.number} scores ${points(delta)} over live v${live.number}.`;
 }
 
-export function MakeLiveDialog({
+export function deployable(versions: VersionInfo[]): VersionInfo[] {
+    return versions
+        .filter((version) => version.status === "ready")
+        .sort((left, right) => right.number - left.number);
+}
+
+function VersionPicker({
+    versions,
+    value,
+    onChange,
+}: {
+    versions: VersionInfo[];
+    value: number;
+    onChange: (number: number) => void;
+}) {
+    return (
+        <Field id="deploy-version" label="Version">
+            <Select value={String(value)} onValueChange={(next) => onChange(Number(next ?? value))}>
+                <SelectTrigger id="deploy-version" className="w-full max-w-64">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {versions.map((version) => {
+                        const text = [
+                            versionLabel(version),
+                            version.score === null ? null : percent(version.score),
+                            version.current ? "deployed" : null,
+                        ]
+                            .filter(Boolean)
+                            .join(" · ");
+                        return (
+                            <SelectItem key={version.number} value={String(version.number)}>
+                                {text}
+                            </SelectItem>
+                        );
+                    })}
+                </SelectContent>
+            </Select>
+        </Field>
+    );
+}
+
+export function DeployVersionDialog({
     row,
     versions,
     number,
     onOpenChange,
+    pick = false,
 }: {
     row: ModelRow;
     versions: VersionInfo[];
     number: number | null;
     onOpenChange: (open: boolean) => void;
+    pick?: boolean;
 }) {
     const client = useQueryClient();
     const toast = useToast();
     const can = useCan();
-    const version = versions.find((item) => item.number === number);
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
+    const [picked, setPicked] = useState<number | null>(null);
+    const chosen = picked ?? number;
+    const version = versions.find((item) => item.number === chosen);
     const deployed = isDeployed(row);
+    const live = deployed ? liveOf(versions) : undefined;
+    const already = Boolean(version && live && live.number === version.number);
+    const close = (open: boolean) => {
+        if (!open) {
+            setPicked(null);
+        }
+        onOpenChange(open);
+    };
     const promote = useMutation({
         mutationFn: (target: number) =>
             unwrap(
@@ -106,9 +167,9 @@ export function MakeLiveDialog({
             ),
         onSuccess: async (_, target) => {
             await client.invalidateQueries();
-            onOpenChange(false);
+            close(false);
             toast({
-                title: `v${target} of ${row.name} is live`,
+                title: `v${target} of ${row.name} is deployed`,
                 description: live
                     ? `v${live.number} stays callable as ${row.key}@${live.number}.`
                     : undefined,
@@ -116,50 +177,59 @@ export function MakeLiveDialog({
             });
         },
     });
-    const blocked = version ? liveBlock(row, version) : null;
+    const blocked = version && !already ? liveBlock(row, version) : null;
     return (
-        <Dialog open={Boolean(version) && can.build} onOpenChange={onOpenChange}>
+        <Dialog open={number !== null && can.build} onOpenChange={close}>
             <DialogContent className="sm:max-w-lg">
-                {version && (
-                    <>
-                        <DialogHeader>
-                            <DialogTitle>{`Make v${version.number} of ${row.name} live?`}</DialogTitle>
-                            <DialogDescription>
-                                {[
-                                    direction(version, live),
-                                    `Requests to ${row.key} are answered by v${version.number} from now on.`,
-                                    live
-                                        ? `v${live.number} stays callable as ${row.key}@${live.number}, and you can make it live again at any time.`
-                                        : "",
-                                ]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                            </DialogDescription>
-                        </DialogHeader>
-                        {blocked && (
-                            <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
-                                {blocked}
-                            </p>
-                        )}
-                        {!deployed && !blocked && (
-                            <p className="rounded-md border bg-muted px-3 py-2">
-                                {`${row.name} is not deployed: making v${version.number} live also deploys it, so ${row.key} starts answering.`}
-                            </p>
-                        )}
-                        <ErrorLine error={promote.error} />
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>
-                                Cancel
-                            </Button>
-                            <Button
-                                disabled={Boolean(blocked) || promote.isPending}
-                                onClick={() => promote.mutate(version.number)}
-                            >
-                                {`Make v${version.number} live`}
-                            </Button>
-                        </DialogFooter>
-                    </>
+                <DialogHeader>
+                    <DialogTitle>
+                        {pick || !version
+                            ? `Deploy ${row.name}`
+                            : `Deploy v${version.number} of ${row.name}?`}
+                    </DialogTitle>
+                    {version && !already && (
+                        <DialogDescription>
+                            {[
+                                direction(version, live),
+                                `Requests to ${row.key} are answered by v${version.number} from now on.`,
+                                live
+                                    ? `v${live.number} stays callable as ${row.key}@${live.number}, and you can deploy it again at any time.`
+                                    : "",
+                            ]
+                                .filter(Boolean)
+                                .join(" ")}
+                        </DialogDescription>
+                    )}
+                </DialogHeader>
+                {pick && version && (
+                    <VersionPicker
+                        versions={deployable(versions)}
+                        value={version.number}
+                        onChange={setPicked}
+                    />
                 )}
+                {already && version && (
+                    <p className="rounded-md border bg-muted px-3 py-2">
+                        {`v${version.number} is deployed and answers ${row.key}.`}
+                    </p>
+                )}
+                {blocked && (
+                    <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
+                        {blocked}
+                    </p>
+                )}
+                <ErrorLine error={promote.error} />
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => close(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        disabled={!version || already || Boolean(blocked) || promote.isPending}
+                        onClick={() => version && promote.mutate(version.number)}
+                    >
+                        {version ? `Deploy v${version.number}` : "Deploy"}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

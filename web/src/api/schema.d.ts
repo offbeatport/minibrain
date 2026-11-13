@@ -454,6 +454,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/{name}/rescore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Score every version again with the current graders */
+        post: operations["rescore_versions_api_models__name__rescore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/{name}/promotion": {
         parameters: {
             query?: never;
@@ -7566,6 +7583,16 @@ export interface components {
             /** Last At */
             last_at: string | null;
         };
+        /** RescoreResult */
+        RescoreResult: {
+            /**
+             * Versions
+             * @description Versions queued to be scored again with the model's graders and judge.
+             */
+            versions: number[];
+            /** Jobs */
+            jobs: number[];
+        };
         /** ReservedNameInfo */
         ReservedNameInfo: {
             /** Name */
@@ -10021,6 +10048,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rescore_versions_api_models__name__rescore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescoreResult"];
                 };
             };
             /** @description Validation Error */

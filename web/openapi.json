@@ -1250,6 +1250,48 @@
         }
       }
     },
+    "/api/models/{name}/rescore": {
+      "post": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Score every version again with the current graders",
+        "operationId": "rescore_versions_api_models__name__rescore_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RescoreResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/models/{name}/promotion": {
       "put": {
         "tags": [
@@ -24596,6 +24638,31 @@
           "last_at"
         ],
         "title": "RequestSummary"
+      },
+      "RescoreResult": {
+        "properties": {
+          "versions": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Versions",
+            "description": "Versions queued to be scored again with the model's graders and judge."
+          },
+          "jobs": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Jobs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "versions",
+          "jobs"
+        ],
+        "title": "RescoreResult"
       },
       "ReservedNameInfo": {
         "properties": {

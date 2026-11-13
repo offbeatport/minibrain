@@ -72,6 +72,11 @@ class GradersUpdate(BaseModel):
     graders: list[GraderConfig]
 
 
+class RescoreResult(BaseModel):
+    versions: list[int] = Field(description="Versions queued to be scored again with the model's graders and judge.")
+    jobs: list[int]
+
+
 class JudgeUpdate(BaseModel):
     model: str | None = Field(default=None, max_length=200)
 

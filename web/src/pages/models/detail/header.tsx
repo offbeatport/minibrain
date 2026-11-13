@@ -1,20 +1,3 @@
-import { useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "@tanstack/react-router";
-import {
-    CopyPlus,
-    FolderOpen,
-    GraduationCap,
-    MoreHorizontal,
-    Pencil,
-    Play,
-    Plug,
-    Power,
-    PowerOff,
-    Replace,
-    Smile,
-    SquarePlus,
-    Trash2,
-} from "lucide-react";
 import {
     Button,
     Dialog,
@@ -23,36 +6,22 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuGroup,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
     Link,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import { Fragment, type ReactElement, type ReactNode, useState } from "react";
+import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
-import { keys, useAllModels } from "~/api/queries";
 import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { StatusText, type Tone } from "~/components/models/StatusText";
-import { useCan } from "~/lib/access";
-import { percent } from "~/lib/format";
-import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
+import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
-import { beingDeleted, busyTearingDown, deleteModel, rowId, setDeployed } from "~/lib/teardown";
-import { ChangeAvatarDialog } from "../ChangeAvatarDialog";
-import { DeleteModelsDialog } from "../DeleteModelsDialog";
-import { DuplicateModelDialog } from "../DuplicateModelDialog";
-import { SwitchBaseDialog } from "../SwitchBaseDialog";
-import { ConfirmAction, type Confirmation, EditModelDialog, useModelsRefresh } from "../dialogs";
-import type { Entry } from "../entries";
+import { beingDeleted, busyTearingDown, setDeployed } from "~/lib/teardown";
+import type { Confirmation } from "../dialogs";
 import { parametersText } from "./facts";
 
 export type Fact = ReactElement | null | false;
@@ -133,15 +102,6 @@ export function CompactHeader({
     );
 }
 
-const DEPLOYMENT: Record<ModelRow["deployment"]["state"], { tone: Tone; label: string }> = {
-    running: { tone: "success", label: "Deployed" },
-    starting: { tone: "info", label: "Starting" },
-    unhealthy: { tone: "destructive", label: "Unhealthy" },
-    stopping: { tone: "info", label: "Stopping" },
-    stop_failed: { tone: "destructive", label: "Stop failed" },
-    not_deployed: { tone: "neutral", label: "Not deployed" },
-};
-
 export function isDeployed(row: ModelRow): boolean {
     return row.deployment.state !== "not_deployed";
 }
@@ -156,14 +116,6 @@ function trimmed(text: string): string {
 
 export function baseNameOf(rows: ModelRow[] | undefined, key: string | null | undefined): string {
     return rows?.find((item) => item.key === key)?.name ?? key ?? "";
-}
-
-function liveText(row: ModelRow): string | null {
-    if (row.kind !== "custom" || row.current_version === null || !isDeployed(row)) {
-        return null;
-    }
-    const score = row.score === null || row.score === undefined ? "" : ` ${percent(row.score)}`;
-    return `v${row.current_version} live${score}`;
 }
 
 function subtitleOf(row: ModelRow, base: BaseModelDetail | undefined): string {
@@ -192,30 +144,67 @@ export function ModelAvatar({ row, size = "md" }: { row: ModelRow; size?: "sm" |
     );
 }
 
+type Shown = { tone: Tone; label: string; href?: string };
+
+function deploymentShown(row: ModelRow): Shown {
+    const version =
+        row.kind === "custom" && row.current_version !== null ? ` v${row.current_version}` : "";
+    const job = row.teardown?.jobs?.[0];
+    const jobLink = job ? `/jobs/${job}` : undefined;
+    switch (row.deployment.state) {
+        case "running":
+            return { tone: "success", label: version ? `Deployed ·${version}` : "Deployed" };
+        case "starting":
+            return { tone: "info", label: `Deploying${version}…` };
+        case "unhealthy":
+            return {
+                tone: "destructive",
+                label: "Deploy failed",
+                href: modelPageHref(row.key, "monitoring"),
+            };
+        case "stopping":
+            return { tone: "info", label: "Undeploying…", href: jobLink };
+        case "stop_failed":
+            return { tone: "destructive", label: "Undeploy failed", href: jobLink };
+        default:
+            return { tone: "neutral", label: "Not deployed" };
+    }
+}
+
+export function DeploymentStatus({ row }: { row: ModelRow }) {
+    const shown = deploymentShown(row);
+    const text = (
+        <StatusText
+            tone={shown.tone}
+            className={shown.tone === "destructive" ? "text-destructive" : undefined}
+        >
+            {shown.label}
+        </StatusText>
+    );
+    return shown.href ? (
+        <Link href={shown.href} className="text-inherit hover:underline">
+            {text}
+        </Link>
+    ) : (
+        text
+    );
+}
+
 export function ModelHeader({
     row,
-    detail,
     base,
+    actions,
 }: {
     row: ModelRow;
-    detail: ModelDetail | undefined;
     base: BaseModelDetail | undefined;
+    actions: ReactNode;
 }) {
-    const status = DEPLOYMENT[row.deployment.state];
-    const live = liveText(row);
     const description = subtitleOf(row, base);
     return (
         <CompactHeader
             icon={<ModelAvatar row={row} size="lg" />}
             title={row.name}
-            facts={[
-                isDeployed(row) ? (
-                    <StatusText key="deployed" tone={status.tone}>
-                        {status.label}
-                    </StatusText>
-                ) : null,
-                live ? <span key="live">{live}</span> : null,
-            ]}
+            facts={[<DeploymentStatus key="deployment" row={row} />]}
             subtitle={
                 <>
                     <span className="flex items-center gap-1">
@@ -227,96 +216,32 @@ export function ModelHeader({
                     {description && <span>{description}</span>}
                 </>
             }
-            actions={<HeaderActions row={row} detail={detail} base={base} />}
+            actions={actions}
         />
     );
 }
 
-function TryItButton({ row }: { row: ModelRow }) {
-    if (!row.can_test) {
-        return (
-            <Tip
-                tip={
-                    row.kind === "custom"
-                        ? "Nothing to try yet: make a version first."
-                        : "Its weights are not ready on this install."
-                }
-            >
-                <Button variant="outline" disabled>
-                    <Play />
-                    Try it
-                </Button>
-            </Tip>
-        );
+export function rolloutBlock(row: ModelRow): string | null {
+    if (busyTearingDown(row)) {
+        return row.teardown?.label ?? "A rollout is running.";
     }
-    return (
-        <Button variant="outline" asChild>
-            <Link href={playgroundHref(row.key)}>
-                <Play />
-                Try it
-            </Link>
-        </Button>
-    );
+    if (row.deployment.state === "starting" || row.deployment.state === "stopping") {
+        return `${deploymentShown(row).label.replace("…", "")}: wait for it to finish.`;
+    }
+    return null;
 }
 
-function HeaderActions({
-    row,
-    detail,
-    base,
-}: {
-    row: ModelRow;
-    detail: ModelDetail | undefined;
-    base: BaseModelDetail | undefined;
-}) {
-    const can = useCan();
-    const [connecting, setConnecting] = useState(false);
-    return (
-        <>
-            <TryItButton row={row} />
-            <Button variant="outline" onClick={() => setConnecting(true)}>
-                <Plug />
-                Connect
-            </Button>
-            {can.build && <ModelMenu row={row} detail={detail} base={base} />}
-            <ConnectDialog row={row} open={connecting} onOpenChange={setConnecting} />
-        </>
-    );
-}
-
-function BlockedItem({
-    icon,
-    label,
-    blocked,
-    onSelect,
-}: {
-    icon: ReactNode;
-    label: string;
-    blocked: string | null;
-    onSelect: () => void;
-}) {
-    return (
-        <DropdownMenuItem
-            disabled={Boolean(blocked)}
-            className={blocked ? "items-start [&>svg]:mt-0.5" : undefined}
-            onSelect={onSelect}
-        >
-            {icon}
-            <span className="flex flex-col">
-                <span>{label}</span>
-                {blocked && (
-                    <span className="text-sm whitespace-normal text-muted-foreground">
-                        {blocked}
-                    </span>
-                )}
-            </span>
-        </DropdownMenuItem>
-    );
-}
-
-export function trainBlock(row: ModelRow, detail: ModelDetail | undefined): string | null {
+export function trainBlock(
+    row: ModelRow,
+    detail: ModelDetail | undefined,
+    base?: BaseModelDetail,
+): string | null {
     const serveOnly = detail?.serve_only ?? row.serve_only;
     if (serveOnly) {
         return serveOnly.reason;
+    }
+    if (base && base.availability.state !== "available") {
+        return `Waits for ${base.name} to download.`;
     }
     if (detail && !detail.dataset_version) {
         return "Add training data first: training needs examples.";
@@ -327,9 +252,10 @@ export function trainBlock(row: ModelRow, detail: ModelDetail | undefined): stri
     return null;
 }
 
-function deployBlock(row: ModelRow, base: BaseModelDetail | undefined): string | null {
-    if (busyTearingDown(row)) {
-        return row.teardown?.label ?? "Busy";
+export function deployBlock(row: ModelRow, base: BaseModelDetail | undefined): string | null {
+    const rollout = rolloutBlock(row);
+    if (rollout) {
+        return rollout;
     }
     if (row.kind === "base" && base && base.availability.state !== "available") {
         return "Its weights are not ready yet.";
@@ -363,192 +289,6 @@ export function deployConfirmation(
         destructive: deployed,
         run: () => setDeployed(row, !deployed).then(after),
     };
-}
-
-function ModelMenu({
-    row,
-    detail,
-    base,
-}: {
-    row: ModelRow;
-    detail: ModelDetail | undefined;
-    base: BaseModelDetail | undefined;
-}) {
-    const router = useRouter();
-    const can = useCan();
-    const refresh = useModelsRefresh();
-    const client = useQueryClient();
-    const models = useAllModels();
-    const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
-    const [editing, setEditing] = useState(false);
-    const [duplicating, setDuplicating] = useState(false);
-    const [picking, setPicking] = useState(false);
-    const [switching, setSwitching] = useState(false);
-    const [deleting, setDeleting] = useState<Entry[] | null>(null);
-    const custom = row.kind === "custom";
-    const deployed = isDeployed(row);
-    const reload = async () => {
-        await refresh();
-        await client.invalidateQueries({ queryKey: keys.modelPage(row.key) });
-    };
-    const moveTo = (detail?.serve_only ?? row.serve_only)?.switch_to ?? null;
-    const canDelete = custom || can.admin;
-    const canRename = custom || can.admin;
-    return (
-        <>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label={`More actions for ${row.name}`}
-                    >
-                        <MoreHorizontal />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                    <DropdownMenuGroup>
-                        {deployed ? (
-                            <BlockedItem
-                                icon={<PowerOff />}
-                                label="Undeploy"
-                                blocked={
-                                    busyTearingDown(row) ? (row.teardown?.label ?? null) : null
-                                }
-                                onSelect={() =>
-                                    setConfirmation(deployConfirmation(row, true, reload))
-                                }
-                            />
-                        ) : (
-                            <BlockedItem
-                                icon={<Power />}
-                                label="Deploy"
-                                blocked={deployBlock(row, base)}
-                                onSelect={() =>
-                                    setConfirmation(deployConfirmation(row, false, reload))
-                                }
-                            />
-                        )}
-                        {custom && (
-                            <BlockedItem
-                                icon={<GraduationCap />}
-                                label={`Train v${nextVersion(row)}`}
-                                blocked={trainBlock(row, detail)}
-                                onSelect={() => router.history.push(trainHref(row.key))}
-                            />
-                        )}
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuGroup>
-                        {canRename && (
-                            <DropdownMenuItem
-                                disabled={beingDeleted(row)}
-                                onSelect={() => setEditing(true)}
-                            >
-                                <Pencil />
-                                Rename
-                            </DropdownMenuItem>
-                        )}
-                        {custom && (
-                            <DropdownMenuItem
-                                disabled={beingDeleted(row)}
-                                onSelect={() => setPicking(true)}
-                            >
-                                <Smile />
-                                Change avatar
-                            </DropdownMenuItem>
-                        )}
-                        {custom ? (
-                            <>
-                                <DropdownMenuItem
-                                    disabled={beingDeleted(row)}
-                                    onSelect={() => setDuplicating(true)}
-                                >
-                                    <CopyPlus />
-                                    Duplicate
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    disabled={beingDeleted(row)}
-                                    onSelect={() => setSwitching(true)}
-                                >
-                                    <Replace />
-                                    {moveTo ? `Move to ${moveTo.name}` : "Switch base"}
-                                </DropdownMenuItem>
-                            </>
-                        ) : (
-                            <>
-                                <DropdownMenuItem
-                                    onSelect={() =>
-                                        router.history.push(
-                                            `/models/new?base=${encodeURIComponent(row.key)}`,
-                                        )
-                                    }
-                                >
-                                    <SquarePlus />
-                                    Add a model on it
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                    onSelect={() =>
-                                        router.history.push(modelPageHref(row.key, "files"))
-                                    }
-                                >
-                                    <FolderOpen />
-                                    View files
-                                </DropdownMenuItem>
-                            </>
-                        )}
-                    </DropdownMenuGroup>
-                    {canDelete && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                                variant="destructive"
-                                disabled={beingDeleted(row)}
-                                onSelect={() =>
-                                    setDeleting([{ key: rowId(row), model: row, version: null }])
-                                }
-                            >
-                                <Trash2 />
-                                Delete model
-                            </DropdownMenuItem>
-                        </>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <ConfirmAction
-                confirmation={confirmation}
-                onOpenChange={(open) => !open && setConfirmation(null)}
-            />
-            <EditModelDialog
-                row={editing ? row : null}
-                onOpenChange={(open) => !open && setEditing(false)}
-            />
-            {custom && (
-                <>
-                    <ChangeAvatarDialog row={row} open={picking} onOpenChange={setPicking} />
-                    <DuplicateModelDialog
-                        row={duplicating ? row : null}
-                        onOpenChange={(open) => !open && setDuplicating(false)}
-                    />
-                    <SwitchBaseDialog
-                        row={switching ? row : null}
-                        preferred={moveTo?.key ?? null}
-                        onOpenChange={(open) => !open && setSwitching(false)}
-                    />
-                </>
-            )}
-            <DeleteModelsDialog
-                chosen={deleting}
-                rows={models.data ?? []}
-                onOpenChange={(open) => !open && setDeleting(null)}
-                onDelete={async (cascade, cancelJobs) => {
-                    await deleteModel(row, { cascade, undeploy: true, cancelJobs });
-                    await refresh();
-                    router.history.push(modelsHref());
-                }}
-            />
-        </>
-    );
 }
 
 function Copyable({ label, value }: { label: string; value: string }) {

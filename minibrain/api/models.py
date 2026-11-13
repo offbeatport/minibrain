@@ -32,6 +32,7 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     RequestBodiesUpdate,
+    RescoreResult,
     SampleDetail,
 )
 from minibrain.api.versions import audit_version, start_version
@@ -82,6 +83,7 @@ from minibrain.tasks.contracts import FREE_TEXT, Contract, ContractError, change
 from minibrain.tasks.duplicate import copied_version, duplicate_model, source_version
 from minibrain.tasks.judges import installed
 from minibrain.tasks.promotion import Rule, RuleError
+from minibrain.tasks.rescore import rescore
 from minibrain.tasks.service import (
     contract_of,
     latest_version_of,
@@ -494,6 +496,19 @@ def update_graders(name: str, body: GradersUpdate, session: SessionDep, settings
     session.add(AuditEvent(actor=current_actor(), action="model.graders", target=name, detail=facts))
     session.commit()
     return detail(settings, model)
+
+
+@router.post(
+    "/{name}/rescore", dependencies=[Depends(builder)], summary="Score every version again with the current graders"
+)
+def rescore_versions(name: str, session: SessionDep, settings: SettingsDep) -> RescoreResult:
+    model = get_model(session, name)
+    jobs = rescore(session, settings, model)
+    numbers = [job.version.number for job in jobs if job.version is not None]
+    facts = {"name": model.name, "versions": numbers}
+    session.add(AuditEvent(actor=current_actor(), action="model.rescore", target=name, detail=facts))
+    session.commit()
+    return RescoreResult(versions=numbers, jobs=[job.id for job in jobs])
 
 
 @router.put("/{name}/promotion", dependencies=[Depends(builder)], summary="Change a custom model's promotion rule")

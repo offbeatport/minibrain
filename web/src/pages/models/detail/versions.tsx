@@ -18,7 +18,7 @@ import {
     useToast,
 } from "obp-ui";
 import { useState } from "react";
-import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
+import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -29,7 +29,7 @@ import { relativeTime } from "~/lib/time";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { Tip, isDeployed } from "./header";
 import {
-    MakeLiveDialog,
+    DeployVersionDialog,
     canGoLive,
     isBaseline,
     liveBlock,
@@ -38,6 +38,7 @@ import {
     ruleReason,
     versionLabel,
 } from "./makeLive";
+import { ScoredBy } from "./scoredBy";
 
 export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
     if (version.current && isDeployed(row)) {
@@ -232,7 +233,7 @@ function VersionRow({
                     {can.build && live && !blocked && (
                         <Button variant="outline" onClick={onLive}>
                             <Rocket aria-hidden="true" />
-                            {`Make v${version.number} live`}
+                            {`Deploy v${version.number}`}
                         </Button>
                     )}
                 </span>
@@ -408,7 +409,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                     </TableBody>
                 </Table>
             )}
-            <MakeLiveDialog
+            <DeployVersionDialog
                 row={row}
                 versions={versions}
                 number={promoting}
@@ -422,10 +423,21 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     );
 }
 
-export function VersionsTab({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
+export function VersionsTab({
+    row,
+    detail,
+    versions,
+}: {
+    row: ModelRow;
+    detail: ModelDetail | undefined;
+    versions: VersionInfo[];
+}) {
     return (
-        <PanelSections>
-            <VersionsTable row={row} versions={versions} />
-        </PanelSections>
+        <>
+            <ScoredBy detail={detail} />
+            <PanelSections>
+                <VersionsTable row={row} versions={versions} />
+            </PanelSections>
+        </>
     );
 }

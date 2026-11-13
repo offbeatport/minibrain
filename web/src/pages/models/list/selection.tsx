@@ -368,7 +368,7 @@ export function CompareDialog({
                                 on.makeLive(model, better);
                             }}
                         >
-                            {`Make v${better.number} live`}
+                            {`Deploy v${better.number}`}
                         </Button>
                     )}
                 </DialogFooter>

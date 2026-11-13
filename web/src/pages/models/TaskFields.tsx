@@ -1,7 +1,6 @@
 import { X } from "lucide-react";
 import {
     Button,
-    Field,
     NumberField,
     Select,
     SelectContent,
@@ -162,37 +161,29 @@ export function PromotionEditor({
             ],
         });
     return (
-        <Field
-            id={id}
-            label="Promotion rule"
-            hint="A version goes live only when every threshold holds on its held-out rows."
-        >
-            <div className="flex flex-col gap-2">
-                {thresholds.map((threshold, index) => (
-                    <ThresholdRow
-                        key={`${index}:${threshold.metric}`}
-                        threshold={threshold}
-                        metrics={metrics}
-                        onChange={(next) => update(index, next)}
-                        onRemove={() => remove(index)}
+        <div id={id} className="flex flex-col gap-2">
+            {thresholds.map((threshold, index) => (
+                <ThresholdRow
+                    key={`${index}:${threshold.metric}`}
+                    threshold={threshold}
+                    metrics={metrics}
+                    onChange={(next) => update(index, next)}
+                    onRemove={() => remove(index)}
+                />
+            ))}
+            <div className="flex flex-wrap items-center gap-4">
+                <Button type="button" variant="outline" size="sm" onClick={add}>
+                    Add threshold
+                </Button>
+                <label htmlFor={`${id}-beats`} className="flex items-center gap-2">
+                    <Switch
+                        id={`${id}-beats`}
+                        checked={value.beats_live ?? true}
+                        onCheckedChange={(checked) => onChange({ ...value, beats_live: checked })}
                     />
-                ))}
-                <div className="flex flex-wrap items-center gap-4">
-                    <Button type="button" variant="outline" size="sm" onClick={add}>
-                        Add threshold
-                    </Button>
-                    <label htmlFor={`${id}-beats`} className="flex items-center gap-2">
-                        <Switch
-                            id={`${id}-beats`}
-                            checked={value.beats_live ?? true}
-                            onCheckedChange={(checked) =>
-                                onChange({ ...value, beats_live: checked })
-                            }
-                        />
-                        At least as good as the live version on its main metric
-                    </label>
-                </div>
+                    At least as good as the deployed version on its main metric
+                </label>
             </div>
-        </Field>
+        </div>
     );
 }

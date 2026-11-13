@@ -224,7 +224,7 @@ def usual_error_rate(session: Session, scope: ColumnElement[bool], until: dateti
 
 def marker_label(event: AuditEvent, version: int | None) -> tuple[Literal["deploy", "undeploy", "live"], str]:
     if event.action == "version.promote":
-        return "live", f"v{version} made live"
+        return "live", f"v{version} deployed"
     if event.action == "model.undeploy":
         return "undeploy", "Undeployed"
     return "deploy", f"Deployed with v{version}" if version is not None else "Deployed"

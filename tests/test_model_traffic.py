@@ -58,7 +58,7 @@ def test_traffic_splits_requests_by_version_and_bucket(harness: Harness) -> None
     callers = {(item["name"], item["key_id"] is None): item["requests"] for item in day["callers"]}
     assert callers == {("ci", False): 3, ("batch", False): 1, (None, True): 1}
     assert day["previous"] is not None and day["previous"]["requests"] == 0
-    assert [(item["kind"], item["label"]) for item in day["markers"]] == [("live", "v0 made live")]
+    assert [(item["kind"], item["label"]) for item in day["markers"]] == [("live", "v0 deployed")]
     month = traffic(harness)
     assert (month["bucket_seconds"], len(month["buckets"]), month["totals"]["requests"]) == (86400, 30, 6)
     assert month["previous"]["requests"] == 1
@@ -108,7 +108,7 @@ def test_activity_tells_what_happened_to_the_model(harness: Harness) -> None:
     add_version(harness, "lora")
     found = activity(harness)
     texts = [event["text"] for event in found["events"]]
-    newest = ["started training v1", "created API key helpdesk", "made v0 live", "renamed it to Ticket Triage"]
+    newest = ["started training v1", "created API key helpdesk", "deployed v0", "renamed it to Ticket Triage"]
     assert texts[:4] == newest
     assert texts[-1] == "created Support Triage"
     for event in found["events"]:
@@ -155,7 +155,7 @@ def test_the_status_line_puts_problems_first(harness: Harness) -> None:
     assert scoring["action"]["everyone"] is True
     finish(harness, "eval", accuracy=1.0)
     better = status_of(harness)
-    assert better["text"] == "v1 ready · 100.0%" and better["action"]["label"] == "Make v1 live"
+    assert better["text"] == "v1 ready · 100.0%" and better["action"]["label"] == "Deploy v1"
     harness.client.post(f"/api/models/{SLUG}/versions/1/promote")
     body = {"input": "I was charged twice", "output": "billing", "rating": "down", "correction": "account"}
     assert harness.client.post(f"/api/models/{SLUG}/feedback", json=body).status_code == 201
@@ -224,7 +224,7 @@ def test_the_status_line_never_offers_the_baseline(harness: Harness) -> None:
     finish(harness, "train")
     finish(harness, "eval", accuracy=0.0)
     trained = status_of(harness)
-    assert (trained["text"], trained["action"]["label"]) == ("v1 ready · 0.0%", "Make v1 live")
+    assert (trained["text"], trained["action"]["label"]) == ("v1 ready · 0.0%", "Deploy v1")
 
 
 def test_activity_of_a_recreated_model_holds_only_its_own_events(harness: Harness) -> None:

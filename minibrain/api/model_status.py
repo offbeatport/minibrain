@@ -155,7 +155,7 @@ def promote_status(model: Model) -> ModelStatus | None:
     else:
         text = f"v{number} ready · {share(score)}" if score is not None else f"v{number} ready"
     return ModelStatus(
-        tone="info", text=text, action=StatusAction(kind="promote", label=f"Make v{number} live", version=number)
+        tone="info", text=text, action=StatusAction(kind="promote", label=f"Deploy v{number}", version=number)
     )
 
 

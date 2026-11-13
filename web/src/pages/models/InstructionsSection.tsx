@@ -88,7 +88,7 @@ export function InstructionsSection({ detail }: { detail: ModelDetail }) {
             icon={MessageSquareText}
             anchor="instructions"
             title="Instructions"
-            description="The system prompt every version starts from. Saving makes a prompt-only version you can try at once in the Playground."
+            tip="The system prompt every version starts from. Saving makes a prompt-only version you can try at once in the Playground."
         >
             {can.build ? (
                 <Editor key={detail.instructions} detail={detail} />

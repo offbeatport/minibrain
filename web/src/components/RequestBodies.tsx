@@ -87,7 +87,7 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
         <PanelSection
             icon={Logs}
             title="Request logs"
-            description={
+            tip={
                 <>
                     {
                         "Every call's time, version, key, status, latency, tokens and response ID are logged, never its content. See them under "

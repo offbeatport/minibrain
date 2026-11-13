@@ -152,7 +152,7 @@ export function ModelSafety({ detail }: { detail: ModelDetail }) {
         <PanelSection
             icon={ShieldCheck}
             title="Safety model"
-            description={
+            tip={
                 safety.effective
                     ? `${safety.effective_name ?? safety.effective} checks every request${safety.effective_answers ? " and answer" : ""} to this model; a blocked call gets a refusal and is audited.`
                     : "No safety model checks this model's calls."

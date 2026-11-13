@@ -340,7 +340,7 @@ export function ActivityPanel({ row }: { row: ModelRow }) {
     const shown = all.slice(0, limit);
     const more = all.length > shown.length;
     return (
-        <PanelSection icon={History} title="Activity" description="Recent changes to this model.">
+        <PanelSection icon={History} title="Activity">
             <div className="flex min-w-0 flex-col gap-3">
                 <ErrorLine error={activity.error} />
                 {activity.isLoading ? (

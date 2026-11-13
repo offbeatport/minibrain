@@ -21,7 +21,14 @@ import { metricName } from "~/lib/metrics";
 import { modelCompareHref, versionPlaygroundHref } from "~/lib/modelLinks";
 import { datasetVersionDiffHref } from "../../data/versionData";
 import { CompactHeader, Crumbs, baseNameOf, isDeployed, modelCrumbs } from "./header";
-import { MakeLiveDialog, canGoLive, liveBlock, liveOf, points, versionLabel } from "./makeLive";
+import {
+    DeployVersionDialog,
+    canGoLive,
+    liveBlock,
+    liveOf,
+    points,
+    versionLabel,
+} from "./makeLive";
 import { ExampleList, useAnswers, verdictOf } from "./version";
 import { recipeText } from "./versions";
 
@@ -322,7 +329,7 @@ export function CompareView({ row }: { row: ModelRow }) {
                         {liveable && (
                             <Button
                                 onClick={() => setPromoting(goal.number)}
-                            >{`Make v${goal.number} live`}</Button>
+                            >{`Deploy v${goal.number}`}</Button>
                         )}
                     </>
                 }
@@ -359,7 +366,7 @@ export function CompareView({ row }: { row: ModelRow }) {
             />
             <Answers row={row} a={a} b={b} />
             <DataDiff a={a} b={b} />
-            <MakeLiveDialog
+            <DeployVersionDialog
                 row={row}
                 versions={list}
                 number={promoting}

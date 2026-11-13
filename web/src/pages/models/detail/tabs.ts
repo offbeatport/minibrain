@@ -9,6 +9,7 @@ export const TAB_LABELS: Record<ModelTab, string> = {
     training: "Training",
     monitoring: "Monitoring",
     api: "API keys",
+    settings: "Settings",
     files: "Files",
 };
 
@@ -16,10 +17,12 @@ const ALIASES: Record<string, ModelTab> = { data: "training", keys: "api" };
 
 export function tabsFor(row: ModelRow, builder: boolean): ModelTab[] {
     if (row.kind === "base") {
-        return ["overview", "monitoring", "api"];
+        return builder
+            ? ["overview", "monitoring", "api", "settings"]
+            : ["overview", "monitoring", "api"];
     }
     return builder
-        ? ["overview", "versions", "training", "monitoring", "api"]
+        ? ["overview", "versions", "training", "monitoring", "api", "settings"]
         : ["overview", "versions", "monitoring", "api"];
 }
 

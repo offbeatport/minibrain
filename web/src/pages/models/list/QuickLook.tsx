@@ -181,7 +181,7 @@ function Latest({ model }: { model: ListModel }) {
 
 function nextLabel(next: NextAction): string {
     if (next.kind === "promote" && next.version !== null && next.version !== undefined) {
-        return `Make v${next.version} live`;
+        return `Deploy v${next.version}`;
     }
     return next.label;
 }
@@ -281,7 +281,7 @@ function Body({ model, on, can }: { model: ListModel; on: Handlers; can: Abiliti
                 <Button onClick={() => on.open(hrefOf(model))}>Open model</Button>
                 {candidate && (
                     <Button variant="secondary" onClick={() => on.makeLive(model, candidate)}>
-                        {`Make v${candidate.number} live`}
+                        {`Deploy v${candidate.number}`}
                     </Button>
                 )}
                 <Button variant="outline" onClick={() => on.open(playgroundHref(model.row.key))}>

@@ -18,7 +18,7 @@ function Endpoint({ row, keyValue }: { row: ModelRow; keyValue: string | null })
         <PanelSection
             icon={Plug}
             title="Endpoint"
-            description={
+            tip={
                 isDeployed(row)
                     ? `OpenAI-compatible. Call it as ${row.key}${row.kind === "custom" ? `; ${row.key}@N pins version N` : ""}.`
                     : "Deploy it to call it from the API; keys can be created now."
@@ -58,7 +58,6 @@ export function KeysTab({ row, detail }: { row: ModelRow; detail: ModelDetail | 
                 <ApiKeys
                     scope={{ kind: row.kind, key: row.key }}
                     onCreated={setCreated}
-                    description={`Keys that can call ${row.key}${row.kind === "custom" ? ` and ${row.key}@N` : ""}, keys for all models included. Each is shown once, when it is created.`}
                     secretActions={
                         <Button variant="outline" onClick={() => setConnecting(true)}>
                             <Plug aria-hidden="true" />

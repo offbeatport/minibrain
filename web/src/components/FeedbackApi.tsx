@@ -35,11 +35,7 @@ export function FeedbackApi({
 }) {
     const code = feedbackCurl(baseUrl, model, keyValue ?? "YOUR_KEY");
     return (
-        <PanelSection
-            icon={ThumbsUp}
-            title="Feedback"
-            description="Tell the model when an answer was right or wrong; it lands in the review queue."
-        >
+        <PanelSection icon={ThumbsUp} title="Feedback">
             <div className="flex flex-col gap-3">
                 <p>
                     <span className="font-mono">POST {baseUrl}/feedback</span> with the{" "}

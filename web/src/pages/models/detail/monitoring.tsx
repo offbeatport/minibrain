@@ -23,7 +23,6 @@ import { count } from "~/lib/format";
 import { modelVersionHref, requestLogHref } from "~/lib/modelLinks";
 import { STATUS_TONES, clockTime, modelLabel } from "~/lib/requests";
 import {
-    LAST,
     PERIOD,
     SPAN,
     type TrafficRange,
@@ -144,11 +143,7 @@ function LatencySection({
 }: { row: ModelRow; report: TrafficReport; range: TrafficRange }) {
     const lines = percentileLines(report);
     return (
-        <PanelSection
-            icon={Timer}
-            title="Latency"
-            description={`p50, p95 and p99 ${SPAN[range]}, from the request logs.`}
-        >
+        <PanelSection icon={Timer} title="Latency">
             <LineChart
                 rows={lines.rows}
                 series={lines.series}
@@ -186,12 +181,7 @@ function ErrorsSection({
     const line = errorLine(report);
     const usual = report.usual_error_rate;
     return (
-        <PanelSection
-            icon={CircleAlert}
-            title="Errors"
-            description={`The share of requests that failed ${SPAN[range]}, and what failed.`}
-            flush
-        >
+        <PanelSection icon={CircleAlert} title="Errors" flush>
             <div className="p-panel">
                 <LineChart
                     rows={line.rows}
@@ -254,18 +244,14 @@ function ErrorsSection({
     );
 }
 
-function VersionsSection({
-    row,
-    report,
-    range,
-}: { row: ModelRow; report: TrafficReport; range: TrafficRange }) {
+function VersionsSection({ row, report }: { row: ModelRow; report: TrafficReport }) {
     const total = report.versions.reduce((sum, item) => sum + item.requests, 0);
     const usual = report.usual_error_rate ?? null;
     return (
         <PanelSection
             icon={History}
             title="By version"
-            description={`Each version that answered ${SPAN[range]}; calls to ${row.key}@N reach that version whether live or not.`}
+            tip={`Calls to ${row.key}@N reach that version whether it is deployed or not.`}
             flush
         >
             <Table>
@@ -335,12 +321,7 @@ function CallersSection({
 }: { row: ModelRow; report: TrafficReport; range: TrafficRange }) {
     const total = report.callers.reduce((sum, item) => sum + item.requests, 0);
     return (
-        <PanelSection
-            icon={KeyRound}
-            title="Callers"
-            description={`The API keys that sent the most requests ${SPAN[range]}.`}
-            flush
-        >
+        <PanelSection icon={KeyRound} title="Callers" flush>
             {report.callers.length === 0 ? (
                 <p className="p-panel text-muted-foreground">{`No requests ${SPAN[range]}.`}</p>
             ) : (
@@ -414,7 +395,7 @@ function RequestLogSection({ row }: { row: ModelRow }) {
         <PanelSection
             icon={Logs}
             title="Request log"
-            description="The latest requests, newest first. Prompts and answers stay on this install."
+            tip="Prompts and answers stay on this install."
             actions={
                 <Link
                     href={requestLogHref({ model: row.key })}
@@ -509,7 +490,7 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                 <PanelSection
                     icon={ChartLine}
                     title="Traffic"
-                    description={`${LAST[range]}${row.kind === "custom" ? ", by the version that answered" : ""}. Changes compare with ${PERIOD[range]}.`}
+                    tip={`Changes compare with ${PERIOD[range]}.`}
                 >
                     <div className="flex flex-col gap-6">
                         {report && !empty && (
@@ -533,9 +514,7 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                     <>
                         <LatencySection row={row} report={report} range={range} />
                         <ErrorsSection row={row} report={report} range={range} />
-                        {row.kind === "custom" && (
-                            <VersionsSection row={row} report={report} range={range} />
-                        )}
+                        {row.kind === "custom" && <VersionsSection row={row} report={report} />}
                         <CallersSection row={row} report={report} range={range} />
                         <RequestLogSection row={row} />
                     </>

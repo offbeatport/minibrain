@@ -2,48 +2,27 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Scale } from "lucide-react";
 import {
     Button,
-    CheckboxSelect,
     ConfirmDialog,
     Field,
     Input,
     Label,
     RadioGroup,
     RadioGroupItem,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
     SettingsGroup,
     SettingsRow,
     Textarea,
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
-import {
-    type ContractInfo,
-    type GraderConfig,
-    type ModelDetail,
-    type PromotionInfo,
-    api,
-    unwrap,
-} from "~/api/client";
-import { useAllModels, useJudgeSetting, usePresets } from "~/api/queries";
+import { type ContractInfo, type GraderConfig, type ModelDetail, api, unwrap } from "~/api/client";
 import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
-import { contractSentence, gradersSentence, judgeSentence, ruleSentence } from "~/lib/judging";
-import {
-    EXAMPLE_SCHEMA,
-    PromotionEditor,
-    metricsFor,
-    schemaProblem,
-    splitLabels,
-} from "./TaskFields";
+import { contractSentence } from "~/lib/judging";
+import { EXAMPLE_SCHEMA, schemaProblem, splitLabels } from "./TaskFields";
 
 type Change = { path: string; detail: string; breaking: boolean };
-type Part = "answer" | "graders" | "judge" | "rule";
+type Part = "answer" | "rubric";
 
-const INSTALL_JUDGE = "install";
 const JUDGE = "judge";
 
 function useSaved(title: string, onDone: () => void) {
@@ -283,19 +262,8 @@ function ContractEditor({ detail, onDone }: { detail: ModelDetail; onDone: () =>
     );
 }
 
-function contractKind(contract: ContractInfo): string {
-    return contract.labels ? "labels" : contract.kind;
-}
-
-function GradersEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => void }) {
-    const presets = usePresets();
-    const [names, setNames] = useState(detail.graders.map((item) => item.name));
+function RubricEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => void }) {
     const [rubric, setRubric] = useState(detail.judge.rubric ?? detail.judge.default_rubric ?? "");
-    const kind = contractKind(detail.contract);
-    const options = (presets.data?.graders ?? [])
-        .filter((item) => item.contracts.includes(kind))
-        .map((item) => ({ value: item.name, label: item.label }));
-    const judged = names.includes(JUDGE);
     const save = useMutation({
         mutationFn: (graders: GraderConfig[]) =>
             unwrap(
@@ -304,177 +272,32 @@ function GradersEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => 
                     body: { graders },
                 }),
             ),
-        ...useSaved("Graders saved", onDone),
+        ...useSaved("Rubric saved", onDone),
     });
-    const configs: GraderConfig[] = [
-        ...(judged ? [{ name: JUDGE, rubric: rubric.trim() }] : []),
-        ...names.filter((name) => name !== JUDGE).map((name) => ({ name })),
-    ];
-    const unchanged =
-        JSON.stringify(configs) ===
-        JSON.stringify(
-            detail.graders.map((item) =>
-                item.name === JUDGE
-                    ? { name: JUDGE, rubric: item.rubric ?? "" }
-                    : { name: item.name },
-            ),
-        );
-    const problem =
-        names.length === 0
-            ? "Pick at least one grader."
-            : judged && !rubric.trim()
-              ? "Write the rubric the judge scores against."
-              : undefined;
+    const configs: GraderConfig[] = detail.graders.map((item) =>
+        item.name === JUDGE ? { name: JUDGE, rubric: rubric.trim() } : { name: item.name },
+    );
+    const unchanged = rubric.trim() === (detail.judge.rubric ?? detail.judge.default_rubric ?? "");
     return (
         <div className="flex flex-col gap-3">
-            <Field
-                id="graders-picked"
-                label="Graders"
-                hint="The judge, when picked, comes first and gives the main score. Otherwise the first grader does."
-            >
-                <CheckboxSelect
-                    label="Graders"
-                    allLabel="No graders"
-                    noun="graders"
-                    options={options}
-                    value={names}
-                    onValueChange={setNames}
-                />
-            </Field>
-            {judged && (
-                <Field
-                    id="judge-rubric"
-                    label="Judge rubric"
-                    hint="The judge scores each answer from 1 to 5 against this and says why in a sentence. Scores are cached per answer, rubric and judge."
-                >
-                    <Textarea
-                        id="judge-rubric"
-                        className="min-h-32"
-                        value={rubric}
-                        onChange={(event) => setRubric(event.target.value)}
-                    />
-                </Field>
-            )}
+            <Textarea
+                id="judge-rubric"
+                aria-label="Judge rubric"
+                className="min-h-32"
+                value={rubric}
+                onChange={(event) => setRubric(event.target.value)}
+            />
             <Actions>
                 <Button
-                    disabled={Boolean(problem) || unchanged || save.isPending}
+                    disabled={!rubric.trim() || unchanged || save.isPending}
                     onClick={() => save.mutate(configs)}
                 >
                     Save
                 </Button>
-                {!detail.graders_default && (
-                    <Button
-                        variant="outline"
-                        disabled={save.isPending}
-                        onClick={() => save.mutate([])}
-                    >
-                        Use the defaults
-                    </Button>
-                )}
                 <Button variant="ghost" onClick={onDone}>
                     Cancel
                 </Button>
-                {problem && <span className="text-sm text-muted-foreground">{problem}</span>}
-            </Actions>
-        </div>
-    );
-}
-
-function JudgeEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => void }) {
-    const models = useAllModels();
-    const install = useJudgeSetting();
-    const [value, setValue] = useState(detail.judge.override ?? INSTALL_JUDGE);
-    const bases = (models.data ?? []).filter(
-        (row) =>
-            row.kind === "base" &&
-            (row.availability.state === "available" || row.key === detail.judge.override),
-    );
-    const fallback = install.data?.name
-        ? `This install's judge model, ${install.data.name}`
-        : `This install's judge model (none chosen: its own base, ${detail.base_model})`;
-    const save = useMutation({
-        mutationFn: () =>
-            unwrap(
-                api.PUT("/api/models/{name}/judge", {
-                    params: { path: { name: detail.slug } },
-                    body: { model: value === INSTALL_JUDGE ? null : value },
-                }),
-            ),
-        ...useSaved("Judge model saved", onDone),
-    });
-    return (
-        <div className="flex flex-col gap-3">
-            <Field
-                id="judge-model"
-                label="Judge model"
-                hint="Any base on this install. A larger base judges better; the judge runs as its own job and its scores are cached."
-            >
-                <Select value={value} onValueChange={(next) => setValue(String(next ?? value))}>
-                    <SelectTrigger id="judge-model" className="w-full max-w-md">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value={INSTALL_JUDGE}>{fallback}</SelectItem>
-                        {bases.map((row) => (
-                            <SelectItem key={row.key} value={row.key}>
-                                {row.name}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-            <Actions>
-                <Button
-                    disabled={save.isPending || value === (detail.judge.override ?? INSTALL_JUDGE)}
-                    onClick={() => save.mutate()}
-                >
-                    Save
-                </Button>
-                <Button variant="ghost" onClick={onDone}>
-                    Cancel
-                </Button>
-                <ErrorLine error={models.error ?? install.error} />
-            </Actions>
-        </div>
-    );
-}
-
-function RuleEditor({
-    detail,
-    metrics,
-    onDone,
-}: {
-    detail: ModelDetail;
-    metrics: string[];
-    onDone: () => void;
-}) {
-    const [rule, setRule] = useState<PromotionInfo>(detail.promotion);
-    const save = useMutation({
-        mutationFn: () =>
-            unwrap(
-                api.PUT("/api/models/{name}/promotion", {
-                    params: { path: { name: detail.slug } },
-                    body: rule,
-                }),
-            ),
-        ...useSaved("Promotion rule saved", onDone),
-    });
-    const dirty = JSON.stringify(rule) !== JSON.stringify(detail.promotion);
-    return (
-        <div className="flex flex-col gap-3">
-            <PromotionEditor
-                id="model-promotion"
-                value={rule}
-                metrics={metrics}
-                onChange={setRule}
-            />
-            <Actions>
-                <Button disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
-                    Save
-                </Button>
-                <Button variant="ghost" onClick={onDone}>
-                    Cancel
-                </Button>
+                <ErrorLine error={save.error} />
             </Actions>
         </div>
     );
@@ -525,22 +348,13 @@ function JudgedRow({
 }
 
 export function JudgedSection({ detail }: { detail: ModelDetail }) {
-    const presets = usePresets();
     const can = useCan();
     const [open, setOpen] = useState<Part | null>(null);
-    const preset = presets.data?.presets.find((item) => item.key === detail.preset);
-    const names = detail.graders.map((item) => item.name);
-    const metrics = metricsFor(presets.data, names);
     const close = () => setOpen(null);
     const toggle = (part: Part) => () => setOpen(open === part ? null : part);
-    const judgeShown = !detail.contract.labels && (detail.judge.used || Boolean(preset?.rubric));
+    const judged = detail.graders.some((item) => item.name === JUDGE);
     return (
-        <PanelSection
-            icon={Scale}
-            anchor="how-its-judged"
-            title="How it's judged"
-            description={`What every answer is held to, how versions are scored and when one can go live. ${detail.graders_default ? `Each part starts from the ${preset?.label ?? detail.preset} defaults.` : "The graders are edited; the rest starts from the defaults."}`}
-        >
+        <PanelSection icon={Scale} anchor="how-its-judged" title="How it's judged">
             <SettingsGroup>
                 <JudgedRow
                     part="answer"
@@ -560,51 +374,22 @@ export function JudgedSection({ detail }: { detail: ModelDetail }) {
                         onDone={close}
                     />
                 </JudgedRow>
-                <JudgedRow
-                    part="graders"
-                    label="Scored by"
-                    description={gradersSentence(names)}
-                    open={open === "graders"}
-                    editable={can.build}
-                    onToggle={toggle("graders")}
-                >
-                    <GradersEditor
-                        key={JSON.stringify(detail.graders)}
-                        detail={detail}
-                        onDone={close}
-                    />
-                </JudgedRow>
-                {judgeShown && (
+                {judged && (
                     <JudgedRow
-                        part="judge"
-                        label="Judge"
-                        description={
-                            detail.judge.used || detail.judge.source !== "base"
-                                ? judgeSentence(detail.judge)
-                                : `${judgeSentence(detail.judge)} Pick one here, or for every model in Settings, General, to add a judge score.`
-                        }
-                        open={open === "judge"}
+                        part="rubric"
+                        label="Judge rubric"
+                        description={detail.judge.rubric ?? detail.judge.default_rubric ?? ""}
+                        open={open === "rubric"}
                         editable={can.build}
-                        onToggle={toggle("judge")}
+                        onToggle={toggle("rubric")}
                     >
-                        <JudgeEditor detail={detail} onDone={close} />
+                        <RubricEditor
+                            key={JSON.stringify(detail.graders)}
+                            detail={detail}
+                            onDone={close}
+                        />
                     </JudgedRow>
                 )}
-                <JudgedRow
-                    part="rule"
-                    label="Goes live when"
-                    description={ruleSentence(detail.promotion, metrics[0] ?? detail.main_metric)}
-                    open={open === "rule"}
-                    editable={can.build}
-                    onToggle={toggle("rule")}
-                >
-                    <RuleEditor
-                        key={JSON.stringify(detail.promotion)}
-                        detail={detail}
-                        metrics={metrics}
-                        onDone={close}
-                    />
-                </JudgedRow>
             </SettingsGroup>
         </PanelSection>
     );

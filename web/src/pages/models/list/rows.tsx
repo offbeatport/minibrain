@@ -263,7 +263,7 @@ function MakeLiveLink({
                 onClick={() => on.makeLive(model, version)}
                 className="relative z-10 rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             >
-                {`Make v${number} live`}
+                {`Deploy v${number}`}
             </button>
         </>
     );
@@ -883,7 +883,7 @@ export function VersionLine({
                         }
                         onClick={() => on.makeLive(model, version)}
                     >
-                        {`Make v${version.number} live`}
+                        {`Deploy v${version.number}`}
                     </Button>
                 )}
             </ActionsCell>

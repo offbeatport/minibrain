@@ -35,6 +35,7 @@ import { splitTags, useModelsRefresh } from "../dialogs";
 import { Clipped, Fact, Group, Mono, Muted, Row, parametersText } from "./facts";
 import { baseNameOf, isDeployed } from "./header";
 import { liveOf, versionLabel } from "./makeLive";
+import { settingsHref } from "./settings";
 import { useTrafficRange } from "./usage";
 
 type EditKind = "description" | "tags";
@@ -157,11 +158,7 @@ function useEdit(row: ModelRow) {
 
 function AboutSection({ children }: { children: ReactNode }) {
     return (
-        <PanelSection
-            icon={Info}
-            title="About"
-            description="What this model is and how to call it."
-        >
+        <PanelSection icon={Info} title="About">
             <div className="@container">
                 <dl className="grid gap-x-4 gap-y-3 @md:grid-cols-2 @xl:grid-cols-3">{children}</dl>
             </div>
@@ -169,9 +166,9 @@ function AboutSection({ children }: { children: ReactNode }) {
     );
 }
 
-function DetailsSection({ description, children }: { description: string; children: ReactNode }) {
+function DetailsSection({ children }: { children: ReactNode }) {
     return (
-        <PanelSection icon={SlidersHorizontal} title="Details" description={description} flush>
+        <PanelSection icon={SlidersHorizontal} title="Details" flush>
             <div className="@container flex flex-col divide-y py-1">{children}</div>
         </PanelSection>
     );
@@ -240,7 +237,7 @@ export function About({
             <Fact label="Task">
                 <Clipped
                     text={taskText(detail, preset?.label)}
-                    href={`${modelPageHref(row.key, "versions")}#how-its-judged`}
+                    href={`${modelPageHref(row.key, "training")}#how-its-judged`}
                 />
             </Fact>
             <Fact label="Live">
@@ -359,12 +356,13 @@ export function Details({
     const instructions = detail.instructions || detail.default_instructions;
     const firstLine = instructions.split("\n").find((line) => line.trim()) ?? "";
     const versionsHref = modelPageHref(row.key, "versions");
-    const editLink = (anchor: string, label: string) =>
-        can.build ? <EditLink href={`${versionsHref}#${anchor}`} label={label} /> : undefined;
+    const trainingHref = modelPageHref(row.key, "training");
+    const editLink = (href: string, label: string) =>
+        can.build ? <EditLink href={href} label={label} /> : undefined;
     const splits = splitsText(detail);
     const safety = safetyText(detail);
     return (
-        <DetailsSection description="Task setup, data, serving, lineage and integrity.">
+        <DetailsSection>
             <Group title="Task setup">
                 <Row label="Labels">
                     {labels.length > 0 ? (
@@ -373,7 +371,10 @@ export function Details({
                         <Muted>Free text</Muted>
                     )}
                 </Row>
-                <Row label="Instructions" edit={editLink("instructions", "Edit instructions")}>
+                <Row
+                    label="Instructions"
+                    edit={editLink(`${trainingHref}#instructions`, "Edit instructions")}
+                >
                     {firstLine ? (
                         <Clipped
                             text={`${instructions.replace(/\n+/g, " ")}${detail.instructions ? "" : " (default)"}`}
@@ -382,12 +383,12 @@ export function Details({
                         <Muted>None</Muted>
                     )}
                 </Row>
-                <Row label="Graders">
+                <Row label="Graders" edit={editLink(settingsHref(row.key), "Edit graders")}>
                     <Clipped text={gradersText(detail)} />
                 </Row>
                 <Row
                     label="Promotion rule"
-                    edit={editLink("how-its-judged", "Edit promotion rule")}
+                    edit={editLink(settingsHref(row.key), "Edit promotion rule")}
                 >
                     <Clipped text={rulesText(detail)} />
                 </Row>
@@ -561,13 +562,7 @@ export function BaseDetails({ row, base }: { row: ModelRow; base: BaseModelDetai
     );
     const serveOnly = base.serve_only ?? row.serve_only;
     return (
-        <DetailsSection
-            description={
-                children.length > 0
-                    ? "Serving, source, lineage and integrity."
-                    : "Serving, source and integrity."
-            }
-        >
+        <DetailsSection>
             <Group title="Serving">
                 <Row label="Machines">
                     {hosts.length > 0 ? (

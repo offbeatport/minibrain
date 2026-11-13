@@ -283,17 +283,17 @@ export function ModelsList() {
             const notes = [
                 `Requests to ${model.key} are answered by v${version.number} from now on.`,
                 live
-                    ? `v${live.number} stays callable as ${model.key}@${live.number}, and you can make it live again at any time.`
-                    : `${model.name} is not deployed yet: making v${version.number} live also deploys it.`,
+                    ? `v${live.number} stays callable as ${model.key}@${live.number}, and you can deploy it again at any time.`
+                    : `${model.name} is not deployed yet: this deploys it.`,
             ];
             confirm({
-                title: `Make v${version.number} of ${model.name} live?`,
+                title: `Deploy v${version.number} of ${model.name}?`,
                 description: <p>{notes.join(" ")}</p>,
-                confirmLabel: `Make v${version.number} live`,
+                confirmLabel: `Deploy v${version.number}`,
                 run: async () => {
                     await promoteVersion(model.key, version.number);
                     toast({
-                        title: `v${version.number} of ${model.name} is live`,
+                        title: `v${version.number} of ${model.name} is deployed`,
                         tone: "success",
                     });
                 },

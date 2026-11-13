@@ -24,6 +24,7 @@ from minibrain.registry.models import (
 )
 from minibrain.settings import Settings
 from minibrain.tasks.judge import REASON_CHARACTERS, judge_of, pending_items
+from minibrain.tasks.rescore import RESCORE
 from minibrain.tasks.service import graded, graders_of, judge_keys, judge_scores, split_examples
 
 TRANSFERS = (JobKind.DOWNLOAD, JobKind.IMPORT)
@@ -51,7 +52,7 @@ class DomainEffects:
 
     def on_failure(self, session: Session, job: Job) -> None:
         version = job.version if job.version is not None and job.version.status != VersionStatus.DELETING else None
-        if version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL):
+        if version is not None and job.kind in (JobKind.TRAIN, JobKind.EVAL) and RESCORE not in job.params:
             version.status = VersionStatus.FAILED
         if version is not None and job.kind == JobKind.JUDGE:
             version.status = VersionStatus.READY
@@ -74,7 +75,7 @@ class DomainEffects:
             return
         if job.kind == JobKind.TRAIN:
             job.version.status = VersionStatus.TRAINING
-        elif job.kind in (JobKind.EVAL, JobKind.JUDGE):
+        elif job.kind in (JobKind.EVAL, JobKind.JUDGE) and RESCORE not in job.params:
             job.version.status = VersionStatus.EVALUATING
 
     def transferred(self, session: Session, job: Job) -> None:
@@ -158,6 +159,9 @@ class DomainEffects:
         result = job.result or {}
         answers = result.get("answers") or {}
         store = store_for(self.settings)
+        rescored = job.params.get(RESCORE)
+        if rescored is not None:
+            version.graders = list(rescored)
         version.metrics = dict(result.get("metrics", {})) | graded(session, store, version, answers)
         examples = split_examples(session, store, version)
         judge = judge_of(graders_of(version, judge_scores(session, judge_keys(version, examples, answers))))
@@ -171,6 +175,8 @@ class DomainEffects:
             return
         unique = list({item.key: item for item in items}.values())
         params = judge_params(session, self.settings, version, judge, unique) | {"eval_job": job.id}
+        if rescored is not None:
+            params[RESCORE] = True
         enqueue(session, JobKind.JUDGE, params, version.model_id, version.id, f"judge:{version.id}:{job.id}")
 
     def judged(self, session: Session, job: Job) -> None:

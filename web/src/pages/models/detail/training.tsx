@@ -45,6 +45,7 @@ import { InstructionsSection } from "../InstructionsSection";
 import { JudgedSection } from "../JudgedSection";
 import { Tip, isDeployed, nextVersion, trainBlock } from "./header";
 import { liveOf, versionLabel } from "./makeLive";
+import { ScoredBy } from "./scoredBy";
 import { recipeText } from "./versions";
 
 type View = "scores" | "loss";
@@ -254,7 +255,7 @@ function TrainingChart({
         <PanelSection
             icon={ChartLine}
             title={view === "scores" ? "Score by version" : "Loss curves"}
-            description={
+            tip={
                 view === "scores"
                     ? scoreNote(versions, detail)
                     : `Training loss of ${running ? "the running job and " : ""}the last finished runs, by share of training done.`
@@ -318,13 +319,7 @@ function RunsSection({
     const runs = jobs.filter((job) => job.kind === "train" || job.kind === "eval");
     const byNumber = new Map(versions.map((version) => [version.number, version]));
     return (
-        <PanelSection
-            icon={GraduationCap}
-            title="Training runs"
-            description={`Each run trained or scored one version of ${row.name}; open one for its loss and logs.`}
-            actions={actions}
-            flush
-        >
+        <PanelSection icon={GraduationCap} title="Training runs" actions={actions} flush>
             {runs.length === 0 ? (
                 <p className="p-panel text-muted-foreground">No training runs yet.</p>
             ) : (
@@ -456,7 +451,6 @@ function DataSection({ row, detail }: { row: ModelRow; detail: ModelDetail }) {
             icon={Database}
             anchor="training-data"
             title="Training data"
-            description="The saved dataset version the next run trains and is scored on."
             actions={
                 can.build &&
                 version && (
@@ -593,42 +587,45 @@ export function TrainingTab({
     const jobs = useJobs(row.key);
     const list = jobs.data ?? [];
     return (
-        <PanelSections>
-            <TrainingChart row={row} detail={detail} versions={versions} jobs={list} />
-            <RunsSection
-                row={row}
-                jobs={list}
-                versions={versions}
-                actions={
-                    <>
-                        <ScoreButton row={row} detail={detail} />
-                        <TrainButton
-                            row={row}
-                            detail={detail}
-                            onTrain={() => router.history.push(trainHref(row.key))}
-                        />
-                    </>
-                }
-            />
-            {detail && <DataSection row={row} detail={detail} />}
-            {detail && <InstructionsSection detail={detail} />}
-            {detail && <JudgedSection detail={detail} />}
-            <PanelSection
-                icon={ThumbsUp}
-                title="Feedback"
-                description="Answers marked right or wrong since the last version. Accepted ones join the next run's training rows."
-            >
-                <FeedbackSince slug={row.key} />
-            </PanelSection>
-            <PanelSection
-                icon={ListChecks}
-                anchor="test-examples"
-                title="Test examples"
-                description="Conversations saved from the Playground with the answer they should get. Each joins the held-out rows of the next version's data, so that version is scored on it."
-                bare
-            >
-                <TestExamples slug={row.key} />
-            </PanelSection>
-        </PanelSections>
+        <>
+            <ScoredBy detail={detail} />
+            <PanelSections>
+                <TrainingChart row={row} detail={detail} versions={versions} jobs={list} />
+                <RunsSection
+                    row={row}
+                    jobs={list}
+                    versions={versions}
+                    actions={
+                        <>
+                            <ScoreButton row={row} detail={detail} />
+                            <TrainButton
+                                row={row}
+                                detail={detail}
+                                onTrain={() => router.history.push(trainHref(row.key))}
+                            />
+                        </>
+                    }
+                />
+                {detail && <DataSection row={row} detail={detail} />}
+                {detail && <InstructionsSection detail={detail} />}
+                {detail && <JudgedSection detail={detail} />}
+                <PanelSection
+                    icon={ThumbsUp}
+                    title="Feedback"
+                    tip="Accepted ones join the next run's training rows."
+                >
+                    <FeedbackSince slug={row.key} />
+                </PanelSection>
+                <PanelSection
+                    icon={ListChecks}
+                    anchor="test-examples"
+                    title="Test examples"
+                    tip="Saved from the Playground with the answer they should get. Each joins the held-out rows of the next version's data."
+                    bare
+                >
+                    <TestExamples slug={row.key} />
+                </PanelSection>
+            </PanelSections>
+        </>
     );
 }

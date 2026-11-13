@@ -115,7 +115,7 @@ def version_said(event: AuditEvent) -> Said:
             return Said(f"scored {name}, prompt only", link)
         return Said(f"started training {name}", link)
     if event.action == "version.promote":
-        return Said(f"made {name} live", link, "success")
+        return Said(f"deployed {name}", link, "success")
     if event.action in ("version.delete", "version.delete_finished"):
         return Said(f"deleted {name}")
     if event.action == "version.card":
@@ -213,6 +213,11 @@ def kept(owner: Owner, event: AuditEvent) -> Said:
     return Said(f"turned keeping inputs and answers {'on' if (event.detail or {}).get('to') else 'off'}")
 
 
+def rescored(owner: Owner, event: AuditEvent) -> Said:
+    count = len((event.detail or {}).get("versions") or [])
+    return Said(f"started re-scoring {count} version{'' if count == 1 else 's'}")
+
+
 def updated(owner: Owner, event: AuditEvent) -> Said:
     return update_said(event)
 
@@ -227,6 +232,7 @@ SENTENCES: dict[str, Callable[[Owner, AuditEvent], Said]] = {
     "model.instructions": fixed("changed the instructions"),
     "model.graders": fixed("changed the graders"),
     "model.promotion": fixed("changed the promotion rule"),
+    "model.rescore": rescored,
     "model.contract": fixed("changed the answers"),
     "model.judge": fixed("changed the judge"),
     "model.safety": fixed("changed the safety model"),

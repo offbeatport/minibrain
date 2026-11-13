@@ -1,5 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle, cn } from "obp-ui";
+import {
+    Card,
+    CardAction,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+    InfoTip,
+    cn,
+} from "obp-ui";
 import type { ReactNode } from "react";
 
 const FLUSH_GRID =
@@ -43,6 +52,7 @@ export function PanelSection({
     anchor,
     title,
     description,
+    tip,
     actions,
     bare = false,
     flush = false,
@@ -52,6 +62,7 @@ export function PanelSection({
     anchor?: string;
     title: string;
     description?: ReactNode;
+    tip?: ReactNode;
     actions?: ReactNode;
     bare?: boolean;
     flush?: boolean;
@@ -70,6 +81,11 @@ export function PanelSection({
                             className="size-5 shrink-0 text-muted-foreground"
                         />
                         {title}
+                        {tip && (
+                            <InfoTip label={`About ${title.toLowerCase()}`} side="right">
+                                {tip}
+                            </InfoTip>
+                        )}
                     </h2>
                     {description && (
                         <p className="pl-7 text-sm text-muted-foreground">{description}</p>

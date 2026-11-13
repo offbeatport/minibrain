@@ -23,12 +23,14 @@ import { useHealthActions } from "../healthActions";
 import { About, BaseAbout, BaseDetails, Details } from "./about";
 import { ActivityPanel } from "./activity";
 import { CompareView } from "./compare";
+import { ModelActions } from "./deploy";
 import { BaseFiles, CustomFiles, FilesSheet, adapterText, verifiedText } from "./files";
 import { Crumbs, ModelHeader, baseNameOf, modelCrumbs } from "./header";
 import { KeysTab } from "./keys";
 import { liveOf } from "./makeLive";
 import { MonitoringTab } from "./monitoring";
 import { HealthNotice, TeardownNotice } from "./parts";
+import { SettingsTab } from "./settings";
 import { TAB_LABELS, tabsFor, useModelTab } from "./tabs";
 import { TrainingTab } from "./training";
 import { UsagePanel } from "./usage";
@@ -252,7 +254,18 @@ function Loaded({ row }: { row: ModelRow }) {
         <Page wide>
             <Crumbs items={modelCrumbs(row)} />
             <div className="flex flex-col gap-3">
-                <ModelHeader row={row} detail={modelDetail} base={base.data} />
+                <ModelHeader
+                    row={row}
+                    base={base.data}
+                    actions={
+                        <ModelActions
+                            row={row}
+                            detail={modelDetail}
+                            base={base.data}
+                            versions={list}
+                        />
+                    }
+                />
                 <TabNav
                     label={`${row.name} pages`}
                     tabs={tabs.map((item) => ({
@@ -266,12 +279,17 @@ function Loaded({ row }: { row: ModelRow }) {
                 {(tab === "overview" || tab === "files") && (
                     <Overview row={row} detail={modelDetail} base={base.data} versions={list} />
                 )}
-                {tab === "versions" && <VersionsTab row={row} versions={list} />}
+                {tab === "versions" && (
+                    <VersionsTab row={row} detail={modelDetail} versions={list} />
+                )}
                 {tab === "training" && (
                     <TrainingTab row={row} detail={modelDetail} versions={list} />
                 )}
                 {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
                 {tab === "api" && <KeysTab row={row} detail={modelDetail} />}
+                {tab === "settings" && (
+                    <SettingsTab row={row} detail={modelDetail} versions={list} />
+                )}
             </div>
             <Files row={row} open={tab === "files"} base={base.data} versions={list} />
         </Page>

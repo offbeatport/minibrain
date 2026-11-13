@@ -43,6 +43,7 @@ const ACTIONS: Record<string, string> = {
     "model.labels_dismiss": "Label suggestions dismissed",
     "model.name_release": "API name released",
     "model.promotion": "Promotion rule changed",
+    "model.rescore": "Versions re-scored",
     "model.update": "Model changed",
     "settings.judge": "Default judge changed",
     "settings.prices": "Compute prices changed",
