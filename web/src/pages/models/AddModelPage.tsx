@@ -42,6 +42,17 @@ type Problems = {
 
 const PROBLEM_ORDER: (keyof Problems)[] = ["model", "dataset", "name", "licence"];
 
+const FIELD_IDS: Record<keyof Problems, string> = {
+    model: "base-model",
+    dataset: "create-dataset",
+    name: "create-name",
+    licence: "create-licence",
+};
+
+function FieldError({ text }: { text: string | undefined }) {
+    return text ? <p className="text-sm text-destructive">{text}</p> : null;
+}
+
 const STARTING_PRESET = "general";
 
 const UPLOAD_NEW = "upload-new";
@@ -212,6 +223,7 @@ export function AddModelPage() {
     }, [loaded, identity.name, taken]);
     const name = identity.name;
     const nameTouched = name !== firstName.current;
+    const [attempted, setAttempted] = useState(false);
     const cancel = () => router.history.push(modelsHref());
     const add = useMutation({
         mutationFn: async (slug: string) => {
@@ -290,10 +302,21 @@ export function AddModelPage() {
         Boolean(text),
     );
     const ready = baseReady && blocked.length === 0 && Boolean(chosenDataset);
+    const shown = attempted ? blocked : [];
+    const shownFor = (field: keyof Problems) => (attempted ? problems[field] : undefined);
     const submit = () => {
-        if (ready && chosenDataset && !add.isPending) {
-            add.mutate(chosenDataset.slug);
+        if (add.isPending) {
+            return;
         }
+        if (!ready || !chosenDataset) {
+            setAttempted(true);
+            const first = PROBLEM_ORDER.find((field) => problems[field]);
+            if (first) {
+                document.getElementById(FIELD_IDS[first])?.focus();
+            }
+            return;
+        }
+        add.mutate(chosenDataset.slug);
     };
     const shortcut = (event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -330,6 +353,7 @@ export function AddModelPage() {
                         )}
                         <ErrorLine error={catalog.error} />
                         <BaseSummary option={option} plan={plan} />
+                        <FieldError text={shownFor("model")} />
                     </FormControl>
                 </FormRow>
                 {showFormat && (
@@ -354,6 +378,7 @@ export function AddModelPage() {
                                 accepted={accepted}
                                 onAccepted={setAccepted}
                             />
+                            <FieldError text={shownFor("licence")} />
                         </FormControl>
                     </FormRow>
                 )}
@@ -362,11 +387,12 @@ export function AddModelPage() {
                         <DatasetPicker
                             value={dataset}
                             datasets={datasetList}
-                            invalid={Boolean(dataset) && Boolean(problems.dataset)}
+                            invalid={Boolean(shownFor("dataset"))}
                             onChange={setDataset}
                             onUpload={() => router.history.push(UPLOAD_HREF)}
                         />
                         <ErrorLine error={datasets.error} />
+                        <FieldError text={shownFor("dataset")} />
                     </FormControl>
                 </FormRow>
                 <FormRow id="create-name" label="Name" align="start">
@@ -377,7 +403,7 @@ export function AddModelPage() {
                             value={identity}
                             onChange={setIdentity}
                             taken={nameTaken}
-                            error={nameTouched ? problems.name : undefined}
+                            error={nameTouched || attempted ? problems.name : undefined}
                         >
                             <ApiNameHint name={name} />
                         </NameAvatarField>
@@ -402,7 +428,7 @@ export function AddModelPage() {
                         free={catalog.data?.store_free_bytes}
                         catalog={catalog.data}
                         outcome={outcome}
-                        blocked={blocked}
+                        blocked={[]}
                         onVariant={changeVariant}
                         onPickAnother={() => setOpen(true)}
                     />
@@ -413,9 +439,13 @@ export function AddModelPage() {
                         {add.isPending ? "Creating…" : "Create model"}
                     </>
                 }
-                disabled={!ready || add.isPending}
-                status={blocked[0] ?? outcome}
-                problem={blocked.length > 0}
+                disabled={add.isPending || shown.length > 0}
+                status={
+                    shown.length > 1
+                        ? `Fix the ${shown.length} fields marked in red`
+                        : (shown[0] ?? outcome)
+                }
+                problem={shown.length > 0}
                 onSubmit={submit}
                 onCancel={cancel}
                 onKeyDown={shortcut}
