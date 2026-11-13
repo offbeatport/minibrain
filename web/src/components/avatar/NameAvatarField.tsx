@@ -1,5 +1,5 @@
-import { Dices, Lock } from "lucide-react";
-import { Button, Input, Kbd, Label, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
+import { Dices } from "lucide-react";
+import { Button, Input, Kbd, Label, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { generateName } from "~/lib/avatarNames";
 import { PickerDialog, isTyping } from "./AvatarPicker";
@@ -11,8 +11,6 @@ export type Identity = { name: string; avatar: AvatarChoice };
 
 export type NameTaken = (name: string) => boolean;
 
-type Locks = { name: string | null; avatar: AvatarChoice | null };
-
 export function newIdentity(taken: NameTaken): Identity {
     return {
         name: generateName(taken),
@@ -20,33 +18,8 @@ export function newIdentity(taken: NameTaken): Identity {
     };
 }
 
-function shuffleLabel(locks: Locks): string {
-    return locks.name !== null ? "Undo the name to shuffle again" : "Shuffle the name";
-}
-
-function LockNote({
-    what,
-    previous,
-    onUndo,
-}: {
-    what: string;
-    previous: string;
-    onUndo: () => void;
-}) {
-    return (
-        <span className="inline-flex items-center gap-1.5">
-            <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-            <span>{what} kept</span>
-            <button
-                type="button"
-                onClick={onUndo}
-                aria-label={`Undo ${what.toLowerCase()}, back to ${previous}`}
-                className="rounded-sm text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                Undo
-            </button>
-        </span>
-    );
+function shuffleLabel(): string {
+    return "Shuffle the name";
 }
 
 export function NameAvatarField({
@@ -68,18 +41,13 @@ export function NameAvatarField({
     rows?: { avatar: (node: ReactNode) => ReactNode; name: (node: ReactNode) => ReactNode };
     children?: ReactNode;
 }) {
-    const [locks, setLocks] = useState<Locks>({ name: null, avatar: null });
     const [picking, setPicking] = useState(false);
     const [dealt, setDealt] = useState(0);
     const display = value.name.trim() || "Untitled model";
-    const bothLocked = locks.name !== null;
-    const latest = useRef({ value, locks, taken, onChange });
-    latest.current = { value, locks, taken, onChange };
+    const latest = useRef({ value, taken, onChange });
+    latest.current = { value, taken, onChange };
     const shuffle = () => {
-        const { value: current, locks: held, taken: isTaken, onChange: emit } = latest.current;
-        if (held.name !== null) {
-            return;
-        }
+        const { value: current, taken: isTaken, onChange: emit } = latest.current;
         const previous = current.name.trim().toLowerCase();
         emit({
             name: generateName((name) => isTaken(name) || name.toLowerCase() === previous),
@@ -110,21 +78,13 @@ export function NameAvatarField({
         return () => window.removeEventListener("keydown", onKey);
     }, [picking]);
     const rename = (name: string) => {
-        setLocks((held) => (held.name === null ? { ...held, name: value.name } : held));
         onChange({ ...value, name });
     };
     const applyAvatar = (avatar: AvatarChoice) => {
         if (sameChoice(avatar, value.avatar)) {
             return;
         }
-        setLocks((held) => (held.avatar === null ? { ...held, avatar: value.avatar } : held));
         onChange({ ...value, avatar });
-    };
-    const undoName = () => {
-        if (locks.name !== null) {
-            onChange({ ...value, name: locks.name });
-            setLocks((held) => ({ ...held, name: null }));
-        }
     };
     const avatarButton = (size: "md" | "field") => (
         <Tooltip>
@@ -148,7 +108,7 @@ export function NameAvatarField({
             <TooltipContent>Change avatar</TooltipContent>
         </Tooltip>
     );
-    const label = shuffleLabel(locks);
+    const label = shuffleLabel();
     const field = (
         <div data-testid="name-row" className="flex flex-col gap-label">
             {labelled && <Label htmlFor={id}>Name</Label>}
@@ -164,14 +124,8 @@ export function NameAvatarField({
                         spellCheck={false}
                         aria-invalid={Boolean(error)}
                         onChange={(event) => rename(event.target.value)}
-                        className={cn("avatar-fade", locks.name !== null && "pr-8")}
+                        className="avatar-fade"
                     />
-                    {locks.name !== null && (
-                        <Lock
-                            aria-hidden="true"
-                            className="pointer-events-none absolute top-1/2 right-2.5 size-3.5 -translate-y-1/2 text-muted-foreground"
-                        />
-                    )}
                 </div>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -180,9 +134,7 @@ export function NameAvatarField({
                             variant="outline"
                             size="icon"
                             aria-label={label}
-                            aria-disabled={bothLocked}
                             onClick={shuffle}
-                            className={cn(bothLocked && "opacity-50 hover:bg-card")}
                         >
                             <Dices aria-hidden="true" />
                         </Button>
@@ -190,16 +142,11 @@ export function NameAvatarField({
                     <TooltipContent>
                         <span className="flex items-center gap-2">
                             {label}
-                            {!bothLocked && <Kbd>R</Kbd>}
+                            <Kbd>R</Kbd>
                         </span>
                     </TooltipContent>
                 </Tooltip>
             </div>
-            {locks.name !== null && (
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                    <LockNote what="Name" previous={locks.name} onUndo={undoName} />
-                </div>
-            )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             {children}
         </div>
