@@ -50,8 +50,9 @@ function GetStarted() {
                     .
                 </li>
                 <li>
-                    On Data, upload <span className="font-mono">samples/demo_travel_intents.jsonl</span>{" "}
-                    and build the dataset.
+                    On Data, upload{" "}
+                    <span className="font-mono">samples/demo_travel_intents.jsonl</span> and build
+                    the dataset.
                 </li>
                 <li>
                     On Training, pick it as the model's data; the model page then offers to restrict
