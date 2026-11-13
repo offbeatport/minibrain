@@ -151,10 +151,10 @@ export function ServeOnlyNotice({
     return (
         <div className="flex flex-col gap-2.5">
             <StatusText tone="warning">{`${scheme(variant)} can't be fine-tuned`}</StatusText>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground">
                 Quantized formats serve only; training needs full precision. {next}
             </p>
-            <p className="text-sm text-muted-foreground">{still}</p>
+            <p className="text-muted-foreground">{still}</p>
             <div>
                 {full ? (
                     <Button type="button" variant="outline" onClick={() => onVariant(full.id)}>

@@ -97,45 +97,6 @@ export function HeldOutWarning({ heldOut }: { heldOut: number }) {
     );
 }
 
-export function MemoryGaugeFooter({
-    option,
-    memoryLabel,
-}: {
-    option: OptionInfo;
-    memoryLabel: string;
-}) {
-    const ok = fits(option);
-    const parts = partsOf(option);
-    const available = option.available_bytes ?? option.peak_bytes;
-    return (
-        <div className="flex flex-col gap-1.5">
-            <ResourceBar
-                label={`${memoryLabel} for training`}
-                total={Math.max(available, option.peak_bytes)}
-                segments={SEGMENTS.map((segment) => ({
-                    id: segment.key,
-                    value: parts[segment.key],
-                    fill: ok ? segment.fill : segment.danger,
-                }))}
-            />
-            <p className="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted-foreground tabular-nums">
-                <span className={cn("text-foreground", !ok && "text-destructive")}>
-                    {`${gigabytes(option.peak_bytes)} of ${gigabytes(available)} ${memoryLabel}`}
-                </span>
-                {SEGMENTS.map((segment) => (
-                    <span key={segment.key} className="inline-flex items-center gap-1.5">
-                        <span
-                            aria-hidden
-                            className={cn("size-2 rounded-xs", ok ? segment.fill : segment.danger)}
-                        />
-                        {`${segment.label} ${gigabytes(parts[segment.key])}`}
-                    </span>
-                ))}
-            </p>
-        </div>
-    );
-}
-
 export function MemorySummary({
     option,
     memoryLabel,
@@ -165,7 +126,7 @@ export function MemorySummary({
                     ? `${gigabytes(option.peak_bytes)} of ${gigabytes(available)} ${memoryLabel}`
                     : `${gigabytes(option.peak_bytes)} needed · only ${gigabytes(available)} ${memoryLabel}`}
             </SummaryLine>
-            <ul className="flex flex-col gap-0.5 text-sm text-muted-foreground tabular-nums">
+            <ul className="flex flex-col gap-0.5 text-muted-foreground tabular-nums">
                 {SEGMENTS.map((segment) => (
                     <li key={segment.key} className="flex items-center gap-2">
                         <span

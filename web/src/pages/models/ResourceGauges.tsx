@@ -72,7 +72,7 @@ function Figures({ icon, children }: { icon: LucideIcon; children: ReactNode }) 
 
 function Where({ children }: { children: ReactNode }) {
     return (
-        <SummaryLine icon={Server} className="text-sm text-muted-foreground">
+        <SummaryLine icon={Server} className="text-muted-foreground">
             {children}
         </SummaryLine>
     );

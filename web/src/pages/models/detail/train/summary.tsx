@@ -125,7 +125,7 @@ function PoolFact({ run }: { run: TrainRun }) {
                 </Link>
             )}
             {machine && pinned && (
-                <span className="block truncate text-sm text-muted-foreground">{machine.name}</span>
+                <span className="block truncate text-muted-foreground">{machine.name}</span>
             )}
         </>
     );
@@ -224,7 +224,7 @@ export function RunSummary({
                         {run.planning ? "Planning…" : "Not planned yet"}
                     </SummaryLine>
                 )}
-                {unknown && <p className="text-sm text-muted-foreground">{unknown}</p>}
+                {unknown && <p className="text-muted-foreground">{unknown}</p>}
             </SummarySection>
             <SummarySection title="Result">
                 <SummaryLine icon={GraduationCap} className="tabular-nums">
