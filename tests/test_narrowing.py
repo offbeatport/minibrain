@@ -1,7 +1,7 @@
 from typing import Any
 
 from minibrain.registry.models import AuditEvent
-from tests.conftest import LABELS, Harness, give_data
+from tests.conftest import LABELS, Harness, blank_dataset, give_data
 from tests.test_general import pairs_csv
 
 SLUG = "assistant-1"
@@ -11,7 +11,7 @@ LABELLED = {"kind": "json", "labels": sorted(LABELS)}
 
 def add_assistant(harness: Harness) -> dict[str, Any]:
     name = harness.client.get("/api/models/name").json()["name"]
-    created = harness.client.post("/api/models", json={"name": name})
+    created = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client), "name": name})
     assert created.status_code == 201, created.text
     return created.json()
 
@@ -30,16 +30,18 @@ def dismiss(harness: Harness, dataset_version_id: int) -> Any:
     )
 
 
-def test_add_model_needs_only_a_name_and_starts_a_chat_assistant(harness: Harness) -> None:
+def test_add_model_needs_a_dataset_and_a_name_and_starts_a_chat_assistant(harness: Harness) -> None:
     created = add_assistant(harness)
     assert (created["name"], created["preset"], created["versions"]) == ("Assistant 1", "general", 1)
     assert created["contract"] == {"kind": "text", "json_schema": None, "labels": None}
     assert (created["went_live"], created["label_proposal"]) == (False, None)
     suggested = harness.client.get("/api/models/name").json()
     assert suggested == {"name": "Assistant 2", "api_name": "assistant-2", "reserved": None}
-    taken = harness.client.post("/api/models", json={"name": "assistant 1"})
+    taken = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client), "name": "assistant 1"})
     assert taken.status_code == 409 and "already exists" in taken.json()["detail"]
-    labelled = harness.client.post("/api/models", json={"name": "Router", "labels": ["billing", "bug"]})
+    labelled = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Router", "labels": ["billing", "bug"]}
+    )
     assert labelled.status_code == 409 and "preset classify" in labelled.json()["detail"]
     assert harness.client.get("/api/models/router").status_code == 404
 
@@ -72,7 +74,7 @@ def test_free_text_data_proposes_nothing_and_a_dismissal_names_its_own_data(harn
     attached = give_data(harness, SLUG, pairs_csv("question,answer"), "pairs.csv")
     assert attached["dataset_version"]["labels"] == []
     assert attached["label_proposal"] is None
-    other = harness.client.post("/api/models", json={"name": "Other"}).json()
+    other = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client), "name": "Other"}).json()
     give_data(harness, other["slug"])
     elsewhere = model(harness, other["slug"])["dataset_version"]["id"]
     refused = dismiss(harness, elsewhere)

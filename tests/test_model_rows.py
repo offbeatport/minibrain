@@ -7,7 +7,7 @@ from minibrain.api.model_rows import usage_index
 from minibrain.models.hardware import GIB
 from minibrain.registry.models import BaseModel, BaseModelStatus, Model, RequestLog, now
 from minibrain.storage import Space
-from tests.conftest import Harness, give_data
+from tests.conftest import Harness, blank_dataset, give_data
 from tests.test_flow import (
     SLUG,
     add_key,
@@ -25,7 +25,13 @@ def custom_row(harness: Harness, slug: str) -> dict:
 
 def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     give_data(harness, SLUG)
     add_version(harness, "prompt")
@@ -37,7 +43,13 @@ def test_a_deployed_version_shows_its_score(harness: Harness) -> None:
 
 def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> None:
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     assert custom_row(harness, SLUG)["usage"] is None
     with harness.sessions() as session:
@@ -63,7 +75,13 @@ def test_usage_reports_total_trend_failures_and_last_use(harness: Harness) -> No
 
 def test_last_use_is_reported_even_without_recent_requests(harness: Harness) -> None:
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     with harness.sessions() as session:
         model = session.query(Model).filter_by(slug=SLUG).one()
@@ -122,7 +140,13 @@ def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Har
 
 def test_rows_count_api_keys(harness: Harness) -> None:
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     add_key(harness, name="app")
     add_key(harness, name="batch")
@@ -139,9 +163,13 @@ def test_a_deployed_model_must_be_undeployed_before_it_is_deleted(harness: Harne
 
 
 def test_new_models_take_a_ready_preset(harness: Harness) -> None:
-    later = harness.client.post("/api/models", json={"name": "Fields", "preset": "extract"})
+    later = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Fields", "preset": "extract"}
+    )
     assert later.status_code == 422
-    created = harness.client.post("/api/models", json={"name": "Notes", "preset": "custom"})
+    created = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Notes", "preset": "custom"}
+    )
     assert created.status_code == 201
     assert (created.json()["preset"], created.json()["contract"]["kind"]) == ("custom", "text")
 
@@ -195,7 +223,13 @@ def test_listing_takes_the_same_queries_however_many_models_and_versions_there_a
 
 def test_usage_reports_p95_and_errors_from_one_pass(harness: Harness) -> None:
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     with harness.sessions() as session:
         model = session.query(Model).filter_by(slug=SLUG).one()

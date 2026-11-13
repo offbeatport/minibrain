@@ -15,7 +15,7 @@ from minibrain.auth.config import OIDC_CREDENTIAL_ENV, AuthConfigError, load_aut
 from minibrain.auth.first_run import FirstRun, prepare
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
-from tests.conftest import FakeBackend
+from tests.conftest import FakeBackend, blank_dataset
 from tests.fake_oidc import CLIENT_CREDENTIAL, CLIENT_ID, ISSUER, FakeProvider
 from tests.test_accounts import csrf
 from tests.test_proxy import write_config
@@ -94,7 +94,12 @@ def test_single_sign_on_signs_people_in_with_pkce(sso: Sso) -> None:
     assert (
         browser.post(
             "/api/models",
-            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"},
+            json={
+                "preset": "classify",
+                "labels": ["billing", "bug"],
+                "name": "Triage",
+                "dataset": blank_dataset(browser, csrf(browser)),
+            },
             headers=csrf(browser),
         ).status_code
         == 201

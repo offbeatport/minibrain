@@ -21036,14 +21036,9 @@
             ]
           },
           "dataset": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
             "title": "Dataset"
           },
           "avatar": {
@@ -21071,7 +21066,8 @@
         },
         "type": "object",
         "required": [
-          "name"
+          "name",
+          "dataset"
         ],
         "title": "ModelCreate"
       },

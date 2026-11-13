@@ -6,7 +6,7 @@ from sqlalchemy import select
 from minibrain.data import splits
 from minibrain.registry.files import store_for
 from minibrain.registry.models import Artifact, DatasetVersion
-from tests.conftest import Harness, tickets_csv
+from tests.conftest import Harness, blank_dataset, tickets_csv
 from tests.test_flow import SLUG, finish
 
 pytestmark = pytest.mark.both_stores
@@ -22,7 +22,13 @@ def dataset_with_model(harness: Harness, rows: int = 200) -> dict:
     source = upload(harness, rows)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Support Triage"}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Support Triage",
+        },
     )
     harness.client.put(f"/api/models/{SLUG}/dataset", json={"dataset": "tickets"})
     return source

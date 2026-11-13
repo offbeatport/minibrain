@@ -6391,7 +6391,7 @@ export interface components {
             graders?: components["schemas"]["GraderConfig"][] | null;
             promotion?: components["schemas"]["PromotionInfo"] | null;
             /** Dataset */
-            dataset?: string | null;
+            dataset: string;
             avatar?: components["schemas"]["ModelAvatar"] | null;
             /** Api Name */
             api_name?: string | null;

@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from minibrain.gateway.standalone import create_gateway_app
 from minibrain.registry.models import AuditEvent, RequestLog
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import FakeBackend, Harness, blank_dataset
 from tests.test_access import status, team_of
 from tests.test_feedback import chat, send
 from tests.test_flow import SLUG, add_key
@@ -69,7 +69,15 @@ def test_inputs_and_answers_are_kept_per_model_and_audited(harness: Harness) -> 
     assert status(people.viewer, "PUT", PATH, {"kept": True}) == 403
     assert status(people.builder, "PUT", PATH, {"kept": True}) == 200
     assert set_policy(harness, "request_bodies", True) == 200
-    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Other",
+        },
+    )
     assert bodies_of(harness, "other")["kept"] is True
     assert set_policy(harness, "request_bodies", False) == 200
     assert bodies_of(harness)["kept"] is True and bodies_of(harness, "other")["kept"] is True

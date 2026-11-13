@@ -15,7 +15,7 @@ from minibrain.models.copies import MANIFEST, bucket_chunks, read_manifest
 from minibrain.registry.models import Artifact, AuditEvent, BaseModel
 from minibrain.serve.engine import local_copy, prune_engines, pull_base
 from minibrain.storage import GIB, Space
-from tests.conftest import BUCKET, FOLDER, Harness, use_bucket
+from tests.conftest import BUCKET, FOLDER, Harness, blank_dataset, use_bucket
 from tests.fake_s3 import FakeS3
 from tests.test_models import FILES, add_tiny, download_tiny, hub, manifest
 
@@ -208,7 +208,7 @@ def test_a_quantized_base_in_the_bucket_is_refused_for_training_up_front(harness
     imported = harness.client.get(f"/api/models/{base['key']}").json()
     assert imported["store"] == "s3" and not Path(imported["storage_path"]).exists()
     body = {"name": "On FP8", "preset": "classify", "labels": ["billing", "bug"], "base_model": base["key"]}
-    assert harness.client.post("/api/models", json=body).status_code == 201
+    assert harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body).status_code == 201
     trained = harness.client.post("/api/models/on-fp8/versions", json={"kind": "lora"})
     assert trained.status_code == 409
     assert trained.json()["detail"] == "Corp FP8 is FP8, which serves only. Switch to a full-precision base to train."

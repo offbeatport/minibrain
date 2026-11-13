@@ -1,7 +1,7 @@
 from sqlalchemy import select
 
 from minibrain.registry.models import DatasetVersion
-from tests.conftest import Harness, tickets_csv
+from tests.conftest import Harness, blank_dataset, tickets_csv
 
 
 def upload(harness: Harness, name: str = "tickets.csv") -> dict:
@@ -26,7 +26,15 @@ def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:
         "category",
     )
     for name in ("Triage A", "Triage B"):
-        harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name})
+        harness.client.post(
+            "/api/models",
+            json={
+                "dataset": blank_dataset(harness.client),
+                "preset": "classify",
+                "labels": ["billing", "bug"],
+                "name": name,
+            },
+        )
     for slug in ("triage-a", "triage-b"):
         chosen = harness.client.put(f"/api/models/{slug}/dataset", json={"dataset": "tickets"}).json()
         assert (chosen["dataset"], chosen["source"]["rows"]) == ("tickets", 200)
@@ -37,7 +45,15 @@ def test_two_models_train_on_one_shared_dataset(harness: Harness) -> None:
 def test_deleting_a_dataset_in_use_releases_its_models_and_keeps_their_dataset_versions(harness: Harness) -> None:
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
-    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"})
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Triage",
+        },
+    )
     harness.client.put("/api/models/triage/dataset", json={"dataset": "tickets"})
     taken = dataset_version_hash(harness, "triage")
     assert harness.client.post("/api/models/triage/versions", json={"kind": "prompt"}).status_code == 201
@@ -58,7 +74,15 @@ def test_models_sharing_a_dataset_see_its_mapping_change(harness: Harness) -> No
     source = upload(harness)
     harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": source["id"]})
     for name in ("Triage A", "Triage B"):
-        harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name})
+        harness.client.post(
+            "/api/models",
+            json={
+                "dataset": blank_dataset(harness.client),
+                "preset": "classify",
+                "labels": ["billing", "bug"],
+                "name": name,
+            },
+        )
         harness.client.put(f"/api/models/{name.lower().replace(' ', '-')}/dataset", json={"dataset": "tickets"})
     assert harness.client.get("/api/models/triage-b").json()["source"]["rows"] == 200
     mapped = harness.client.put(

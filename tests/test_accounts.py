@@ -30,7 +30,7 @@ from minibrain.auth.passwords import hash_password, verify_password
 from minibrain.registry.db import make_sessions, migrate
 from minibrain.registry.models import ApiKey, AuditEvent, LoginSession, Setting, User, now
 from minibrain.settings import Settings
-from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness
+from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, blank_dataset
 
 PASSWORD = "correct horse battery"
 ADMIN = "ada@example.com"
@@ -199,18 +199,14 @@ def test_setup_checks_the_password_and_email(install: Install) -> None:
 
 def test_state_changing_calls_need_the_csrf_token(install: Install) -> None:
     admin = set_up(install)
-    refused = admin.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"})
+    body = {"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}
+    body["dataset"] = blank_dataset(admin, csrf(admin))
+    refused = admin.post("/api/models", json=body)
     assert refused.status_code == 403 and "CSRF" in refused.json()["detail"]
-    wrong = admin.post(
-        "/api/models",
-        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"},
-        headers={"X-CSRF-Token": "0" * 64},
-    )
+    wrong = admin.post("/api/models", json=body, headers={"X-CSRF-Token": "0" * 64})
     assert wrong.status_code == 403
     assert admin.get("/api/models").status_code == 200
-    created = admin.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}, headers=csrf(admin)
-    )
+    created = admin.post("/api/models", json=body, headers=csrf(admin))
     assert created.status_code == 201
     assert admin.delete("/api/models/triage", headers=csrf(admin)).status_code == 202
     [event] = install.events("model.delete")
@@ -394,7 +390,10 @@ def test_signed_in_people_are_recorded_on_reviews_and_keys(install: Install) -> 
     headers = csrf(admin)
     assert (
         admin.post(
-            "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}, headers=headers
+            "/api/models",
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}
+            | {"dataset": blank_dataset(admin, headers)},
+            headers=headers,
         ).status_code
         == 201
     )
@@ -579,7 +578,13 @@ def test_harness_signs_in_as_an_admin(harness: Harness) -> None:
     assert viewer.get("/api/models").status_code == 403
     assert (
         harness.client.post(
-            "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"}
+            "/api/models",
+            json={
+                "preset": "classify",
+                "labels": ["billing", "bug"],
+                "name": "Triage",
+                "dataset": blank_dataset(harness.client),
+            },
         ).status_code
         == 201
     )

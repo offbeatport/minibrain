@@ -18,7 +18,7 @@ from minibrain.policy import PREFIX
 from minibrain.registry.models import AuditEvent, CatalogModel, CatalogVariant
 from minibrain.registry.settings_store import write
 from minibrain.storage import Space
-from tests.conftest import Harness
+from tests.conftest import Harness, blank_dataset
 from tests.test_flow import SLUG, add_version, bearer, create_on_data, create_with_dataset, deploy, finish
 
 REPO = "test/tiny"
@@ -187,7 +187,13 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
     harness.client.post("/api/models/tiny/deploy", json={"deployed": False})
     custom = harness.client.post(
         "/api/models",
-        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"},
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Tickets",
+            "base_model": "tiny",
+        },
     ).json()
     assert "Tickets is trained on Tiny" in harness.client.delete("/api/models/tiny").json()["detail"]
     assert harness.client.delete(f"/api/models/{custom['slug']}").status_code == 202
@@ -340,7 +346,15 @@ def test_my_models_shows_training_and_serving_independently(harness: Harness) ->
         "progress": None,
         "job_id": claim["job_id"],
     }
-    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Draft"})
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Draft",
+        },
+    )
     assert rows(harness)["draft"]["activity"]["label"] == "v0 ready"
     harness.client.patch("/api/models/draft", json={"tags": ["x"]})
     assert rows(harness)["draft"]["tags"] == ["x"]
@@ -504,17 +518,29 @@ def test_a_custom_model_can_start_on_a_base_that_is_still_importing(harness: Har
     base = harness.client.post("/api/models/import", json={"name": "Corp base", "location": str(folder)}).json()
     created = harness.client.post(
         "/api/models",
-        json={"preset": "classify", "labels": ["billing", "bug"], "name": "On corp", "base_model": base["key"]},
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "On corp",
+            "base_model": base["key"],
+        },
     )
     assert created.status_code == 201
     pending = harness.client.post("/api/models/on-corp/versions", json={"kind": "prompt"})
     assert pending.status_code == 409 and "still being imported" in pending.json()["detail"]
     harness.worker(kinds=["import"]).run_once()
     trained = harness.client.post("/api/models/on-corp/versions", json={"kind": "lora"})
-    assert "pick a dataset" in trained.json()["detail"]
+    assert "has no saved version yet" in trained.json()["detail"]
     missing = harness.client.post(
         "/api/models",
-        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Nowhere", "base_model": "nope"},
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Nowhere",
+            "base_model": "nope",
+        },
     )
     assert missing.status_code == 409
 
@@ -531,7 +557,13 @@ def test_a_quantized_base_serves_but_is_not_trained(harness: Harness, tmp_path: 
     assert (
         harness.client.post(
             "/api/models",
-            json={"preset": "classify", "labels": ["billing", "bug"], "name": "On FP8", "base_model": base["key"]},
+            json={
+                "dataset": blank_dataset(harness.client),
+                "preset": "classify",
+                "labels": ["billing", "bug"],
+                "name": "On FP8",
+                "base_model": base["key"],
+            },
         ).status_code
         == 201
     )
@@ -554,7 +586,13 @@ def test_a_custom_model_shows_its_base_download(harness: Harness, hub: Path) -> 
     download_tiny(harness)
     created = harness.client.post(
         "/api/models",
-        json={"preset": "classify", "labels": ["billing", "bug"], "name": "Tickets", "base_model": "tiny"},
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Tickets",
+            "base_model": "tiny",
+        },
     )
     assert created.status_code == 201, created.text
     assert rows(harness)["tickets"]["availability"]["state"] == "downloading"

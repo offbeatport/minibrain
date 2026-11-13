@@ -5,12 +5,18 @@ from sqlalchemy import select
 
 from minibrain.jobs.queue import enqueue
 from minibrain.registry.models import Job, JobKind, JobStatus, Model, now
-from tests.conftest import Harness
+from tests.conftest import Harness, blank_dataset
 
 
 def model_id(harness: Harness, name: str) -> int:
     slug = harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": name,
+        },
     ).json()["slug"]
     with harness.sessions() as session:
         return session.scalars(select(Model.id).where(Model.slug == slug)).one()

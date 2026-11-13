@@ -5,7 +5,7 @@ from minibrain.data.splits import read_split
 from minibrain.registry.files import dataset_version_location
 from minibrain.registry.models import AuditEvent, Job, JobKind, JudgeScore, Model
 from minibrain.tasks.examples import Example
-from tests.conftest import Harness, fake_adapter
+from tests.conftest import Harness, blank_dataset, fake_adapter
 from tests.test_flow import TIMING
 
 SLUG = "assistant-1"
@@ -35,7 +35,9 @@ def pairs_csv(header: str, rows: int = 120) -> bytes:
 
 def create_assistant(harness: Harness, **extra: Any) -> dict[str, Any]:
     name = harness.client.get("/api/models/name?preset=general").json()["name"]
-    response = harness.client.post("/api/models", json={"name": name, "preset": "general", **extra})
+    response = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": name, "preset": "general", **extra}
+    )
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -112,7 +114,9 @@ def test_add_model_defaults_for_a_chat_assistant(harness: Harness) -> None:
     narrowed = harness.client.put(f"/api/models/{SLUG}/contract", json={"contract": schema})
     assert narrowed.status_code == 200, narrowed.text
     assert (narrowed.json()["preset"], narrowed.json()["contract"]["json_schema"]) == ("custom", schema["json_schema"])
-    custom = harness.client.post("/api/models", json={"name": "Free", "preset": "custom"}).json()
+    custom = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Free", "preset": "custom"}
+    ).json()
     assert custom["judge"]["default_rubric"] is None
     assert versions(harness, "free")[0]["view"] == "free_text"
 
@@ -168,7 +172,9 @@ def test_chat_jsonl_is_a_first_class_upload(harness: Harness) -> None:
 
 def test_two_column_tables_map_to_one_turn_chats(harness: Harness) -> None:
     for header, slug in (("question,answer", "qa"), ("prompt,completion", "pc"), ("input,output", "io")):
-        created = harness.client.post("/api/models", json={"name": slug, "preset": "general"})
+        created = harness.client.post(
+            "/api/models", json={"dataset": blank_dataset(harness.client), "name": slug, "preset": "general"}
+        )
         assert created.status_code == 201, created.text
         detail = attach(harness, slug, f"{slug}.csv", pairs_csv(header))
         first, second = header.split(",")

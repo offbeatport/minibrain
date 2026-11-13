@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from minibrain.registry.models import Model, Version
-from tests.conftest import LABELS, Harness, fake_adapter, give_data, scored_answers, tickets_csv
+from tests.conftest import LABELS, Harness, blank_dataset, fake_adapter, give_data, scored_answers, tickets_csv
 
 pytestmark = pytest.mark.both_stores
 
@@ -19,7 +19,10 @@ def build_dataset(harness: Harness) -> dict[str, Any]:
 
 
 def create_model(harness: Harness, name: str = "Support Triage") -> dict[str, Any]:
-    response = harness.client.post("/api/models", json={"name": name, "preset": "classify", "labels": list(LABELS)})
+    response = harness.client.post(
+        "/api/models",
+        json={"dataset": blank_dataset(harness.client), "name": name, "preset": "classify", "labels": list(LABELS)},
+    )
     assert response.status_code == 201, response.text
     return response.json()
 
@@ -296,6 +299,22 @@ def test_system_settings_and_ops(harness: Harness) -> None:
     assert harness.client.get("/metrics").status_code == 404
 
 
+def test_a_custom_model_needs_a_dataset_and_scores_v0_on_its_held_out_rows(harness: Harness) -> None:
+    bare = harness.client.post("/api/models", json={"name": "Bare", "preset": "general"})
+    assert bare.status_code == 422
+    empty = harness.client.post("/api/models", json={"name": "Bare", "preset": "general", "dataset": ""})
+    assert empty.status_code == 422
+    missing = harness.client.post("/api/models", json={"name": "Bare", "preset": "general", "dataset": "nope"})
+    assert missing.status_code == 404
+    assert [row["slug"] for row in harness.client.get("/api/models").json() if row["kind"] == "custom"] == []
+    created = create_on_data(harness)
+    assert created["dataset_version"]["counts"]["eval"] > 0
+    [v0] = harness.client.get(f"/api/models/{SLUG}/versions").json()
+    assert (v0["number"], v0["kind"], v0["dataset_version_id"]) == (0, "prompt", created["dataset_version"]["id"])
+    claim = harness.claim(["eval"])
+    assert claim is not None and claim["job_id"] > 0
+
+
 def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:
     body = {"worker": {"id": "w", "host": "h", "kinds": ["eval"], "gpus": 1}, "wait": 0}
     assert harness.client.post("/internal/worker/claim", json=body).status_code == 401
@@ -305,15 +324,33 @@ def test_internal_endpoints_need_the_worker_token(harness: Harness) -> None:
 
 def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness) -> None:
     blank = harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "**** "}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "**** ",
+        },
     )
     assert blank.status_code == 422 and "letter or number" in blank.json()["detail"]
     assert create_model(harness)["slug"] == SLUG
     taken = harness.client.post(
-        "/api/models", json={"name": "support triage", "preset": "classify", "labels": list(LABELS)}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "name": "support triage",
+            "preset": "classify",
+            "labels": list(LABELS),
+        },
     )
     assert taken.status_code == 409 and "support triage" in taken.json()["detail"]
     same_address = harness.client.post(
-        "/api/models", json={"name": "support  triage!", "preset": "classify", "labels": list(LABELS)}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "name": "support  triage!",
+            "preset": "classify",
+            "labels": list(LABELS),
+        },
     )
     assert same_address.status_code == 201 and same_address.json()["slug"] == f"{SLUG}-2"

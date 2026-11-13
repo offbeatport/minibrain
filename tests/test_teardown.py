@@ -28,7 +28,7 @@ from minibrain.registry.models import (
 from minibrain.registry.service import create_model
 from minibrain.serve.backend import CompletionRequest
 from minibrain.serve.engine import create_engine_app
-from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, give_data
+from tests.conftest import ADMIN_EMAIL, FakeBackend, Harness, blank_dataset, give_data
 from tests.test_flow import SLUG, add_key, add_version, bearer, create_with_dataset, deploy, finish
 
 pytestmark = pytest.mark.both_stores
@@ -101,7 +101,14 @@ def add_base(harness: Harness, key: str = BASE, name: str = "Tiny") -> Path:
 
 def add_custom(harness: Harness, name: str, trained: bool = False) -> str:
     slug = harness.client.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": name, "base_model": BASE}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": name,
+            "base_model": BASE,
+        },
     ).json()["slug"]
     if trained:
         give_data(harness, slug)
@@ -426,7 +433,9 @@ def test_a_base_being_deleted_takes_no_new_models_and_a_failed_delete_restarts_w
     add_custom(harness, "Foo")
     started = harness.client.delete(f"/api/models/{BASE}", params={"cascade": True})
     assert started.status_code == 202
-    refused = harness.client.post("/api/models", json={"name": "Late", "base_model": BASE})
+    refused = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Late", "base_model": BASE}
+    )
     assert refused.status_code == 409 and refused.json()["detail"] == "Tiny is being deleted; pick another base"
     with harness.sessions() as session:
         create_model(session, "Late", "general", BASE)

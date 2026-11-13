@@ -14,7 +14,7 @@ from minibrain.auth.config import AuthConfigError, load_auth
 from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent, User
 from minibrain.settings import Settings
-from tests.conftest import FakeBackend
+from tests.conftest import FakeBackend, blank_dataset
 from tests.test_accounts import ADMIN, PASSWORD, csrf
 
 PROXY = "10.0.0.2"
@@ -145,10 +145,11 @@ def test_proxy_people_need_the_csrf_token_too(proxied: Proxied) -> None:
         == 403
     )
     token = csrf_for(client, builder)
+    dataset = blank_dataset(client, builder | token)
     assert (
         client.post(
             "/api/models",
-            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage"},
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Triage", "dataset": dataset},
             headers=builder | token,
         ).status_code
         == 201
@@ -157,7 +158,7 @@ def test_proxy_people_need_the_csrf_token_too(proxied: Proxied) -> None:
     assert (
         client.post(
             "/api/models",
-            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"},
+            json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other", "dataset": dataset},
             headers=other | token,
         ).status_code
         == 403

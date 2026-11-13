@@ -174,6 +174,22 @@ def give_data(harness: "Harness", slug: str, data: bytes | None = None, name: st
     return chosen.json()
 
 
+BLANK_DATASET = "blank"
+
+
+def blank_dataset(client: TestClient, headers: dict[str, str] | None = None) -> str:
+    if client.get(f"/api/datasets/{BLANK_DATASET}", headers=headers).status_code == 200:
+        return BLANK_DATASET
+    files = {"file": ("blank.csv", b"id\n1\n", "text/csv")}
+    source = client.post("/api/sources", files=files, headers=headers)
+    source.raise_for_status()
+    dataset = client.post(
+        "/api/datasets", json={"name": BLANK_DATASET, "source_id": source.json()["id"]}, headers=headers
+    )
+    dataset.raise_for_status()
+    return dataset.json()["slug"]
+
+
 def fake_adapter() -> bytes:
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w") as archive:

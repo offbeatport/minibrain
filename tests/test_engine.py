@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from minibrain.registry.models import JobKind, JudgeScore
-from tests.conftest import LABELS, Harness, give_data, scored_answers, tickets_csv
+from tests.conftest import LABELS, Harness, blank_dataset, give_data, scored_answers, tickets_csv
 from tests.test_flow import TIMING, bearer, create_model, finish
 
 INVOICE = {
@@ -71,7 +71,9 @@ def test_a_new_model_starts_with_a_prompt_only_v0_ready_to_test(harness: Harness
 
 
 def test_classify_needs_labels_or_data(harness: Harness) -> None:
-    refused = harness.client.post("/api/models", json={"name": "Router", "preset": "classify"})
+    refused = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Router", "preset": "classify"}
+    )
     assert refused.status_code == 409
     assert "at least two labels" in refused.json()["detail"]
     assert harness.client.get("/api/models", params={"kind": "custom"}).json() == []
@@ -138,7 +140,7 @@ def test_custom_models_take_a_json_schema_chat_data_and_json_graders(harness: Ha
         "contract": {"kind": "json", "json_schema": INVOICE},
         "promotion": {"thresholds": [{"metric": "json_valid", "op": "==", "value": 1}], "beats_live": True},
     }
-    created = harness.client.post("/api/models", json=body)
+    created = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body)
     assert created.status_code == 201, created.text
     detail = upload(harness, "invoices", "invoices.jsonl", chat_jsonl())
     assert detail["mapping"]["template"] == {"messages": "messages"}
@@ -185,7 +187,7 @@ def test_custom_free_text_with_a_judge_caches_its_scores(harness: Harness) -> No
         "preset": "custom",
         "graders": [{"name": "judge", "rubric": "Is the answer correct and polite?", "model": "qwen3-0.6b"}],
     }
-    assert harness.client.post("/api/models", json=body).status_code == 201
+    assert harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body).status_code == 201
     upload(harness, "helper", "help.csv", ("question,answer\n" + rows).encode())
     sql = "SELECT question AS input, answer AS label FROM source"
     assert harness.client.put("/api/models/helper/mapping", json={"sql": sql}).status_code == 200
@@ -229,7 +231,7 @@ def test_custom_free_text_with_a_judge_caches_its_scores(harness: Harness) -> No
 
 def test_graders_must_fit_the_contract(harness: Harness) -> None:
     body = {"name": "Text", "preset": "custom", "graders": [{"name": "label_accuracy"}]}
-    refused = harness.client.post("/api/models", json=body)
+    refused = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body)
     assert refused.status_code == 409
     assert "label set" in refused.json()["detail"]
 
@@ -240,7 +242,13 @@ def test_default_names_count_up_and_names_are_unique_across_base_and_custom_mode
     create_model(harness, "Classifier 1")
     assert harness.client.get("/api/models/name?preset=classify").json()["name"] == "Classifier 2"
     taken = harness.client.post(
-        "/api/models", json={"name": "classifier 1", "preset": "classify", "labels": list(LABELS)}
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "name": "classifier 1",
+            "preset": "classify",
+            "labels": list(LABELS),
+        },
     )
     assert taken.status_code == 409
 

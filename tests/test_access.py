@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from minibrain.api.access import Guard
 from minibrain.auth.roles import Role
-from tests.conftest import Harness
+from tests.conftest import Harness, blank_dataset
 from tests.test_accounts import csrf
 from tests.test_flow import SLUG, add_version, create_with_dataset, finish
 from tests.test_teardown import BASE, add_base
@@ -258,22 +258,20 @@ def status(client: TestClient, method: str, path: str, body: Any = None) -> int:
     return client.request(method, path, json=body, headers=headers).status_code
 
 
+def triage_body(client: TestClient) -> dict[str, Any]:
+    dataset = blank_dataset(client, csrf(client))
+    return {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"], "dataset": dataset}
+
+
 def test_viewers_see_models_but_change_nothing(team: Team) -> None:
-    assert (
-        status(
-            team.builder, "POST", "/api/models", {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"]}
-        )
-        == 201
-    )
+    assert status(team.builder, "POST", "/api/models", triage_body(team.builder)) == 201
     viewer = team.viewer
     assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/models/triage") == 200
     assert status(viewer, "GET", "/api/models") == 200
     assert status(viewer, "GET", "/api/jobs") == 200
     assert status(viewer, "GET", "/api/system/infrastructure") == 200
-    refused = viewer.post(
-        "/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"}, headers=csrf(viewer)
-    )
+    refused = viewer.post("/api/models", json=triage_body(team.builder) | {"name": "Other"}, headers=csrf(viewer))
     assert refused.status_code == 403 and refused.json()["detail"] == "This needs the Builder role"
     assert status(viewer, "GET", "/api/sources") == 403
     assert status(viewer, "GET", "/api/models/triage/preview") == 403
@@ -286,10 +284,7 @@ def test_viewers_see_models_but_change_nothing(team: Team) -> None:
 
 def test_builders_build_but_do_not_run_the_install(team: Team) -> None:
     builder = team.builder
-    assert (
-        status(builder, "POST", "/api/models", {"name": "Triage", "preset": "classify", "labels": ["billing", "bug"]})
-        == 201
-    )
+    assert status(builder, "POST", "/api/models", triage_body(builder)) == 201
     assert status(builder, "GET", "/api/sources") == 200
     assert status(builder, "GET", "/api/keys") == 200
     body = {"name": "app", "models": [{"kind": "custom", "key": "triage"}]}

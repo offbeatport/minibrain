@@ -169,8 +169,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Delete a base and its files, and its models once confirmed.
   UI: Models › Delete · API: DELETE /api/models/{name}
 - **Custom models** · shipped · product, ml
-  Pick a base and a name; it starts as a chat assistant.
-  UI: Models › Add model · API: GET /api/models, POST /api/models, GET /api/models/name, GET /api/models/{name}, PATCH /api/models/{name}, DELETE /api/models/{name}
+  Base, dataset and name; v0 is scored on held-out rows at once.
+  UI: Models › Add model, Data › Add · API: GET /api/models, POST /api/models, GET /api/datasets, GET /api/models/name, GET /api/models/{name}, PATCH /api/models/{name}, DELETE /api/models/{name}
 - **Duplicate models** · shipped · product, ml
   Copy a custom model's settings, data and live version, sharing its files.
   UI: Models › Duplicate, Models › model › Settings › Duplicate · API: POST /api/models/{name}/duplicate

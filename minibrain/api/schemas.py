@@ -169,7 +169,7 @@ class ModelCreate(BaseModel):
     instructions: str | None = Field(default=None, max_length=8000)
     graders: list[GraderConfig] | None = None
     promotion: PromotionInfo | None = None
-    dataset: str | None = None
+    dataset: str = Field(min_length=1, max_length=200)
     avatar: ModelAvatar | None = None
     api_name: str | None = Field(default=None, max_length=48)
 

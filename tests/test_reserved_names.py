@@ -10,7 +10,7 @@ from sqlalchemy.orm import sessionmaker
 from minibrain.gateway.logs import LogEntry, database_sink
 from minibrain.registry.db import MIGRATIONS, make_engine
 from minibrain.registry.models import AuditEvent, Job, Model, RequestLog, ReservedName, now
-from tests.conftest import ADMIN_EMAIL, Harness
+from tests.conftest import ADMIN_EMAIL, Harness, blank_dataset
 from tests.test_flow import SLUG, add_key, create_model
 from tests.test_gateway import CHAT, servable
 from tests.test_model_page import import_base
@@ -20,7 +20,10 @@ LABELS = ["billing", "bug"]
 
 
 def create(harness: Harness, name: str, **extra: Any) -> Any:
-    return harness.client.post("/api/models", json={"name": name, "preset": "classify", "labels": LABELS} | extra)
+    return harness.client.post(
+        "/api/models",
+        json={"dataset": blank_dataset(harness.client), "name": name, "preset": "classify", "labels": LABELS} | extra,
+    )
 
 
 def delete(harness: Harness, name: str, path: str = "/api/models") -> None:

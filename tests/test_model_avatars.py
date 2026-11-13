@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from minibrain.auth.roles import Role
 from minibrain.registry.models import AuditEvent
-from tests.conftest import Harness
+from tests.conftest import Harness, blank_dataset
 
 SLUG = "brisk-heron"
 PIXELBOT = {"style": "pixelbot", "seed": "a1b2c3d4", "tone": "parquet"}
@@ -16,7 +16,7 @@ def create(harness: Harness, avatar: dict[str, Any] | None = None, name: str = "
     body: dict[str, Any] = {"name": name}
     if avatar is not None:
         body["avatar"] = avatar
-    return harness.client.post("/api/models", json=body)
+    return harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body)
 
 
 def events(harness: Harness, action: str) -> list[AuditEvent]:

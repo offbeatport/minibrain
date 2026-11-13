@@ -5,7 +5,7 @@ import pytest
 
 from minibrain.auth.roles import Role
 from minibrain.registry.models import BaseModel, BaseModelStatus
-from tests.conftest import LABELS, Harness, give_data
+from tests.conftest import LABELS, Harness, blank_dataset, give_data
 from tests.test_flow import SLUG, add_version, bearer, build_dataset, deploy, finish
 from tests.test_model_page import page
 from tests.test_teardown import BASE, add_base, events, shown, trained_and_live
@@ -44,7 +44,7 @@ def add_gguf(harness: Harness) -> None:
 def on_gguf(harness: Harness) -> None:
     add_gguf(harness)
     body = {"name": "Support Triage", "preset": "classify", "labels": list(LABELS), "base_model": GGUF}
-    created = harness.client.post("/api/models", json=body)
+    created = harness.client.post("/api/models", json={"dataset": blank_dataset(harness.client)} | body)
     assert created.status_code == 201, created.text
     give_data(harness, SLUG)
     build_dataset(harness)

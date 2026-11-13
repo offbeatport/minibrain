@@ -4,7 +4,7 @@ from typing import Any
 
 from minibrain.registry.models import now
 from minibrain.registry.service import address_taken
-from tests.conftest import Harness
+from tests.conftest import Harness, blank_dataset
 from tests.test_flow import SLUG, add_version, create_model, create_with_dataset, deploy, finish
 from tests.test_gateway import servable
 from tests.test_models import FILES
@@ -31,16 +31,22 @@ def test_names_are_unique_across_base_and_custom(harness: Harness, tmp_path: Pat
     clash = import_base(harness, tmp_path, "Support Triage")
     assert clash.status_code == 409 and "Support Triage already exists" in clash.json()["detail"]
     assert import_base(harness, tmp_path, "Corp LLM").json()["key"] == "corp-llm"
-    taken = harness.client.post("/api/models", json={"name": "Corp LLM", "preset": "general"})
+    taken = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Corp LLM", "preset": "general"}
+    )
     assert taken.status_code == 409
     renamed = harness.client.patch(f"/api/models/{SLUG}", json={"name": "corp llm"})
     assert renamed.status_code == 409 and "share names" in renamed.json()["detail"]
     base = harness.client.patch("/api/models/corp-llm", json={"name": "Support Triage"})
     assert base.status_code == 409
     assert harness.client.patch(f"/api/models/{SLUG}", json={"name": "SUPPORT triage"}).status_code == 200
-    reserved = harness.client.post("/api/models", json={"name": "New", "preset": "general"})
+    reserved = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "New", "preset": "general"}
+    )
     assert reserved.status_code == 201 and reserved.json()["slug"] == "new-2"
-    held = harness.client.post("/api/models", json={"name": "Corp-LLM!", "preset": "general"})
+    held = harness.client.post(
+        "/api/models", json={"dataset": blank_dataset(harness.client), "name": "Corp-LLM!", "preset": "general"}
+    )
     assert held.status_code == 201 and held.json()["slug"] == "corp-llm-2"
     with harness.sessions() as session:
         assert address_taken(session, SLUG) and address_taken(session, "corp-llm") and address_taken(session, "base")

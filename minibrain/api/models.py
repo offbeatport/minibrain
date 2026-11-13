@@ -169,8 +169,7 @@ def configured(session: Session, settings: Settings, store: ArtifactStore, body:
     model.instructions = (body.instructions or "").strip() or None
     model.graders = chosen_graders(body.graders)
     model.promotion = rule_from(body.promotion, chosen.promotion)
-    if body.dataset:
-        model.dataset = get_dataset(session, body.dataset)
+    model.dataset = get_dataset(session, body.dataset)
     session.add(AuditEvent(actor=current_actor(), action="model.create", target=model.slug, detail=created(model)))
     first_version(session, settings, store, model)
     return model

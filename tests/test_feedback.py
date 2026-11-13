@@ -9,7 +9,7 @@ from minibrain.data.splits import read_rows
 from minibrain.gateway.standalone import create_gateway_app
 from minibrain.registry.files import dataset_version_location, store_for
 from minibrain.registry.models import AuditEvent, DatasetVersion, Feedback, RequestLog
-from tests.conftest import FakeBackend, Harness
+from tests.conftest import FakeBackend, Harness, blank_dataset
 from tests.test_flow import SLUG, add_version, bearer, create_with_dataset, finish
 from tests.test_gateway import CHAT, Down, servable
 
@@ -42,7 +42,15 @@ def test_feedback_needs_a_key_that_covers_the_model(harness: Harness) -> None:
     response_id = chat(harness, headers)
     body = {"response_id": response_id, "rating": "down", "input": "I was charged twice"}
     assert harness.client.post("/v1/feedback", json={"model": SLUG} | body).status_code == 401
-    harness.client.post("/api/models", json={"preset": "classify", "labels": ["billing", "bug"], "name": "Other"})
+    harness.client.post(
+        "/api/models",
+        json={
+            "dataset": blank_dataset(harness.client),
+            "preset": "classify",
+            "labels": ["billing", "bug"],
+            "name": "Other",
+        },
+    )
     other = bearer(harness, ("custom", "other"))
     assert send(harness, other, **body).status_code == 403
     assert send(harness, headers, **(body | {"model": "nope"})).status_code == 404
