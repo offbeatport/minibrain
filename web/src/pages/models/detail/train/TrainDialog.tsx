@@ -39,7 +39,6 @@ import {
     Meta,
     PaneHeader,
     PickSelect,
-    PresetPicker,
     Row,
     fitText,
     timeText,
@@ -60,6 +59,7 @@ import {
     labelOf,
     planQuery,
     presetRecipe,
+    presetText,
 } from "./recipe";
 
 function fetchPlan(slug: string, query: PlanQuery) {
@@ -265,11 +265,10 @@ function Body({
             onKeyDown={onKeyDown}
         >
             <DialogHeader className="border-b px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
-                <DialogTitle>{`Train v${number} of ${row.name}`}</DialogTitle>
+                <DialogTitle>{`Train version v${number} of ${row.name}`}</DialogTitle>
             </DialogHeader>
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(0,4fr)_minmax(0,3fr)] md:overflow-hidden">
                 <div className="min-h-fit px-5 sm:px-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain">
-                    <PaneHeader id="train-general" title="General" />
                     <div className="divide-y">
                         <Row id="train-method" label="Method">
                             <p className="min-h-8 sm:leading-8">Supervised fine-tuning (SFT)</p>
@@ -320,6 +319,26 @@ function Body({
                                     Add training data first: training needs examples.
                                 </p>
                             )}
+                        </Row>
+                        <Row id="train-quality" label="Training">
+                            <PickSelect
+                                id="train-quality-select"
+                                value={level}
+                                onChange={(next) => choose(next as Level)}
+                                options={[
+                                    ...QUALITIES.map((item) => ({
+                                        value: item.id,
+                                        label: item.label,
+                                        meta: `${presetText(item.id)} · ${timeText(minutes[item.id])}`,
+                                    })),
+                                    {
+                                        value: "custom",
+                                        label: "Custom",
+                                        meta: "set each parameter",
+                                        separated: true,
+                                    },
+                                ]}
+                            />
                         </Row>
                         <Row id="train-compute" label="Compute">
                             <PickSelect
@@ -380,18 +399,6 @@ function Body({
                         />
                     </div>
                     <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-5 py-5">
-                        <PresetPicker
-                            value={level}
-                            onPick={(next) => choose(next as Level)}
-                            options={[
-                                ...QUALITIES.map((item) => ({
-                                    value: item.id,
-                                    label: item.label,
-                                    detail: timeText(minutes[item.id]).replace("≈ ", ""),
-                                })),
-                                { value: "custom", label: "Custom", detail: "edit" },
-                            ]}
-                        />
                         <Advanced
                             disabled={!custom}
                             recipe={recipe}
@@ -468,7 +475,7 @@ export function TrainDialog({
 }) {
     return (
         <Dialog open={open && Boolean(detail)} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[70rem]">
+            <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[64rem]">
                 {open && detail && (
                     <Body row={row} detail={detail} versions={versions} onClose={onClose} />
                 )}

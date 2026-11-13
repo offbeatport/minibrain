@@ -389,7 +389,7 @@ export function Advanced({
                     id="train-strategy"
                     label={
                         <Tipped
-                            label="Method"
+                            label="LoRA type"
                             tip="QLoRA holds the base in 4 bits: about a third of the memory, a little slower."
                         />
                     }
