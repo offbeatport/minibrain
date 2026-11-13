@@ -204,6 +204,10 @@ API keys decide who may call which models.
 New capabilities add a job kind (export, distill, rebase) or a pool type (Kubernetes, your cloud, managed compute),
 not a new concept.
 
+A custom model is bound to one dataset, picked when it is created (optional: v0 can be the base plus instructions)
+or, if it has none, on its first training run. Retraining uses that dataset's newer versions. A model never switches
+dataset; Duplicate covers that, and the copy takes another dataset (2026-11-13).
+
 | Term | Meaning |
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
@@ -1825,6 +1829,8 @@ Order: 1 and 2 together, then 5 and 6, then 3 and 4.
   - [ ] Distil what you run: record a large model's answers through `/v1` and train a smaller copy from them
   - [ ] Recipes: worked use cases, designed properly later.
   - [ ] Shadow mode: copy live requests to a new version, grade both, promote only if it wins
+  - [ ] Change a model's dataset: re-point a custom model to another dataset, built only if users ask; Duplicate
+    covers it until then
   - [ ] Continue from a version: train the next version on top of a chosen version's adapter (warm start) instead of
     fresh from the base, picked per run ("Continue from v4"); the version records what it started from, and the
     promotion rule still guards the result. Comes first: it is how most people improve one model
