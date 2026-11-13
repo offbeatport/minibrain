@@ -140,6 +140,7 @@ ROUTE_ROLES = {
     ("POST", "/api/models/{name}/versions"): "builder",
     ("DELETE", "/api/models/{name}/versions/{number}"): "builder",
     ("POST", "/api/models/{name}/versions/{number}/promote"): "builder",
+    ("POST", "/api/models/{name}/rescore"): "builder",
     ("GET", "/api/models/{name}/training-plan"): "viewer",
     ("GET", "/api/playground/models"): "viewer",
     ("POST", "/api/playground/chat/completions"): "viewer",
