@@ -198,20 +198,6 @@ export function rateText(value: number): string {
     return value.toExponential(0).replace("e-", "e-");
 }
 
-export function recipeText(recipe: Recipe): string {
-    const alpha = recipe.alpha === "auto" ? recipe.rank * 2 : recipe.alpha;
-    const rows = recipe.maxRows === "all" ? "all rows" : `${recipe.maxRows.toLocaleString()} rows`;
-    const epochs = `${recipe.epochs} ${recipe.epochs === 1 ? "epoch" : "epochs"}`;
-    return [
-        `rank ${recipe.rank}`,
-        `alpha ${alpha}`,
-        `lr ${rateText(recipe.learningRate)}`,
-        epochs,
-        rows,
-        ...(recipe.machine === "auto" ? [] : [`on ${recipe.machine}`]),
-    ].join(" · ");
-}
-
 export function strategyName(strategy: string | null | undefined): string {
     return strategy === "qlora" ? "QLoRA" : "LoRA";
 }

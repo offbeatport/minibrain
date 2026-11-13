@@ -3,7 +3,7 @@ import { Card, Collapsible, CollapsibleContent, CollapsibleTrigger, cn } from "o
 import { PickSelect } from "~/components/PickSelect";
 import { Advanced } from "./advanced";
 import { timeText } from "./parts";
-import { QUALITIES, presetText, recipeText } from "./recipe";
+import { QUALITIES, presetText } from "./recipe";
 import type { TrainRun } from "./useTrainRun";
 
 const PRESET_ICONS: Record<(typeof QUALITIES)[number]["id"], LucideIcon> = {
@@ -85,11 +85,9 @@ export function TrainingCard({ run }: { run: TrainRun }) {
                                 aria-label={run.open ? "Hide parameters" : "Show parameters"}
                                 className="flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-md px-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                             >
-                                {!run.open && (
-                                    <span className="min-w-0 text-left text-sm tabular-nums sm:truncate">
-                                        {recipeText(run.recipe)}
-                                    </span>
-                                )}
+                                <span className="text-sm">
+                                    {run.open ? "Hide parameters" : "Show parameters"}
+                                </span>
                                 <ChevronDown
                                     aria-hidden="true"
                                     className={cn(

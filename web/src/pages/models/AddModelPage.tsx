@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
-import { CubePlus, Link, useToast } from "obp-ui";
+import { CubePlus, useToast } from "obp-ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { type CatalogEntry, type DatasetSummary, type ModelRow, api, unwrap } from "~/api/client";
 import { useAllModels, useCatalog, useDatasets } from "~/api/queries";
+import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
 import { PageHeader } from "~/components/PageHeader";
@@ -388,13 +388,9 @@ export function AddModelPage() {
     );
     return (
         <Page>
-            <Link
-                href={modelsHref()}
-                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-                <ChevronLeft className="size-4" />
-                Models
-            </Link>
+            <Breadcrumbs
+                items={[{ label: "Models", href: modelsHref() }, { label: "Add model" }]}
+            />
             <PageHeader title="Add model" />
             <CreateLayout
                 form={form}

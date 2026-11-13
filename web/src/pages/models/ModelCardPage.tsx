@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { ChevronLeft } from "lucide-react";
 import {
     Button,
     Card,
@@ -12,12 +11,12 @@ import {
     DialogHeader,
     DialogTitle,
     Field,
-    Link,
     Textarea,
 } from "obp-ui";
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useModel, useVersions } from "~/api/queries";
+import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
@@ -25,6 +24,7 @@ import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { modelAibomHref, modelCardDownloadHref, modelPageHref } from "~/lib/modelLinks";
+import { modelsHref } from "~/lib/modelsSearch";
 import {
     ApprovalsSection,
     BaseSection,
@@ -60,18 +60,6 @@ function useModelCard(target: Target) {
         refetchInterval: (query) =>
             BUSY.has(query.state.data?.card.version.status ?? "") ? 2000 : false,
     });
-}
-
-function BackLink({ slug, name }: { slug: string; name: string }) {
-    return (
-        <Link
-            href={modelPageHref(slug, "versions")}
-            className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-            <ChevronLeft className="size-4" />
-            {name}
-        </Link>
-    );
 }
 
 function Change({ value }: { value: number | null | undefined }) {
@@ -253,7 +241,17 @@ function CardView({
     const live = current && Boolean(model.data?.deployed);
     return (
         <>
-            <BackLink slug={target.slug} name={card.version.name} />
+            <Breadcrumbs
+                items={[
+                    { label: "Models", href: modelsHref() },
+                    { label: card.version.name, href: modelPageHref(target.slug) },
+                    {
+                        label: `v${card.version.number}`,
+                        href: modelPageHref(target.slug, "versions"),
+                    },
+                    { label: "Model card" },
+                ]}
+            />
             <PageHeader
                 title={`${card.version.name} v${card.version.number}`}
                 icon={<PublisherLogo name={card.version.name} size="lg" />}

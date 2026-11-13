@@ -1,10 +1,11 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ExternalLink, Info, Layers, Scale } from "lucide-react";
+import { ExternalLink, Info, Layers, Scale } from "lucide-react";
 import { Button, CubePlus, DataGrid, Link, Skeleton } from "obp-ui";
 import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
+import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -208,13 +209,12 @@ export function DiscoverModelPage() {
     );
     return (
         <Page>
-            <Link
-                href={discoverListHref()}
-                className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-                <ChevronLeft className="size-4" />
-                Discover
-            </Link>
+            <Breadcrumbs
+                items={[
+                    { label: "Discover", href: discoverListHref() },
+                    { label: entry?.name ?? "Model" },
+                ]}
+            />
             <ErrorLine error={catalog.error} />
             {catalog.isLoading && (
                 <div className="flex flex-col gap-8 pt-2">
