@@ -55,7 +55,7 @@ def test_bulk_cancel_stops_what_it_can_and_says_why_not(harness: Harness) -> Non
         (9999, False, None),
     ]
     assert "already succeeded" in results[2]["error"]
-    assert results[3]["error"] == "job 9999 not found"
+    assert results[3]["error"] == "No job 9999"
     assert harness.client.get(f"/api/jobs/{running}").json()["cancel_requested"] is True
     assert status_of(harness, left) == "queued"
     assert audited(harness, "job.cancel") == [

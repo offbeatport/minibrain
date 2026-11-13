@@ -65,7 +65,7 @@ def deleted_on(reserved: ReservedName) -> str:
 
 def no_model(session: Session, name: str) -> NotFoundError:
     reserved = reserved_name(session, name)
-    return NotFoundError(deleted_on(reserved) if reserved is not None else f"no model called {name}")
+    return NotFoundError(deleted_on(reserved) if reserved is not None else f"No model called {name}")
 
 
 def reserve_name(session: Session, name: str, kind: str, model_name: str, actor: str) -> None:
@@ -196,7 +196,7 @@ def find_version(model: Model, number: int) -> Version | None:
 def get_version(model: Model, number: int) -> Version:
     version = find_version(model, number)
     if version is None:
-        raise NotFoundError(f"{model.slug}@{number} not found")
+        raise NotFoundError(f"{model.slug} has no v{number}")
     return version
 
 

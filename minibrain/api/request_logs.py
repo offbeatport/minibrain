@@ -489,7 +489,7 @@ def body_state(session: Session, log: RequestLog, rows: bool) -> tuple[BodyState
 def read_request(request_id: int, session: SessionDep) -> RequestDetail:
     found = rows_for(session, [RequestLog.id == request_id], 1)
     if not found:
-        raise NotFoundError(f"request {request_id} not found")
+        raise NotFoundError(f"No request {request_id}")
     log = found[0][0]
     rows = sees_rows()
     state, locked = body_state(session, log, rows)

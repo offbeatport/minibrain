@@ -62,7 +62,7 @@ Facet = Literal["status", "model", "kind"]
 def get_job(session: SessionDep, job_id: int) -> Job:
     job = session.get(Job, job_id)
     if job is None:
-        raise NotFoundError(f"job {job_id} not found")
+        raise NotFoundError(f"No job {job_id}")
     return job
 
 
@@ -298,7 +298,7 @@ def each_job(session: Session, ids: list[int], act: Callable[[Job], Job | None])
     for job_id in dict.fromkeys(ids):
         job = session.get(Job, job_id)
         if job is None:
-            results.append(JobActionResult(id=job_id, done=False, status=None, error=f"job {job_id} not found"))
+            results.append(JobActionResult(id=job_id, done=False, status=None, error=f"No job {job_id}"))
             continue
         try:
             made = act(job)
@@ -374,7 +374,7 @@ def delete_one(
 ) -> JobActionResult:
     job = session.get(Job, job_id)
     if job is None:
-        return JobActionResult(id=job_id, done=False, status=None, error=f"job {job_id} not found", reason="not_found")
+        return JobActionResult(id=job_id, done=False, status=None, error=f"No job {job_id}", reason="not_found")
     before = job.status
     try:
         left = delete(session, queue, settings, job, cancel_jobs)
