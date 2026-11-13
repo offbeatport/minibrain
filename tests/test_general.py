@@ -291,3 +291,39 @@ def test_a_chat_assistant_end_to_end(harness: Harness) -> None:
     assert v4["score"] > 0.75
     assert v4["promotion"]["passed"] is True
     assert harness.client.post(f"/api/models/{SLUG}/versions/4/promote").status_code == 200
+
+
+def instruction_changes(harness: Harness) -> int:
+    with harness.sessions() as session:
+        return session.query(AuditEvent).filter(AuditEvent.action == "model.instructions").count()
+
+
+def test_a_version_saves_new_instructions_and_keeps_its_own_snapshot(harness: Harness) -> None:
+    create_assistant(harness)
+    made = harness.client.post(
+        f"/api/models/{SLUG}/versions", json={"kind": "prompt", "instructions": "  Answer as Acme support.  "}
+    )
+    assert made.status_code == 201, made.text
+    assert made.json()["instructions"] == "Answer as Acme support."
+    assert harness.client.get(f"/api/models/{SLUG}").json()["instructions"] == "Answer as Acme support."
+    reset = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt", "instructions": ""})
+    assert reset.status_code == 201, reset.text
+    assert "helpful assistant" in reset.json()["instructions"]
+    assert harness.client.get(f"/api/models/{SLUG}").json()["instructions"] == ""
+    kept = versions(harness)
+    assert kept[1]["instructions"] == "Answer as Acme support."
+    assert "helpful assistant" in kept[2]["instructions"]
+    assert instruction_changes(harness) == 2
+    same = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt", "instructions": ""})
+    assert same.status_code == 201, same.text
+    assert instruction_changes(harness) == 2
+
+
+def test_a_refused_version_does_not_save_its_instructions(harness: Harness) -> None:
+    create_assistant(harness)
+    refused = harness.client.post(
+        f"/api/models/{SLUG}/versions", json={"kind": "lora", "instructions": "Answer as Acme support."}
+    )
+    assert refused.status_code >= 400
+    assert harness.client.get(f"/api/models/{SLUG}").json()["instructions"] == ""
+    assert instruction_changes(harness) == 0

@@ -29036,6 +29036,19 @@
             "type": "boolean",
             "title": "Breaking",
             "default": false
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions",
+            "description": "New model instructions saved with this version; empty restores the preset's default."
           }
         },
         "type": "object",

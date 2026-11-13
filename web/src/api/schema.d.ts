@@ -8994,6 +8994,11 @@ export interface components {
              * @default false
              */
             breaking?: boolean;
+            /**
+             * Instructions
+             * @description New model instructions saved with this version; empty restores the preset's default.
+             */
+            instructions?: string | null;
         };
         /** VersionFiles */
         VersionFiles: {

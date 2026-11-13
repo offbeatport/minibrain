@@ -114,6 +114,19 @@ def start_version(
     return version
 
 
+def save_instructions(session: Session, model: Model, instructions: str | None) -> None:
+    if instructions is None:
+        return
+    wanted = instructions.strip() or None
+    if wanted == model.instructions:
+        return
+    model.instructions = wanted
+    model.updated_at = now()
+    session.add(
+        AuditEvent(actor=current_actor(), action="model.instructions", target=model.slug, detail={"name": model.name})
+    )
+
+
 def needs_no_data(model: Model, body: VersionCreate) -> bool:
     return body.dataset_version_id is None and latest_dataset_version(model) is None
 
@@ -198,6 +211,7 @@ def add_version(
     require_usable(session, settings, model.base_model)
     if kind == VersionKind.LORA:
         require_trainable(session, settings, model)
+    save_instructions(session, model, body.instructions)
     if kind == VersionKind.PROMPT and needs_no_data(model, body):
         version = start_version(session, settings, store, model, kind, None, {}, body.breaking)
         session.commit()

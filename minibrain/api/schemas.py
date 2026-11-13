@@ -942,6 +942,11 @@ class VersionCreate(TrainingSettings):
     kind: Literal["prompt", "lora"]
     dataset_version_id: int | None = None
     breaking: bool = False
+    instructions: str | None = Field(
+        default=None,
+        max_length=8000,
+        description="New model instructions saved with this version; empty restores the preset's default.",
+    )
 
 
 class TrainingPlanQuery(TrainingSettings):
