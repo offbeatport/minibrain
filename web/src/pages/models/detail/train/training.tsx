@@ -1,28 +1,40 @@
-import { ChevronDown, Lock } from "lucide-react";
-import { Card, Collapsible, CollapsibleContent, CollapsibleTrigger, InfoTip, cn } from "obp-ui";
+import { ChevronDown, Gem, type LucideIcon, Scale, SlidersHorizontal, Zap } from "lucide-react";
+import { Card, Collapsible, CollapsibleContent, CollapsibleTrigger, cn } from "obp-ui";
 import { PickSelect } from "~/components/PickSelect";
 import { Advanced } from "./advanced";
 import { timeText } from "./parts";
 import { QUALITIES, presetText, recipeText } from "./recipe";
 import type { TrainRun } from "./useTrainRun";
 
+const PRESET_ICONS: Record<(typeof QUALITIES)[number]["id"], LucideIcon> = {
+    fast: Zap,
+    balanced: Scale,
+    quality: Gem,
+};
+
 function PresetSelect({ run }: { run: TrainRun }) {
     return (
         <PickSelect
             id="train-quality"
             compact
+            menuClassName="min-w-72"
             value={run.level}
             onChange={(next) => run.choose(next as typeof run.level)}
             options={[
-                ...QUALITIES.map((item) => ({
-                    value: item.id,
-                    label: item.label,
-                    meta: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
-                })),
+                ...QUALITIES.map((item) => {
+                    const Icon = PRESET_ICONS[item.id];
+                    return {
+                        value: item.id,
+                        label: item.label,
+                        icon: <Icon />,
+                        description: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
+                    };
+                }),
                 {
                     value: "custom",
                     label: "Custom",
-                    meta: "set each parameter",
+                    icon: <SlidersHorizontal />,
+                    description: "Set each parameter yourself",
                     separated: true,
                 },
             ]}
@@ -45,13 +57,7 @@ function Status({ run }: { run: TrainRun }) {
     if (run.custom || !run.open) {
         return null;
     }
-    return (
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock aria-hidden="true" className="size-3.5" />
-            Locked
-            <InfoTip label="Locked parameters">Choose Custom to change them.</InfoTip>
-        </span>
-    );
+    return null;
 }
 
 export function TrainingCard({ run }: { run: TrainRun }) {

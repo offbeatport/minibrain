@@ -202,6 +202,7 @@ function PoolSection({ pool, main }: { pool: PoolInfo; main: Record<string, stri
         <PanelSection
             bare
             icon={Server}
+            anchor={`pool-${pool.name}`}
             title={pool.name === "local" ? pool.label : `Pool ${pool.label}`}
             description={`${count(online)} of ${plural(pool.nodes.length, "machine")} online · ${plural(pool.engines.length, "engine")} serving`}
         >

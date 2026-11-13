@@ -9,6 +9,7 @@ import {
     Server,
     Timer,
 } from "lucide-react";
+import { Link, Popover, PopoverContent, PopoverTrigger } from "obp-ui";
 import {
     BlockedReasons,
     SummaryCard,
@@ -20,7 +21,8 @@ import {
 import { count } from "~/lib/format";
 import { durationText } from "~/lib/jobs";
 import { MemorySummary } from "./parts";
-import { duration, hoursText } from "./recipe";
+import type { PoolPlan } from "./pools";
+import { duration, gigabytes, hoursText } from "./recipe";
 import type { TrainRun } from "./useTrainRun";
 
 function estimateOf(run: TrainRun, blocked: string | null): string {
@@ -49,17 +51,79 @@ export function problemsOf(run: TrainRun, blocked: string | null): string[] {
     return [...(run.failure ? [run.failure] : []), ...shown.map((issue) => issue.text)];
 }
 
+function poolHref(name: string): string {
+    return `/infrastructure#pool-${encodeURIComponent(name)}`;
+}
+
+function PoolCard({ pool }: { pool: PoolPlan }) {
+    return (
+        <div className="flex w-72 flex-col gap-2">
+            <div className="flex items-baseline justify-between gap-3">
+                <span className="font-medium">{pool.label}</span>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                    {`${count(pool.machines.length)} ${pool.machines.length === 1 ? "machine" : "machines"}`}
+                </span>
+            </div>
+            <ul className="flex flex-col gap-1.5">
+                {pool.machines.map((item) => (
+                    <li key={item.name} className="flex items-baseline justify-between gap-3">
+                        <span className="min-w-0 truncate">{item.name}</span>
+                        <span
+                            className={
+                                item.chosen
+                                    ? "shrink-0 text-sm text-muted-foreground tabular-nums"
+                                    : "shrink-0 text-sm text-destructive"
+                            }
+                        >
+                            {item.chosen
+                                ? `${gigabytes(item.available_bytes)} ${item.memory_label} · ≈ ${duration(item.minutes)}`
+                                : (item.reason ?? "does not fit")}
+                        </span>
+                    </li>
+                ))}
+            </ul>
+            <Link href={poolHref(pool.name)} className="text-sm text-primary hover:underline">
+                Open in Infrastructure →
+            </Link>
+        </div>
+    );
+}
+
 function PoolFact({ run }: { run: TrainRun }) {
     const machine = run.pickedMachine;
-    const chosen = run.pools.find((item) => item.name === run.compute);
-    const pool = chosen?.label ?? machine?.pool_label;
-    if (!pool) {
+    const chosen =
+        run.pools.find((item) => item.name === run.compute) ??
+        run.pools.find((item) => item.name === machine?.pool);
+    const name = chosen?.name ?? machine?.pool;
+    if (!name) {
         return "–";
     }
     const pinned = run.recipe.machine !== "auto";
     return (
         <>
-            {pool}
+            {chosen ? (
+                <Popover>
+                    <PopoverTrigger
+                        openOnHover
+                        delay={150}
+                        render={
+                            <Link
+                                href={poolHref(name)}
+                                className="text-primary underline-offset-2 hover:underline"
+                            />
+                        }
+                    >
+                        {name}
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-auto">
+                        <PoolCard pool={chosen} />
+                    </PopoverContent>
+                </Popover>
+            ) : (
+                <Link href={poolHref(name)} className="text-primary hover:underline">
+                    {name}
+                </Link>
+            )}
             {machine && (
                 <span className="block truncate text-sm text-muted-foreground">
                     {pinned ? machine.name : `likely ${machine.name}`}

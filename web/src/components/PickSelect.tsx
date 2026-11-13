@@ -13,6 +13,8 @@ export type PickOption = {
     value: string;
     label: ReactNode;
     meta?: ReactNode;
+    icon?: ReactNode;
+    description?: ReactNode;
     disabled?: boolean;
     separated?: boolean;
 };
@@ -26,6 +28,7 @@ export function PickSelect({
     invalid,
     disabled,
     compact,
+    menuClassName,
 }: {
     id: string;
     value: string | null;
@@ -35,6 +38,7 @@ export function PickSelect({
     invalid?: boolean;
     disabled?: boolean;
     compact?: boolean;
+    menuClassName?: string;
 }) {
     return (
         <Select
@@ -52,11 +56,16 @@ export function PickSelect({
             >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className={menuClassName}>
                 {options.map((option) => (
                     <Fragment key={option.value}>
                         {option.separated && <SelectSeparator />}
-                        <SelectItem value={option.value} disabled={option.disabled}>
+                        <SelectItem
+                            value={option.value}
+                            disabled={option.disabled}
+                            icon={option.icon}
+                            description={option.description}
+                        >
                             <span className="truncate">{option.label}</span>
                             {option.meta && (
                                 <span
