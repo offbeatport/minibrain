@@ -165,7 +165,7 @@ function ScoreSummary({
                     </SummaryFact>
                 </SummaryFacts>
             </SummarySection>
-            <SummarySection title="What you'll get">
+            <SummarySection title="Result">
                 <SummaryLine icon={Play} className="tabular-nums">
                     {`v${run.number} · instructions only, ${heldOutText(run)}`}
                 </SummaryLine>
@@ -228,7 +228,7 @@ export function RunSummary({
                 )}
                 {unknown && <p className="text-sm text-muted-foreground">{unknown}</p>}
             </SummarySection>
-            <SummarySection title="What you'll get">
+            <SummarySection title="Result">
                 <SummaryLine icon={GraduationCap} className="tabular-nums">
                     {`v${run.number} · trained on ${count(info?.rows ?? run.available)} rows, ${heldOutText(run)}`}
                 </SummaryLine>

@@ -321,7 +321,7 @@ export function AddModelSummary({
                 />
                 <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
             </SummarySection>
-            <SummarySection title="What you'll get">
+            <SummarySection title="Result">
                 <p className="tabular-nums">{outcome}</p>
                 {variant && !trainable(variant) && (
                     <ServeOnlyNotice
