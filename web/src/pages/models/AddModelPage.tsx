@@ -404,9 +404,17 @@ export function AddModelPage() {
                     error={nameTouched || attempted ? problems.name : undefined}
                     rows={{
                         name: (node) => (
-                            <FormRow id="create-name" label="Name" align="start">
-                                <FormControl width="text">{node}</FormControl>
-                            </FormRow>
+                            <>
+                                <FormRow id="create-name" label="Name" align="start">
+                                    <FormControl width="text">{node}</FormControl>
+                                </FormRow>
+                                <FormRow
+                                    label="API name"
+                                    tip="Apps call the model by this name. It never changes, and is never reused."
+                                >
+                                    <ApiNameHint name={name} bare />
+                                </FormRow>
+                            </>
                         ),
                         avatar: (node) => (
                             <FormRow label="Avatar" align="start">
@@ -414,9 +422,7 @@ export function AddModelPage() {
                             </FormRow>
                         ),
                     }}
-                >
-                    <ApiNameHint name={name} />
-                </NameAvatarField>
+                />
             </FormGroup>
         </FormCard>
     );

@@ -5,7 +5,7 @@ import { generateName } from "~/lib/avatarNames";
 import { PickerDialog, isTyping } from "./AvatarPicker";
 import { AvatarTile } from "./AvatarTile";
 import "./avatarPicker.css";
-import { type AvatarChoice, TWO_LETTERS, randomTone, rerollChoice, sameChoice } from "./avatarSvg";
+import { type AvatarChoice, TWO_LETTERS, randomTone, sameChoice } from "./avatarSvg";
 
 export type Identity = { name: string; avatar: AvatarChoice };
 
@@ -21,16 +21,7 @@ export function newIdentity(taken: NameTaken): Identity {
 }
 
 function shuffleLabel(locks: Locks): string {
-    if (locks.name !== null && locks.avatar !== null) {
-        return "Undo the name to shuffle again";
-    }
-    if (locks.name !== null) {
-        return "Shuffle the avatar";
-    }
-    if (locks.avatar !== null) {
-        return "Shuffle the name";
-    }
-    return "Shuffle name and avatar";
+    return locks.name !== null ? "Undo the name to shuffle again" : "Shuffle the name";
 }
 
 function LockNote({
@@ -81,21 +72,18 @@ export function NameAvatarField({
     const [picking, setPicking] = useState(false);
     const [dealt, setDealt] = useState(0);
     const display = value.name.trim() || "Untitled model";
-    const bothLocked = locks.name !== null && locks.avatar !== null;
+    const bothLocked = locks.name !== null;
     const latest = useRef({ value, locks, taken, onChange });
     latest.current = { value, locks, taken, onChange };
     const shuffle = () => {
         const { value: current, locks: held, taken: isTaken, onChange: emit } = latest.current;
-        if (held.name !== null && held.avatar !== null) {
+        if (held.name !== null) {
             return;
         }
         const previous = current.name.trim().toLowerCase();
         emit({
-            name:
-                held.name !== null
-                    ? current.name
-                    : generateName((name) => isTaken(name) || name.toLowerCase() === previous),
-            avatar: held.avatar !== null ? current.avatar : rerollChoice(current.avatar),
+            name: generateName((name) => isTaken(name) || name.toLowerCase() === previous),
+            avatar: current.avatar,
         });
         setDealt((count) => count + 1);
     };
@@ -229,14 +217,7 @@ export function NameAvatarField({
         return (
             <>
                 {rows.name(field)}
-                {rows.avatar(
-                    <div className="flex items-end gap-3">
-                        {avatarButton("xl")}
-                        <Button type="button" variant="outline" onClick={() => setPicking(true)}>
-                            Change
-                        </Button>
-                    </div>,
-                )}
+                {rows.avatar(avatarButton("xl"))}
                 {picker}
             </>
         );
