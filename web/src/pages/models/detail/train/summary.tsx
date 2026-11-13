@@ -125,9 +125,7 @@ function PoolFact({ run }: { run: TrainRun }) {
                 </Link>
             )}
             {machine && pinned && (
-                <span className="block truncate text-sm text-muted-foreground">
-                    {machine.name}
-                </span>
+                <span className="block truncate text-sm text-muted-foreground">{machine.name}</span>
             )}
         </>
     );
