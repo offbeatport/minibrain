@@ -1,26 +1,26 @@
-import { Cpu, Database, Gauge, Gem, type LucideIcon, Scale, Server, Zap } from "lucide-react";
 import {
-    Badge,
-    Button,
-    DialogClose,
-    Label,
-    RadioGroup,
-    RadioGroupItem,
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-    cn,
-} from "obp-ui";
-import { type ReactNode, useState } from "react";
+    Cpu,
+    Database,
+    Gauge,
+    Gem,
+    type LucideIcon,
+    Scale,
+    Server,
+    SlidersHorizontal,
+    Zap,
+} from "lucide-react";
+import { Button, DialogClose, Label, RadioGroup, RadioGroupItem, cn } from "obp-ui";
+import type { ReactNode } from "react";
 import { count } from "~/lib/format";
 import { DatasetPicker } from "./flowDatasetPicker";
-import { ComputeFields, DataFields, FieldGrid, QualityFields } from "./flowTrainAdvanced";
+import { type RichOption, RichSelect } from "./flowSelect";
+import { ComputeFields, CoreFields, DataFields, FieldGrid, OtherFields } from "./flowTrainAdvanced";
 import {
     FOCUS_RING,
     HeldOutNote,
     MemoryTrack,
     Reason,
+    Segments,
     Stat,
     TrainButton,
     bestOf,
@@ -39,7 +39,7 @@ import {
     presetRecipe,
 } from "./flowTrainPlan";
 import type { Trainer } from "./flowTrainState";
-import { shortAgo } from "./modelsFlowData";
+import { rate, shortAgo } from "./modelsFlowData";
 
 type Card<T extends string> = {
     value: T;
@@ -120,6 +120,10 @@ function Cards<T extends string>({
 
 const QUALITY_ICON: Record<Quality, LucideIcon> = { fast: Zap, balanced: Scale, quality: Gem };
 
+export type QualityStyle = "cards" | "visible" | "select";
+
+type Level = Quality | "custom";
+
 function Section({
     id,
     label,
@@ -127,7 +131,7 @@ function Section({
     children,
 }: {
     id: string;
-    label: string;
+    label: ReactNode;
     aside?: ReactNode;
     children: ReactNode;
 }) {
@@ -148,116 +152,233 @@ function plural(amount: number, word: string): string {
     return `${amount} ${word}${amount === 1 ? "" : "s"}`;
 }
 
-function General({ t }: { t: Trainer }) {
-    const auto = bestOf(t.plan, "auto");
-    const qualityCards = QUALITIES.map((item) => {
-        const preset = presetRecipe(item.id);
-        return {
-            value: item.id,
-            icon: QUALITY_ICON[item.id],
-            title: item.label,
-            primary: t.pick ? qualityTime(t.minutes[item.id]) : "–",
-            secondary: `rank ${preset.rank} · ${plural(preset.epochs, "epoch")}`,
-        };
-    });
-    const dataCards = t.picks.map((pick, index) => ({
-        value: String(pick.number),
-        icon: Database,
-        title: `v${pick.number}`,
-        badge: index === 0 ? <Badge variant="info">Latest</Badge> : undefined,
-        primary: `${count(pick.rows)} rows`,
-        secondary: [shortAgo({ hoursAgo: pick.hoursAgo }), versusLive(t, pick.rows, pick.number)]
-            .filter(Boolean)
-            .join(" · "),
-    }));
-    const computeCards: Card<ComputeChoice>[] = [
-        ...t.plan.machines.map((item) => ({
-            value: `machine:${item.machine.name}` as ComputeChoice,
-            icon: item.machine.device === "cpu" ? Cpu : Server,
-            title: item.machine.name,
-            primary: !t.pick ? (
-                "–"
-            ) : item.chosen ? (
-                approx(item.minutes)
-            ) : (
-                <span className="text-destructive">{item.reason}</span>
-            ),
-            secondary: `${item.machine.memoryGb} GB · ${item.machine.accelerator.replace("NVIDIA ", "")}`,
-            disabled: !item.chosen,
-        })),
-        {
-            value: "auto",
-            icon: Gauge,
-            title: "Auto",
-            primary: !t.pick ? (
-                "–"
-            ) : auto ? (
-                approx(auto.minutes)
-            ) : (
-                <span className="text-destructive">nothing fits</span>
-            ),
-            secondary: auto?.machine.name,
-            disabled: !auto,
-        },
-    ];
+function presetText(quality: Quality): string {
+    const preset = presetRecipe(quality);
+    return `rank ${preset.rank} · ${plural(preset.epochs, "epoch")} · lr ${rate(preset.learningRate)}`;
+}
+
+function presetShort(quality: Quality): string {
+    const preset = presetRecipe(quality);
+    return `rank ${preset.rank} · ${plural(preset.epochs, "epoch")}`;
+}
+
+function customText(t: Trainer): string {
+    const { recipe } = t;
+    return `rank ${recipe.rank} · ${plural(recipe.epochs, "epoch")} · lr ${rate(recipe.learningRate)}`;
+}
+
+function timeOf(t: Trainer, quality: Quality): ReactNode {
+    return t.pick ? qualityTime(t.minutes[quality]) : "–";
+}
+
+function currentTime(t: Trainer): ReactNode {
+    return t.pick && t.plan.pick ? approx(t.plan.pick.minutes) : "–";
+}
+
+function CoreGrid({ t }: { t: Trainer }) {
     return (
-        <>
-            {t.binding && (
-                <Section id="train-data" label="Dataset">
-                    <DatasetPicker
-                        value={t.choice}
-                        onChange={t.setChoice}
-                        className="sm:grid-cols-2"
-                    />
-                </Section>
-            )}
-            <Section id="train-quality" label="Quality">
-                <Cards<Quality>
-                    label="Quality"
-                    value={t.quality}
-                    cards={qualityCards}
-                    onChange={t.choose}
-                    className="grid-cols-1 sm:grid-cols-3"
-                />
-            </Section>
-            {!t.binding && (
-                <Section
-                    id="train-data"
-                    label={t.dataset ? `Data · ${t.dataset.slug}` : "Data"}
-                    aside={<HeldOutNote t={t} />}
-                >
-                    {t.pick && (
-                        <Cards<string>
-                            label="Data version"
-                            value={String(t.pick.number)}
-                            cards={dataCards}
-                            onChange={(next) => t.setPicked(Number(next))}
-                            className="grid-cols-1 sm:grid-cols-3"
-                        />
-                    )}
-                </Section>
-            )}
-            <Section id="train-compute" label="Compute">
-                <Cards<ComputeChoice>
-                    label="Compute"
-                    value={t.compute}
-                    cards={computeCards}
-                    onChange={t.setCompute}
-                    className="sm:grid-cols-4"
-                />
-            </Section>
-        </>
+        <FieldGrid>
+            <CoreFields t={t} />
+        </FieldGrid>
     );
 }
 
-function AdvancedGroups({ t }: { t: Trainer }) {
+function QualityCards({ t }: { t: Trainer }) {
+    const cards: Card<Level>[] = [
+        ...QUALITIES.map((item) => ({
+            value: item.id as Level,
+            icon: QUALITY_ICON[item.id],
+            title: item.label,
+            primary: timeOf(t, item.id),
+            secondary: presetShort(item.id),
+        })),
+        {
+            value: "custom",
+            icon: SlidersHorizontal,
+            title: "Custom",
+            primary: t.level === "custom" ? currentTime(t) : "Your values",
+            secondary:
+                t.level === "custom"
+                    ? `rank ${t.recipe.rank} · ${plural(t.recipe.epochs, "epoch")}`
+                    : "rank, epochs",
+        },
+    ];
     return (
-        <>
-            <Section id="train-advanced-quality" label="Quality">
-                <FieldGrid>
-                    <QualityFields t={t} />
-                </FieldGrid>
+        <Section id="train-quality" label="Quality">
+            <Cards<Level>
+                label="Quality"
+                value={t.level}
+                cards={cards}
+                onChange={t.choose}
+                className="grid-cols-2 sm:grid-cols-4"
+            />
+            {t.level === "custom" && (
+                <div className="pt-3">
+                    <CoreGrid t={t} />
+                </div>
+            )}
+        </Section>
+    );
+}
+
+function QualityVisible({ t }: { t: Trainer }) {
+    return (
+        <Section
+            id="train-quality"
+            label="Quality"
+            aside={
+                <span className="text-sm text-muted-foreground tabular-nums">{currentTime(t)}</span>
+            }
+        >
+            <Segments<Level>
+                label="Quality"
+                value={t.level}
+                onChange={t.choose}
+                options={[
+                    ...QUALITIES.map((item) => ({ value: item.id as Level, label: item.label })),
+                    { value: "custom", label: "Custom" },
+                ]}
+            />
+            <div className="pt-3">
+                <CoreGrid t={t} />
+            </div>
+        </Section>
+    );
+}
+
+function QualitySelect({ t }: { t: Trainer }) {
+    const options: RichOption[] = [
+        ...QUALITIES.map((item) => {
+            const Icon = QUALITY_ICON[item.id];
+            return {
+                value: item.id,
+                label: item.label,
+                icon: <Icon />,
+                meta: (
+                    <>
+                        {presetText(item.id)} · {timeOf(t, item.id)}
+                    </>
+                ),
+            };
+        }),
+        {
+            value: "custom",
+            label: "Custom",
+            icon: <SlidersHorizontal />,
+            meta: t.level === "custom" ? customText(t) : "your values",
+            separated: true,
+        },
+    ];
+    return (
+        <Section id="train-quality" label="Quality">
+            <RichSelect
+                id="train-quality-select"
+                label="Quality"
+                value={t.level}
+                options={options}
+                onChange={(next) => t.choose(next as Level)}
+            />
+            {t.level === "custom" && (
+                <div className="pt-3">
+                    <CoreGrid t={t} />
+                </div>
+            )}
+        </Section>
+    );
+}
+
+function DataBlock({ t }: { t: Trainer }) {
+    if (t.binding) {
+        return (
+            <Section id="train-data" label="Dataset">
+                <DatasetPicker value={t.choice} onChange={t.setChoice} />
             </Section>
+        );
+    }
+    const options: RichOption[] = t.picks.map((pick, index) => ({
+        value: String(pick.number),
+        label: index === 0 ? `v${pick.number} · latest` : `v${pick.number}`,
+        icon: <Database />,
+        meta: [
+            `${count(pick.rows)} rows`,
+            shortAgo({ hoursAgo: pick.hoursAgo }),
+            versusLive(t, pick.rows, pick.number),
+        ]
+            .filter(Boolean)
+            .join(" · "),
+    }));
+    return (
+        <Section
+            id="train-data"
+            label={t.dataset ? `Data · ${t.dataset.name}` : "Data"}
+            aside={<HeldOutNote t={t} />}
+        >
+            <RichSelect
+                id="train-data-version"
+                label="Data version"
+                value={t.pick ? String(t.pick.number) : null}
+                options={options}
+                onChange={(next) => t.setPicked(Number(next))}
+            />
+        </Section>
+    );
+}
+
+function ComputeBlock({ t }: { t: Trainer }) {
+    const auto = bestOf(t.plan, "auto");
+    const options: RichOption[] = [
+        ...t.plan.machines.map((item) => {
+            const Icon = item.machine.device === "cpu" ? Cpu : Server;
+            const spec = `${item.machine.memoryGb} GB · ${item.machine.accelerator.replace("NVIDIA ", "")}`;
+            return {
+                value: `machine:${item.machine.name}`,
+                label: item.machine.name,
+                icon: <Icon />,
+                disabled: Boolean(t.pick) && !item.chosen,
+                meta: !t.pick ? (
+                    spec
+                ) : item.chosen ? (
+                    `${approx(item.minutes)} · ${spec}`
+                ) : (
+                    <span className="text-destructive">{item.reason}</span>
+                ),
+            };
+        }),
+        {
+            value: "auto",
+            label: "Auto",
+            icon: <Gauge />,
+            separated: true,
+            disabled: Boolean(t.pick) && !auto,
+            meta: auto ? `first free that fits · now ${auto.machine.name}` : "first free that fits",
+        },
+    ];
+    return (
+        <Section id="train-compute" label="Compute">
+            <RichSelect
+                id="train-compute-select"
+                label="Compute"
+                value={t.compute}
+                options={options}
+                onChange={(next) => t.setCompute(next as ComputeChoice)}
+            />
+        </Section>
+    );
+}
+
+function AdvancedBlock({ t }: { t: Trainer }) {
+    return (
+        <section aria-labelledby="train-advanced" className="flex flex-col gap-field border-t pt-5">
+            <div className="flex min-h-8 items-center justify-between gap-3">
+                <h3 id="train-advanced" className="font-medium tabular-nums">
+                    {t.changed > 0 ? `Advanced · ${t.changed} changed` : "Advanced"}
+                </h3>
+                {t.changed > 0 && (
+                    <Button type="button" variant="ghost" onClick={t.reset}>
+                        Reset
+                    </Button>
+                )}
+            </div>
             <Section id="train-advanced-data" label="Data">
                 <FieldGrid>
                     <DataFields t={t} />
@@ -268,43 +389,30 @@ function AdvancedGroups({ t }: { t: Trainer }) {
                     <ComputeFields t={t} />
                 </FieldGrid>
             </Section>
-        </>
+            <Section id="train-advanced-other" label="Other">
+                <FieldGrid>
+                    <OtherFields t={t} />
+                </FieldGrid>
+            </Section>
+        </section>
     );
 }
 
-type Tab = "general" | "advanced";
+const QUALITY_BLOCK: Record<QualityStyle, (props: { t: Trainer }) => ReactNode> = {
+    cards: QualityCards,
+    visible: QualityVisible,
+    select: QualitySelect,
+};
 
-const PANEL =
-    "flex min-h-0 flex-1 flex-col gap-field overflow-y-auto overscroll-contain px-5 py-5 sm:px-7";
-
-function Settings({ t }: { t: Trainer }) {
-    const [tab, setTab] = useState<Tab>("general");
+function Settings({ t, style }: { t: Trainer; style: QualityStyle }) {
+    const QualityBlock = QUALITY_BLOCK[style];
     return (
-        <Tabs
-            value={tab}
-            onValueChange={(next) => setTab(next as Tab)}
-            className="min-h-0 flex-1 gap-0"
-        >
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b px-5 py-3 sm:px-7">
-                <TabsList aria-label="Settings">
-                    <TabsTrigger value="general">General</TabsTrigger>
-                    <TabsTrigger value="advanced" className="tabular-nums">
-                        {t.changed > 0 ? `Advanced · ${t.changed} changed` : "Advanced"}
-                    </TabsTrigger>
-                </TabsList>
-                {t.changed > 0 && (
-                    <Button type="button" variant="ghost" onClick={t.reset}>
-                        Reset
-                    </Button>
-                )}
-            </div>
-            <TabsContent value="general" className={PANEL}>
-                <General t={t} />
-            </TabsContent>
-            <TabsContent value="advanced" className={PANEL}>
-                <AdvancedGroups t={t} />
-            </TabsContent>
-        </Tabs>
+        <div className="flex min-h-0 flex-1 flex-col gap-field overflow-y-auto overscroll-contain px-5 py-5 sm:px-7">
+            <DataBlock t={t} />
+            <QualityBlock t={t} />
+            <ComputeBlock t={t} />
+            <AdvancedBlock t={t} />
+        </div>
     );
 }
 
@@ -389,10 +497,10 @@ function Receipt({ t }: { t: Trainer }) {
     );
 }
 
-export function TrainReceipt({ t }: { t: Trainer }) {
+export function TrainReceipt({ t, style }: { t: Trainer; style: QualityStyle }) {
     return (
         <div className="flex min-h-0 flex-1 flex-col md:grid md:grid-cols-[minmax(0,1fr)_17rem] md:grid-rows-[minmax(0,1fr)]">
-            <Settings t={t} />
+            <Settings t={t} style={style} />
             <aside
                 aria-label="Estimate"
                 className="flex shrink-0 flex-col gap-3 border-t bg-muted px-5 py-4 sm:px-6 md:gap-5 md:border-t-0 md:border-l md:py-5"

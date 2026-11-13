@@ -1,30 +1,26 @@
 import { Dialog, DialogContent, DialogTitle, cn } from "obp-ui";
 import { type KeyboardEvent, useState } from "react";
 import { closeTrain, useCan, useOverlays } from "./flowOverlays";
-import { type PickerProps, TrainMinimal } from "./flowTrainMinimal";
 import { Segments } from "./flowTrainParts";
-import { TrainReceipt } from "./flowTrainReceipt";
+import { type QualityStyle, TrainReceipt } from "./flowTrainReceipt";
 import { useTrainer } from "./flowTrainState";
-import { TrainSummary } from "./flowTrainSummary";
 import { type FlowModel, useFlowState } from "./modelsFlowData";
 
-type Variant = "A" | "B" | "C";
+type Variant = "1" | "2" | "3";
 
-const VARIANT_KEY = "minibrain.proto.flow.trainVariant.v2";
-const VARIANTS: Variant[] = ["A", "B", "C"];
+const VARIANT_KEY = "minibrain.proto.flow.trainVariant.v3";
+const VARIANTS: Variant[] = ["1", "2", "3"];
 
-const WIDTH: Record<Variant, string> = {
-    A: "sm:max-w-[36rem]",
-    B: "sm:max-w-[48rem]",
-    C: "h-[calc(100dvh-2rem)] sm:h-[min(40rem,calc(100dvh-2rem))] sm:max-w-[62rem]",
-};
+const STYLE: Record<Variant, QualityStyle> = { "1": "cards", "2": "visible", "3": "select" };
+
+const SIZE = "h-[calc(100dvh-2rem)] sm:h-[min(40rem,calc(100dvh-2rem))] sm:max-w-[62rem]";
 
 function readVariant(): Variant {
     try {
         const stored = window.localStorage.getItem(VARIANT_KEY);
-        return VARIANTS.find((item) => item === stored) ?? "C";
+        return VARIANTS.find((item) => item === stored) ?? "1";
     } catch {
-        return "C";
+        return "1";
     }
 }
 
@@ -49,11 +45,13 @@ function submitsOnEnter(target: HTMLElement): boolean {
 function initialFocus(variant: Variant): () => HTMLElement | null {
     return () => {
         const root = document.querySelector<HTMLElement>("[data-train-dialog]");
-        const selector =
-            variant === "B"
-                ? "button[type=submit]:not(:disabled)"
-                : "form > :not(header) [role=radio][data-checked]";
-        return root?.querySelector<HTMLElement>(selector) ?? null;
+        return (
+            root?.querySelector<HTMLElement>(
+                variant === "1"
+                    ? "form > :not(header) [role=radio][data-checked]"
+                    : "form > :not(header) button[role=combobox]",
+            ) ?? null
+        );
     };
 }
 
@@ -61,13 +59,11 @@ function Body({
     model,
     variant,
     onVariant,
-    picker,
-    onPicker,
 }: {
     model: FlowModel;
     variant: Variant;
     onVariant: (variant: Variant) => void;
-} & PickerProps) {
+}) {
     const t = useTrainer(model);
     const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
@@ -106,9 +102,7 @@ function Body({
                     />
                 </div>
             </header>
-            {variant === "A" && <TrainMinimal t={t} picker={picker} onPicker={onPicker} />}
-            {variant === "B" && <TrainSummary t={t} picker={picker} onPicker={onPicker} />}
-            {variant === "C" && <TrainReceipt t={t} />}
+            <TrainReceipt t={t} style={STYLE[variant]} />
         </form>
     );
 }
@@ -119,28 +113,14 @@ export function TrainDialog() {
     const allowed = useCan("builder");
     const [variant, setVariant] = useState<Variant>(readVariant);
     const model = train && allowed ? state.models.find((item) => item.slug === train) : undefined;
-    const [picker, setPicker] = useState<string | null>(null);
     const choose = (next: Variant) => {
         setVariant(next);
-        setPicker(null);
         writeVariant(next);
     };
-    const onOpenChange = (open: boolean, details: { reason: string; cancel: () => void }) => {
-        if (open) {
-            return;
+    const onOpenChange = (open: boolean) => {
+        if (!open) {
+            closeTrain();
         }
-        if (picker && details.reason === "escape-key") {
-            details.cancel();
-            document
-                .querySelector<HTMLElement>(
-                    "[data-train-dialog] [aria-expanded=true][aria-controls]",
-                )
-                ?.focus();
-            setPicker(null);
-            return;
-        }
-        setPicker(null);
-        closeTrain();
     };
     return (
         <Dialog open={Boolean(model)} onOpenChange={onOpenChange}>
@@ -149,18 +129,10 @@ export function TrainDialog() {
                 initialFocus={initialFocus(variant)}
                 className={cn(
                     "flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0",
-                    WIDTH[variant],
+                    SIZE,
                 )}
             >
-                {model && (
-                    <Body
-                        model={model}
-                        variant={variant}
-                        onVariant={choose}
-                        picker={picker}
-                        onPicker={setPicker}
-                    />
-                )}
+                {model && <Body model={model} variant={variant} onVariant={choose} />}
             </DialogContent>
         </Dialog>
     );

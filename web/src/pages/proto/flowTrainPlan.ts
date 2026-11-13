@@ -295,7 +295,12 @@ export const QUALITIES: { id: Quality; label: string }[] = [
     { id: "quality", label: "Best" },
 ];
 
-const SHARED: Omit<Recipe, "rank" | "alpha" | "learningRate" | "epochs" | "maxRows"> = {
+export const QUALITY_KEYS = ["rank", "alpha", "learningRate", "epochs"] as const;
+
+type QualityKey = (typeof QUALITY_KEYS)[number];
+
+export const DEFAULTS: Omit<Recipe, QualityKey> = {
+    maxRows: "all",
     microBatch: "auto",
     gradAccum: "auto",
     seqLen: "auto",
@@ -307,35 +312,41 @@ const SHARED: Omit<Recipe, "rank" | "alpha" | "learningRate" | "epochs" | "maxRo
 };
 
 const PRESETS: Record<Quality, Recipe> = {
-    fast: { ...SHARED, rank: 8, alpha: 16, learningRate: 2e-4, epochs: 1, maxRows: 1000 },
-    balanced: { ...SHARED, rank: 16, alpha: 32, learningRate: 2e-4, epochs: 2, maxRows: 3000 },
-    quality: {
-        ...SHARED,
-        rank: 32,
-        alpha: 64,
-        learningRate: 1e-4,
-        epochs: 3,
-        maxRows: "all",
-        evalEvery: 50,
-    },
+    fast: { ...DEFAULTS, rank: 8, alpha: 16, learningRate: 2e-4, epochs: 1 },
+    balanced: { ...DEFAULTS, rank: 16, alpha: 32, learningRate: 2e-4, epochs: 2 },
+    quality: { ...DEFAULTS, rank: 32, alpha: 64, learningRate: 1e-4, epochs: 3 },
 };
 
 export function presetRecipe(quality: Quality): Recipe {
     return PRESETS[quality];
 }
 
+export function withPreset(recipe: Recipe, quality: Quality): Recipe {
+    const preset = PRESETS[quality];
+    return {
+        ...recipe,
+        rank: preset.rank,
+        alpha: preset.alpha,
+        learningRate: preset.learningRate,
+        epochs: preset.epochs,
+    };
+}
+
 export function qualityOf(recipe: Recipe): Quality | null {
-    const keys = Object.keys(recipe) as (keyof Recipe)[];
     const found = QUALITIES.find((item) =>
-        keys.every((key) => PRESETS[item.id][key] === recipe[key]),
+        QUALITY_KEYS.every((key) => PRESETS[item.id][key] === recipe[key]),
     );
     return found?.id ?? null;
 }
 
-export function changedFrom(recipe: Recipe, quality: Quality): number {
-    const preset = PRESETS[quality];
-    return (Object.keys(recipe) as (keyof Recipe)[]).filter((key) => preset[key] !== recipe[key])
-        .length;
+export function changedFrom(recipe: Recipe): number {
+    return (Object.keys(DEFAULTS) as (keyof typeof DEFAULTS)[]).filter(
+        (key) => DEFAULTS[key] !== recipe[key],
+    ).length;
+}
+
+export function withDefaults(recipe: Recipe): Recipe {
+    return { ...recipe, ...DEFAULTS };
 }
 
 export const LEARNING_RATES = [2e-5, 5e-5, 1e-4, 2e-4, 3e-4, 5e-4, 1e-3];

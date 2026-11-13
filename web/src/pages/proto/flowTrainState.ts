@@ -24,6 +24,8 @@ import {
     makePlan,
     presetRecipe,
     qualityOf,
+    withDefaults,
+    withPreset,
 } from "./flowTrainPlan";
 import {
     type FlowModel,
@@ -64,7 +66,7 @@ export function useTrainer(model: FlowModel) {
     const dataset = bound ?? state.datasets.find((item) => item.slug === choice);
     const picks: DataPick[] = dataPicks(model, dataset);
     const [picked, setPicked] = useState(picks[0]?.number ?? 0);
-    const [basis, setBasis] = useState<Quality>("balanced");
+    const [custom, setCustom] = useState(false);
     const [recipe, setRecipe] = useState<Recipe>(presetRecipe("balanced"));
     const [computeChoice, setCompute] = useState<ComputeChoice | null>(null);
 
@@ -89,7 +91,7 @@ export function useTrainer(model: FlowModel) {
         computeChoice ?? (best ? `machine:${best.machine.name}` : "auto");
     const input = { base, available, heldOut, longest, compute, busy };
     const plan = makePlan({ ...input, recipe });
-    const quality = qualityOf(recipe);
+    const quality = custom ? null : qualityOf(recipe);
     const minutes = Object.fromEntries(
         QUALITIES.map((item) => {
             const found = makePlan({ ...input, recipe: presetRecipe(item.id) }).pick;
@@ -110,9 +112,17 @@ export function useTrainer(model: FlowModel) {
     ).length;
 
     const change = (patch: Partial<Recipe>) => setRecipe((current) => ({ ...current, ...patch }));
-    const choose = (next: Quality) => {
-        setBasis(next);
-        setRecipe(presetRecipe(next));
+    const choose = (next: Quality | "custom") => {
+        if (next === "custom") {
+            setCustom(true);
+            return;
+        }
+        setCustom(false);
+        setRecipe((current) => withPreset(current, next));
+    };
+    const tune = (patch: Partial<Recipe>) => {
+        setCustom(true);
+        change(patch);
     };
 
     const start = () => {
@@ -176,10 +186,11 @@ export function useTrainer(model: FlowModel) {
         recipe,
         change,
         quality,
-        basis,
+        level: (quality ?? "custom") as Quality | "custom",
         choose,
-        changed: quality ? 0 : changedFrom(recipe, basis),
-        reset: () => choose(basis),
+        tune,
+        changed: changedFrom(recipe),
+        reset: () => setRecipe((current) => withDefaults(current)),
         compute,
         setCompute,
         plan,

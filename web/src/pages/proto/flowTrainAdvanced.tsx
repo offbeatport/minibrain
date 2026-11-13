@@ -79,13 +79,11 @@ function ChoiceSelect<T extends string | number | boolean>({
 
 const GRID = "grid gap-x-field gap-y-5 @md:grid-cols-2 @xl:grid-cols-3";
 
-export function QualityFields({ t }: { t: Trainer }) {
-    const { recipe, change, plan, heldOut } = t;
-    const pick = plan.pick;
+export function CoreFields({ t }: { t: Trainer }) {
+    const { recipe, tune: change } = t;
     const linkedAlpha = recipe.alpha === recipe.rank * 2;
     const setRank = (rank: number) => change(linkedAlpha ? { rank, alpha: rank * 2 } : { rank });
     const rankError = errorFor(t, "rank") ? `max ${MAX_RANK}` : undefined;
-    const general = plan.mixed - plan.rows;
     return (
         <>
             <Field
@@ -149,6 +147,16 @@ export function QualityFields({ t }: { t: Trainer }) {
                     format={WHOLE}
                 />
             </Field>
+        </>
+    );
+}
+
+export function OtherFields({ t }: { t: Trainer }) {
+    const { recipe, change, plan, heldOut } = t;
+    const pick = plan.pick;
+    const general = plan.mixed - plan.rows;
+    return (
+        <>
             <Field
                 id="train-mix"
                 label={
@@ -348,6 +356,15 @@ export function FieldGrid({ children }: { children: ReactNode }) {
         <div className="@container">
             <div className={GRID}>{children}</div>
         </div>
+    );
+}
+
+export function QualityFields({ t }: { t: Trainer }) {
+    return (
+        <>
+            <CoreFields t={t} />
+            <OtherFields t={t} />
+        </>
     );
 }
 

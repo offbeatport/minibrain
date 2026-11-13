@@ -13,7 +13,6 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
-    cn,
     useToast,
 } from "obp-ui";
 import { type FormEvent, useEffect, useState } from "react";
@@ -26,6 +25,7 @@ import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { DatasetPicker } from "./flowDatasetPicker";
 import { useCan } from "./flowOverlays";
+import { RichSelect } from "./flowSelect";
 import {
     CATALOG,
     type CatalogEntry,
@@ -368,43 +368,6 @@ export function FlowCatalogPage() {
     return null;
 }
 
-function BaseOption({
-    entry,
-    checked,
-    installed,
-    onPick,
-}: {
-    entry: CatalogEntry;
-    checked: boolean;
-    installed: boolean;
-    onPick: () => void;
-}) {
-    return (
-        <label
-            className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-md border px-3 py-2.5 hover:bg-secondary has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring",
-                checked && "border-primary bg-accent hover:bg-accent",
-            )}
-        >
-            <input
-                type="radio"
-                name="base"
-                value={entry.id}
-                checked={checked}
-                onChange={onPick}
-                className="sr-only"
-            />
-            <PublisherLogo publisher={entry.publisher} name={entry.name} />
-            <span className="flex min-w-0 flex-1 flex-col">
-                <span className="font-semibold">{entry.name}</span>
-                <span className="truncate text-sm text-muted-foreground">
-                    {`${entry.size} · ${entry.licence}${entry.serveOnly ? " · serve-only, no training" : ""}${installed ? "" : " · downloads first"}`}
-                </span>
-            </span>
-        </label>
-    );
-}
-
 export function FlowAddModelPage() {
     const router = useRouter();
     const initial = catalogEntry(useSearchParam("base"))?.id ?? CATALOG[0].id;
@@ -439,21 +402,29 @@ export function FlowAddModelPage() {
     return (
         <Page>
             <Crumbs items={[{ label: "Models", href: `${FLOW}/models` }, { label: "Add model" }]} />
-            <PageHeader title="Add model" caption="Pick a base, its dataset and a name." />
+            <PageHeader title="Add model" />
             <form onSubmit={create} className="flex max-w-2xl flex-col gap-field">
                 <fieldset className="flex flex-col gap-label">
                     <legend className="mb-2 font-medium">Base</legend>
-                    <div className="grid gap-2">
-                        {shown.map((entry) => (
-                            <BaseOption
-                                key={entry.id}
-                                entry={entry}
-                                checked={entry.id === base}
-                                installed={isInstalled(state, entry.id)}
-                                onPick={() => setBase(entry.id)}
-                            />
-                        ))}
-                    </div>
+                    <RichSelect
+                        id="add-base"
+                        label="Base"
+                        value={base}
+                        onChange={setBase}
+                        options={shown.map((entry) => ({
+                            value: entry.id,
+                            label: entry.name,
+                            icon: <PublisherLogo publisher={entry.publisher} name={entry.name} />,
+                            meta: [
+                                entry.size,
+                                entry.licence,
+                                entry.serveOnly ? "serve-only" : null,
+                                isInstalled(state, entry.id) ? null : "downloads first",
+                            ]
+                                .filter(Boolean)
+                                .join(" · "),
+                        }))}
+                    />
                     <Link
                         href={`${FLOW}/discover`}
                         className="w-fit text-sm text-primary hover:underline"
