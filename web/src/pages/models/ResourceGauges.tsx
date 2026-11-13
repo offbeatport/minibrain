@@ -21,7 +21,11 @@ function percent(value: number, total: number): number {
     return total > 0 ? Math.max(0, Math.min(100, (value / total) * 100)) : 0;
 }
 
-function Bar({ label, total, segments }: { label: string; total: number; segments: Segment[] }) {
+export function ResourceBar({
+    label,
+    total,
+    segments,
+}: { label: string; total: number; segments: Segment[] }) {
     const used = segments.reduce((sum, segment) => sum + segment.value, 0);
     return (
         <div
@@ -112,7 +116,7 @@ export function DiskGauge({
     const tone: Tone = after < 0 ? "destructive" : after < LOW_SPACE ? "warning" : "normal";
     return (
         <>
-            <Bar
+            <ResourceBar
                 label="Storage on your compute"
                 total={total}
                 segments={[
@@ -178,7 +182,7 @@ export function MemoryGauge({
         : null;
     return (
         <>
-            <Bar
+            <ResourceBar
                 label="Memory on your compute"
                 total={available}
                 segments={[

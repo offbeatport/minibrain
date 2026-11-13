@@ -16,34 +16,31 @@ import {
     DialogTitle,
     Kbd,
     Link,
+    cn,
     useToast,
 } from "obp-ui";
-import { Fragment, type KeyboardEvent, useState } from "react";
+import { type KeyboardEvent, useState } from "react";
 import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { type DatasetVersionInfo, useDatasetVersions } from "~/api/dataQueries";
 import { useFeedbackSummary } from "~/api/feedbackQueries";
-import { keys, useAllModels } from "~/api/queries";
+import { keys } from "~/api/queries";
 import { errorMessage } from "~/components/Section";
 import { count } from "~/lib/format";
 import { jobHref } from "~/lib/modelLinks";
-import { baseNameOf, isDeployed, nextVersion } from "../header";
+import { relativeTime } from "~/lib/time";
+import { isDeployed, nextVersion } from "../header";
 import { liveOf } from "../makeLive";
 import { Advanced } from "./advanced";
 import {
     AUTO,
-    ComputePicker,
-    DataPicker,
     type DataRef,
-    Headline,
     HeldOutWarning,
-    MemoryBar,
-    MemoryTrack,
+    MemoryGaugeFooter,
     Meta,
-    QualityPicker,
+    PickSelect,
     Row,
-    TimeLine,
-    ToggleButton,
     fitText,
+    timeText,
     versusLive,
 } from "./parts";
 import {
@@ -55,11 +52,13 @@ import {
     type Quality,
     type Recipe,
     changedFrom,
+    deviceHours,
     duration,
     issuesOf,
     labelOf,
     planQuery,
     presetRecipe,
+    presetText,
 } from "./recipe";
 
 function fetchPlan(slug: string, query: PlanQuery) {
@@ -114,14 +113,11 @@ function Body({
     const client = useQueryClient();
     const dataVersions = useDatasetVersions(detail.dataset ?? "", Boolean(detail.dataset));
     const feedback = useFeedbackSummary(row.key);
-    const models = useAllModels();
-    const baseName = baseNameOf(models.data, row.base_model);
     const saved = (dataVersions.data ?? []).filter((item) => item.saved !== false);
     const [picked, setPicked] = useState<number | null>(null);
     const [basis, setBasis] = useState<Quality>("balanced");
     const [recipe, setRecipe] = useState<Recipe>(presetRecipe("balanced"));
     const [compute, setCompute] = useState<string>(AUTO);
-    const [opened, setOpened] = useState<"data" | "compute" | null>(null);
     const [custom, setCustom] = useState(false);
     const [breaking, setBreaking] = useState<string | null>(null);
     const chosen =
@@ -224,8 +220,6 @@ function Body({
         setBasis(next);
         setRecipe(presetRecipe(next));
     };
-    const toggle = (which: "data" | "compute") =>
-        setOpened((current) => (current === which ? null : which));
     const start = () => {
         if (ready && !create.isPending) {
             create.mutate(false);
@@ -240,28 +234,17 @@ function Body({
             start();
         }
     };
-    const qualityName = custom ? "Custom" : labelOf(basis);
-    const summary =
-        ready && info?.chosen
-            ? [
-                  `Trains v${number} from ${baseName} on ${count(info.rows)} rows`,
-                  qualityName,
-                  `≈ ${duration(info.minutes)} on ${info.machine}`,
-                  info.queue.ahead > 0 ? `${info.queue.ahead} ahead in the queue` : null,
-              ].filter((part): part is string => Boolean(part))
-            : null;
+    const fastest = (info?.machines ?? [])
+        .filter((item) => item.chosen)
+        .reduce<NonNullable<PlanInfo["machines"]>[number] | null>(
+            (best, item) =>
+                best === null || (item.minutes ?? 0) < (best.minutes ?? 0) ? item : best,
+            null,
+        );
     const diff = chosen
         ? versusLive({ id: chosen.id, number: chosen.number, rows: chosen.rows }, live)
         : null;
     const failure = create.error && !breaking ? errorMessage(create.error) : null;
-    const computeTitle = [
-        compute === AUTO ? "Automatic" : null,
-        info?.machine,
-        info?.chosen ? info.chosen.label : null,
-    ]
-        .filter(Boolean)
-        .join(" · ");
-
     return (
         <form
             noValidate
@@ -273,7 +256,7 @@ function Body({
             onKeyDown={onKeyDown}
         >
             <DialogHeader className="border-b px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
-                <DialogTitle>{`Train v${number} · ${row.name}`}</DialogTitle>
+                <DialogTitle>{`Train v${number} of ${row.name}`}</DialogTitle>
             </DialogHeader>
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
                 <div className="min-h-fit px-5 sm:px-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain">
@@ -281,26 +264,29 @@ function Body({
                         <Row id="train-data" label="Data">
                             {chosen ? (
                                 <>
-                                    <Headline
-                                        action={
-                                            saved.length > 1 ? (
-                                                <ToggleButton
-                                                    open={opened === "data"}
-                                                    onToggle={() => toggle("data")}
-                                                    controls="train-data-picker"
-                                                    label="training data"
-                                                />
-                                            ) : undefined
-                                        }
-                                    >
-                                        {`${detail.dataset_name ?? detail.dataset ?? "Data"} v${chosen.number ?? "–"} · ${count(chosen.counts.train ?? 0)} rows`}
-                                        {accepted > 0 && (
-                                            <span className="text-muted-foreground">{` + ${count(accepted)} accepted feedback`}</span>
-                                        )}
-                                    </Headline>
+                                    <PickSelect
+                                        id="train-data-select"
+                                        value={String(chosen.id)}
+                                        onChange={(next) => setPicked(Number(next))}
+                                        options={saved.map((item, index) => ({
+                                            value: String(item.id),
+                                            label: `${detail.dataset_name ?? detail.dataset ?? "Data"} v${item.number ?? "–"}${index === 0 ? " · latest" : ""}`,
+                                            meta: [
+                                                `${count(item.counts.train ?? item.rows)} rows`,
+                                                relativeTime(item.taken_at ?? item.created_at),
+                                            ].join(" · "),
+                                        }))}
+                                    />
                                     <Meta className="flex flex-wrap gap-x-2">
                                         <span>
-                                            {[`${count(heldOut)} held out`, diff]
+                                            {[
+                                                `${count(chosen.counts.train ?? 0)} training rows`,
+                                                accepted > 0
+                                                    ? `+ ${count(accepted)} accepted feedback`
+                                                    : null,
+                                                `${count(heldOut)} held out`,
+                                                diff,
+                                            ]
                                                 .filter(Boolean)
                                                 .join(" · ")}
                                         </span>
@@ -315,93 +301,73 @@ function Body({
                                         )}
                                     </Meta>
                                     {heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={heldOut} />}
-                                    {opened === "data" && (
-                                        <DataPicker
-                                            versions={saved}
-                                            picked={chosen.id}
-                                            live={live}
-                                            onPick={setPicked}
-                                            footer={
-                                                <>
-                                                    {`Saved versions of ${detail.dataset_name ?? detail.dataset}. `}
-                                                    <Link
-                                                        href={`/data?item=${encodeURIComponent(`dataset:${detail.dataset}`)}`}
-                                                        onClick={onClose}
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        Open the dataset
-                                                    </Link>
-                                                </>
-                                            }
-                                        />
-                                    )}
                                 </>
                             ) : (
-                                <Headline>
-                                    <span className="text-destructive">
-                                        Add training data first: training needs examples.
-                                    </span>
-                                </Headline>
+                                <p className="min-h-8 text-destructive sm:leading-8">
+                                    Add training data first: training needs examples.
+                                </p>
                             )}
                         </Row>
                         <Row id="train-method" label="Method">
-                            <p className="flex min-h-8 flex-wrap items-center gap-x-3">
-                                <span>Supervised fine-tuning (SFT)</span>
-                            </p>
+                            <PickSelect
+                                id="train-method-select"
+                                value="sft"
+                                onChange={() => undefined}
+                                options={[{ value: "sft", label: "Supervised fine-tuning (SFT)" }]}
+                            />
                         </Row>
-                        <Row id="train-quality" label="Quality">
-                            <QualityPicker
+                        <Row id="train-quality" label="Training">
+                            <PickSelect
+                                id="train-quality-select"
                                 value={level}
-                                minutes={minutes}
-                                custom={{
-                                    minutes: info?.chosen ? info.minutes : info ? null : undefined,
-                                    text:
-                                        custom && changed > 0
-                                            ? `${changed} changed`
-                                            : "your values",
-                                }}
-                                onPick={choose}
+                                onChange={(next) => choose(next as Level)}
+                                options={[
+                                    ...QUALITIES.map((item) => ({
+                                        value: item.id,
+                                        label: item.label,
+                                        meta: `${presetText(item.id)} · ${timeText(minutes[item.id])}`,
+                                    })),
+                                    {
+                                        value: "custom",
+                                        label: "Custom",
+                                        meta:
+                                            custom && changed > 0
+                                                ? `${changed} changed from ${labelOf(basis)}`
+                                                : "set each parameter",
+                                        separated: true,
+                                    },
+                                ]}
                             />
                         </Row>
                         <Row id="train-compute" label="Compute">
-                            <Headline
-                                action={
-                                    <ToggleButton
-                                        open={opened === "compute"}
-                                        onToggle={() => toggle("compute")}
-                                        controls="train-compute-picker"
-                                        label="compute"
-                                    />
-                                }
-                            >
-                                {computeTitle || "Automatic"}
-                                {info?.chosen && (
-                                    <span className="text-muted-foreground">{` · ${fitText(info.chosen)}`}</span>
-                                )}
-                            </Headline>
-                            {option && <MemoryBar option={option} memoryLabel={memoryLabel} />}
-                            {info?.chosen && info.minutes !== null && info.minutes !== undefined ? (
-                                <>
-                                    <TimeLine
-                                        minutes={info.minutes}
-                                        kind={info.machines.find((item) => item.picked)?.kind}
-                                        ahead={info.queue.ahead}
-                                    />
-                                    <Meta>{`${info.chosen.checkpointing ? "Gradient checkpointing" : "No checkpointing"}, batch ${info.chosen.micro_batch} × ${info.grad_accum ?? info.chosen.grad_accum}: the memory planner's choice.`}</Meta>
-                                </>
-                            ) : info && !info.chosen && info.level === "unknown" ? (
-                                <Meta>{info.basis}</Meta>
-                            ) : (
-                                (planError || info?.level === "insufficient") && (
-                                    <p className="text-destructive">{planError ?? info?.basis}</p>
-                                )
+                            <PickSelect
+                                id="train-compute-select"
+                                value={compute}
+                                onChange={setCompute}
+                                options={[
+                                    {
+                                        value: AUTO,
+                                        label: "Automatic",
+                                        meta: fastest
+                                            ? `fastest that fits · ${fastest.name}`
+                                            : "nothing fits",
+                                    },
+                                    ...(info?.machines ?? []).map((item, index) => ({
+                                        value: item.name,
+                                        label: `${item.name} · ${item.pool}`,
+                                        meta: item.chosen
+                                            ? `${fitText(item.chosen)} · ≈ ${duration(item.minutes)}`
+                                            : (item.reason ?? "does not fit"),
+                                        disabled: !item.chosen,
+                                        separated: index === 0,
+                                    })),
+                                ]}
+                            />
+                            {(planError || info?.level === "insufficient") && (
+                                <p className="text-destructive">{planError ?? info?.basis}</p>
                             )}
-                            {opened === "compute" && info && (
-                                <ComputePicker
-                                    machines={info.machines}
-                                    choice={compute}
-                                    onChoice={setCompute}
-                                />
+                            {info && !info.chosen && info.level === "unknown" && (
+                                <Meta>{info.basis}</Meta>
                             )}
                         </Row>
                     </div>
@@ -412,7 +378,7 @@ function Body({
                 >
                     <div className="flex min-h-14 items-center justify-between gap-3 border-b px-5 py-3">
                         <h3 id="train-parameters" className="font-medium">
-                            Parameters
+                            Training parameters
                         </h3>
                         {custom ? (
                             changed > 0 && (
@@ -448,30 +414,35 @@ function Body({
                     </div>
                 </aside>
             </div>
-            <div className="flex flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:items-center sm:px-7">
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    {option && (
-                        <span className="flex items-center gap-2 text-sm text-muted-foreground tabular-nums">
-                            <MemoryTrack
-                                option={option}
-                                memoryLabel={memoryLabel}
-                                className="h-1.5 w-28 shrink-0"
-                            />
-                            {info?.chosen ? fitText(info.chosen) : "does not fit"}
-                        </span>
-                    )}
+            <div className="flex flex-col gap-4 border-t px-5 py-4 sm:flex-row sm:items-end sm:px-7">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    {option ? (
+                        <MemoryGaugeFooter option={option} memoryLabel={memoryLabel} />
+                    ) : null}
                     <p
                         aria-live="polite"
-                        className={`text-sm tabular-nums ${summary ? "text-muted-foreground" : "text-destructive"}`}
+                        className={cn(
+                            "text-sm tabular-nums",
+                            failure || (!ready && !plan.isFetching)
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                        )}
                     >
                         {failure ??
-                            (summary
-                                ? summary.map((part, index) => (
-                                      <Fragment key={part}>
-                                          {index > 0 && " · "}
-                                          <span className="whitespace-nowrap">{part}</span>
-                                      </Fragment>
-                                  ))
+                            (ready &&
+                            info?.chosen &&
+                            info.minutes !== null &&
+                            info.minutes !== undefined
+                                ? [
+                                      `≈ ${duration(info.minutes)} on ${info.machine}`,
+                                      deviceHours(
+                                          info.minutes,
+                                          info.machines.find((item) => item.picked)?.kind,
+                                      ),
+                                      info.queue.ahead > 0
+                                          ? `${info.queue.ahead} ahead in the queue`
+                                          : "starts now",
+                                  ].join(" · ")
                                 : plan.isFetching
                                   ? "Planning…"
                                   : (issues[0]?.text ??
