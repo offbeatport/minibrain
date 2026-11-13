@@ -443,7 +443,7 @@ export function AddModelPage() {
                 status={
                     shown.length > 1
                         ? `Fix the ${shown.length} fields marked in red`
-                        : (shown[0] ?? outcome)
+                        : (shown[0] ?? "")
                 }
                 problem={shown.length > 0}
                 onSubmit={submit}

@@ -241,12 +241,8 @@ export function statusOf(run: TrainRun, blocked: string | null): string {
     if (problem) {
         return problem;
     }
-    if (!run.training) {
-        return `Scores in ${scoreTime(run)} on ${count(run.heldOut)} held-out rows`;
-    }
-    const minutes = run.info?.chosen ? run.info.minutes : null;
-    if (run.ready && minutes !== null && minutes !== undefined) {
-        return `≈ ${duration(minutes)} · ${count(run.info?.rows ?? run.available)} rows`;
+    if (!run.training || run.ready) {
+        return "";
     }
     return run.planning ? "Planning…" : "Waiting for the planner.";
 }
