@@ -251,7 +251,7 @@ export function targetHref(event: AuditEvent): string | undefined {
         key: () => listHref(API_KEYS_PATH, { q: ref.key }),
         account: () => "/settings/accounts",
         job: () => jobHref({ id: Number(ref.key), kind: jobKind(event) }),
-        dataset: () => "/data",
+        dataset: () => `/data?item=${encodeURIComponent(`dataset:${ref.key}`)}`,
         dataset_folder: () => "/data",
         feedback: () => listHref("/feedback", { item: ref.key.split("/").at(-1) }),
         connection: () => "/settings/connections",

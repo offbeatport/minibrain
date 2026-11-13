@@ -21033,6 +21033,50 @@
         ],
         "title": "ModelCreate"
       },
+      "ModelDatasetRef": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "The dataset version the current version trained on."
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest",
+            "description": "The newest saved version of the dataset."
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "version",
+          "latest"
+        ],
+        "title": "ModelDatasetRef"
+      },
       "ModelDetail": {
         "properties": {
           "slug": {
@@ -21795,6 +21839,16 @@
               "custom"
             ],
             "title": "Kind"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelDatasetRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -29453,6 +29507,18 @@
               }
             ],
             "title": "Base Refusal"
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Version",
+            "description": "The dataset version this version trained on."
           }
         },
         "type": "object",

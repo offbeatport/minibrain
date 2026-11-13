@@ -1351,6 +1351,14 @@ class VersionRow(BaseModel):
     cost: EvalCost | None = None
     base_model: str = ""
     base_refusal: str | None = None
+    dataset_version: int | None = Field(default=None, description="The dataset version this version trained on.")
+
+
+class ModelDatasetRef(BaseModel):
+    key: str
+    name: str
+    version: int | None = Field(description="The dataset version the current version trained on.")
+    latest: int | None = Field(description="The newest saved version of the dataset.")
 
 
 class ImportOrigin(BaseModel):
@@ -1401,6 +1409,7 @@ class ModelFacts(BaseModel):
 
 class ModelRow(ModelFacts):
     kind: Literal["base", "custom"]
+    dataset: ModelDatasetRef | None = None
 
 
 class BaseChoice(BaseModel):

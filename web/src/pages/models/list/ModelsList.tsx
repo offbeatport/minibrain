@@ -79,7 +79,7 @@ const GROUPS: { kind: KindKey; label: string }[] = [
 ];
 
 const EXPANDED_KEY = "minibrain.models.expanded";
-const COLUMNS_KEY = "minibrain.models.columns.shown";
+const COLUMNS_KEY = "minibrain.models.columns.shown.v2";
 const NESTED_KEY = "minibrain.models.showVersions";
 
 function readStored<T>(key: string, fallback: T): T {

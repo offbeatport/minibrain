@@ -6379,6 +6379,23 @@ export interface components {
             /** Api Name */
             api_name?: string | null;
         };
+        /** ModelDatasetRef */
+        ModelDatasetRef: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * Version
+             * @description The dataset version the current version trained on.
+             */
+            version: number | null;
+            /**
+             * Latest
+             * @description The newest saved version of the dataset.
+             */
+            latest: number | null;
+        };
         /** ModelDetail */
         ModelDetail: {
             /** Slug */
@@ -6616,6 +6633,7 @@ export interface components {
              * @enum {string}
              */
             kind: "base" | "custom";
+            dataset?: components["schemas"]["ModelDatasetRef"] | null;
         };
         /** ModelSafety */
         ModelSafety: {
@@ -9098,6 +9116,11 @@ export interface components {
             base_model?: string;
             /** Base Refusal */
             base_refusal?: string | null;
+            /**
+             * Dataset Version
+             * @description The dataset version this version trained on.
+             */
+            dataset_version?: number | null;
         };
         /** VersionTest */
         VersionTest: {

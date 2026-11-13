@@ -262,3 +262,13 @@ def test_two_dataset_versions_diff_by_input_with_label_shift(harness: Harness) -
     assert shifts == {"billing": (50, 50), "bug": (50, 51), "account": (50, 50), "feature": (50, 0)}
     assert found["after"]["rows"] == 151
     assert harness.client.get("/api/dataset-versions/999/diff/1").status_code == 404
+
+
+def test_the_models_list_shows_the_dataset_and_a_newer_version(harness: Harness) -> None:
+    dataset_with_model(harness)
+    first = harness.client.post(f"/api/models/{SLUG}/versions", json={"kind": "prompt"})
+    assert first.status_code == 201, first.text
+    remap(harness, "category <> 'feature'")
+    row = next(item for item in harness.client.get("/api/models").json() if item["key"] == SLUG)
+    assert row["dataset"] == {"key": "tickets", "name": "Tickets", "version": 1, "latest": 2}
+    assert row["versions"][0]["dataset_version"] == 1

@@ -14,7 +14,7 @@ export type StatusKey = "deployed" | "off" | "attention" | "training" | "failed"
 export type KindKey = "custom" | "base";
 export type SortKey = "attention" | "name" | "score" | "requests" | "recent";
 export type Filters = { status: StatusKey[]; kind: KindKey[]; base: string | null };
-export type Column = "quality" | "requests" | "cost" | "p95";
+export type Column = "data" | "quality" | "requests" | "cost" | "p95";
 
 export const NO_FILTERS: Filters = { status: [], kind: [], base: null };
 export const DEFAULT_SORT: SortKey = "attention";
@@ -46,13 +46,14 @@ export const SORTS: { value: SortKey; label: string; detail?: string }[] = [
 ];
 
 export const COLUMNS: { id: Column; label: string; track: string }[] = [
+    { id: "data", label: "Data", track: "minmax(9rem,auto)" },
     { id: "quality", label: "Quality", track: "minmax(10.5rem,auto)" },
     { id: "requests", label: "Requests, 7 days", track: "minmax(9rem,auto)" },
     { id: "cost", label: "Cost / 1k req.", track: "minmax(6rem,auto)" },
     { id: "p95", label: "p95", track: "minmax(4rem,auto)" },
 ];
 
-export const DEFAULT_COLUMNS: Column[] = ["quality", "requests", "cost"];
+export const DEFAULT_COLUMNS: Column[] = ["data", "quality", "requests", "cost"];
 
 export function gridTemplate(shown: Column[]): string {
     const tracks = COLUMNS.filter((column) => shown.includes(column.id)).map((c) => c.track);

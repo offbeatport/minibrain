@@ -1,6 +1,6 @@
 import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import type { ReactNode } from "react";
-import type { ModelVersionRow } from "~/api/client";
+import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
@@ -269,4 +269,29 @@ export function VersionStatus({
         );
     }
     return text;
+}
+
+export function datasetHref(key: string): string {
+    return `/data?item=${encodeURIComponent(`dataset:${key}`)}`;
+}
+
+export function DataCell({ dataset }: { dataset: ModelRow["dataset"] }) {
+    if (!dataset) {
+        return <Muted />;
+    }
+    const newer = dataset.latest !== null && dataset.latest !== (dataset.version ?? 0);
+    return (
+        <div className="flex min-w-0 flex-col">
+            <Link
+                href={datasetHref(dataset.key)}
+                className="relative z-10 truncate text-foreground hover:underline"
+            >
+                {dataset.name}
+            </Link>
+            <span className="truncate text-sm text-muted-foreground tabular-nums">
+                {dataset.version !== null ? `v${dataset.version}` : "not trained yet"}
+                {newer && <span className="text-warning">{` · v${dataset.latest} available`}</span>}
+            </span>
+        </div>
+    );
 }

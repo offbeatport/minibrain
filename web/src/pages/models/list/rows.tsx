@@ -44,6 +44,7 @@ import { bytes, relativeTime } from "~/lib/time";
 import type { Entry } from "../entries";
 import {
     CostCell,
+    DataCell,
     LiveStatus,
     ModelAvatar,
     Muted,
@@ -663,6 +664,12 @@ export function ModelLine({
             <Cells
                 columns={props.columns}
                 cells={{
+                    data:
+                        model.kind === "custom" ? (
+                            <DataCell dataset={model.row.dataset} />
+                        ) : (
+                            <Muted />
+                        ),
                     quality: <QualityCell model={model} on={on} />,
                     requests: (
                         <div className="relative z-10">
@@ -838,6 +845,10 @@ export function VersionLine({
             <Cells
                 columns={props.columns}
                 cells={{
+                    data:
+                        version.dataset_version != null ? (
+                            <span className="text-muted-foreground tabular-nums">{`v${version.dataset_version}`}</span>
+                        ) : null,
                     quality:
                         version.score == null ? (
                             <Muted />

@@ -124,7 +124,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Import from Hugging Face, S3 or a server folder, previewed first.
   UI: Models › Add model › Your imports · API: POST /api/models/inspect, POST /api/models/import · Config: MINIBRAIN_MODELS_S3_URL
 - **Models list** · shipped · product, ml
-  Custom and base models with score, traffic, cost and status.
+  Custom and base models with data, score, traffic, cost and status.
   UI: Models · API: GET /api/models
 - **List view options** · shipped · product, ml
   Filter by status, kind and base, sort, pick columns, reset to default.

@@ -17,6 +17,7 @@ from minibrain.api.schemas import (
     DeploymentState,
     Health,
     ImportOrigin,
+    ModelDatasetRef,
     ModelRow,
     ServeOnlyInfo,
     ServingReplica,
@@ -260,9 +261,25 @@ def version_rows(
                 latency_p50_ms=latency.get("p50_ms"),
                 latency_p95_ms=latency.get("p95_ms"),
                 cost=cost_info(version.metrics, prices or DevicePrices()),
+                dataset_version=version.dataset_version.number if version.dataset_version else None,
             )
         )
     return rows
+
+
+def dataset_ref(model: Model) -> ModelDatasetRef | None:
+    if model.dataset is None:
+        return None
+    current = next((v for v in model.versions if v.number == model.current_version), None)
+    trained = current or max(model.versions, key=lambda v: v.number, default=None)
+    used = trained.dataset_version if trained is not None else None
+    latest = latest_dataset_version(model)
+    return ModelDatasetRef(
+        key=model.dataset.slug,
+        name=model.dataset.name,
+        version=used.number if used is not None else None,
+        latest=latest.number if latest is not None else None,
+    )
 
 
 def custom_availability(model: Model, store: ArtifactStore) -> Availability:
@@ -365,6 +382,7 @@ def custom_row(
         health=custom_health(broken, base_name),
         teardown=info,
         serve_only=serve_only,
+        dataset=dataset_ref(model),
     )
 
 
@@ -550,7 +568,8 @@ def all_rows(
     }
     hashes = {key: found[2] for key, found in bases.items()}
     loaded = select(Model).options(
-        selectinload(Model.versions), selectinload(Model.dataset).selectinload(Dataset.versions)
+        selectinload(Model.versions).selectinload(Version.dataset_version),
+        selectinload(Model.dataset).selectinload(Dataset.versions),
     )
     models = list(session.scalars(loaded))
     facts = serving_facts(session, settings, models, bases_found)
