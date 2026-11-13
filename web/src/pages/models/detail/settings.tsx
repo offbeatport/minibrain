@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Gauge, ListChecks, Power, Settings2, TriangleAlert } from "lucide-react";
+import { Gauge, Layers, ListChecks, Power, Settings2, TriangleAlert } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -25,11 +25,11 @@ import {
     unwrap,
 } from "~/api/client";
 import { useAllModels, useJudgeSetting, usePresets } from "~/api/queries";
-import { CopyButton } from "~/components/CopyButton";
 import { FormRow, FormRows } from "~/components/FormRows";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { TestExamples } from "~/components/TestExamples";
+import { ModelAvatar as AvatarImage } from "~/components/avatar/ModelAvatar";
 import { useCan } from "~/lib/access";
 import { JOBS_PATH, modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
@@ -42,14 +42,7 @@ import { SwitchBaseDialog } from "../SwitchBaseDialog";
 import { PromotionEditor, metricsFor } from "../TaskFields";
 import { ConfirmAction, type Confirmation, splitTags, useModelsRefresh } from "../dialogs";
 import type { Entry } from "../entries";
-import {
-    DeploymentStatus,
-    ModelAvatar,
-    Tip,
-    baseNameOf,
-    deployConfirmation,
-    isDeployed,
-} from "./header";
+import { DeploymentStatus, Tip, baseNameOf, deployConfirmation, isDeployed } from "./header";
 
 const JUDGE = "judge";
 const INSTALL_JUDGE = "install";
@@ -114,7 +107,11 @@ function General({ row }: { row: ModelRow }) {
             }
         >
             <FormRows>
-                <FormRow id="settings-name" label="Name">
+                <FormRow
+                    id="settings-name"
+                    label="Name"
+                    tip={`Renaming keeps the API name ${row.key}; apps keep working.`}
+                >
                     <Input
                         id="settings-name"
                         value={name}
@@ -123,13 +120,9 @@ function General({ row }: { row: ModelRow }) {
                         className="w-full max-w-sm"
                     />
                 </FormRow>
-                <FormRow label="API name" tip="Apps call the model by this name. It never changes.">
-                    <span className="font-mono text-sm">{row.key}</span>
-                    <CopyButton value={row.key} label="Copy API name" />
-                </FormRow>
                 {custom && (
-                    <FormRow label="Avatar">
-                        <ModelAvatar row={row} size="sm" />
+                    <FormRow label="Avatar" align="start">
+                        <AvatarImage name={row.name} avatar={row.avatar} size="xl" />
                         <Button
                             variant="outline"
                             disabled={locked}
@@ -445,78 +438,86 @@ function Danger({ row, detail }: { row: ModelRow; detail: ModelDetail | undefine
     const deleteBlock =
         gone ?? (custom || can.admin ? null : "Only an admin can delete a base model.");
     return (
-        <PanelSection icon={TriangleAlert} anchor="danger" title="Danger zone">
-            <FormRows>
-                {custom && (
-                    <FormRow
-                        label={moveTo ? `Move to ${moveTo.name}` : "Switch base"}
-                        detail={`On ${baseNameOf(models.data, row.base_model)}`}
-                    >
-                        <Tip tip={gone}>
-                            <Button
-                                variant="outline"
-                                disabled={Boolean(gone)}
-                                onClick={() => setSwitching(true)}
-                            >
-                                {moveTo ? "Move" : "Switch base"}
-                            </Button>
-                        </Tip>
-                    </FormRow>
-                )}
-                {custom && (
-                    <FormRow label="Duplicate" detail="Same settings, another dataset">
-                        <Tip tip={gone}>
-                            <Button
-                                variant="outline"
-                                disabled={Boolean(gone)}
-                                onClick={() => setDuplicating(true)}
-                            >
-                                Duplicate
-                            </Button>
-                        </Tip>
-                    </FormRow>
-                )}
-                <FormRow
-                    label="Delete"
-                    detail={custom ? "With every version and key" : "With its files and keys"}
-                >
-                    <Tip tip={deleteBlock}>
-                        <Button
-                            variant="destructive"
-                            disabled={Boolean(deleteBlock)}
-                            onClick={() =>
-                                setDeleting([{ key: rowId(row), model: row, version: null }])
-                            }
-                        >
-                            Delete model
-                        </Button>
-                    </Tip>
-                </FormRow>
-            </FormRows>
+        <>
             {custom && (
-                <>
-                    <DuplicateModelDialog
-                        row={duplicating ? row : null}
-                        onOpenChange={(open) => !open && setDuplicating(false)}
-                    />
-                    <SwitchBaseDialog
-                        row={switching ? row : null}
-                        preferred={moveTo?.key ?? null}
-                        onOpenChange={(open) => !open && setSwitching(false)}
-                    />
-                </>
+                <PanelSection icon={Layers} anchor="base" title="Base and copies">
+                    <FormRows>
+                        {custom && (
+                            <FormRow
+                                label={moveTo ? `Move to ${moveTo.name}` : "Switch base"}
+                                detail={`On ${baseNameOf(models.data, row.base_model)}`}
+                            >
+                                <Tip tip={gone}>
+                                    <Button
+                                        variant="outline"
+                                        disabled={Boolean(gone)}
+                                        onClick={() => setSwitching(true)}
+                                    >
+                                        {moveTo ? "Move" : "Switch base"}
+                                    </Button>
+                                </Tip>
+                            </FormRow>
+                        )}
+                        {custom && (
+                            <FormRow label="Duplicate" detail="Same settings, another dataset">
+                                <Tip tip={gone}>
+                                    <Button
+                                        variant="outline"
+                                        disabled={Boolean(gone)}
+                                        onClick={() => setDuplicating(true)}
+                                    >
+                                        Duplicate
+                                    </Button>
+                                </Tip>
+                            </FormRow>
+                        )}
+                    </FormRows>
+                </PanelSection>
             )}
-            <DeleteModelsDialog
-                chosen={deleting}
-                rows={models.data ?? []}
-                onOpenChange={(open) => !open && setDeleting(null)}
-                onDelete={async (cascade, cancelJobs) => {
-                    await deleteModel(row, { cascade, undeploy: true, cancelJobs });
-                    await refresh();
-                    router.history.push(modelsHref());
-                }}
-            />
-        </PanelSection>
+            <PanelSection icon={TriangleAlert} anchor="danger" title="Danger zone">
+                <FormRows>
+                    <FormRow
+                        label="Delete"
+                        detail={custom ? "With every version and key" : "With its files and keys"}
+                    >
+                        <Tip tip={deleteBlock}>
+                            <Button
+                                variant="destructive"
+                                disabled={Boolean(deleteBlock)}
+                                onClick={() =>
+                                    setDeleting([{ key: rowId(row), model: row, version: null }])
+                                }
+                            >
+                                Delete model
+                            </Button>
+                        </Tip>
+                    </FormRow>
+                </FormRows>
+                {custom && (
+                    <>
+                        <DuplicateModelDialog
+                            row={duplicating ? row : null}
+                            onOpenChange={(open) => !open && setDuplicating(false)}
+                        />
+                        <SwitchBaseDialog
+                            row={switching ? row : null}
+                            preferred={moveTo?.key ?? null}
+                            onOpenChange={(open) => !open && setSwitching(false)}
+                        />
+                    </>
+                )}
+                <DeleteModelsDialog
+                    chosen={deleting}
+                    rows={models.data ?? []}
+                    onOpenChange={(open) => !open && setDeleting(null)}
+                    onDelete={async (cascade, cancelJobs) => {
+                        await deleteModel(row, { cascade, undeploy: true, cancelJobs });
+                        await refresh();
+                        router.history.push(modelsHref());
+                    }}
+                />
+            </PanelSection>
+        </>
     );
 }
 

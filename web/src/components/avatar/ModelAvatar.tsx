@@ -4,7 +4,7 @@ import { useModels } from "~/api/queries";
 import { AvatarTile } from "./AvatarTile";
 import { choiceOfModel } from "./avatarSvg";
 
-export type ModelAvatarSize = "sm" | "md" | "lg";
+export type ModelAvatarSize = "sm" | "md" | "lg" | "xl";
 
 export function ModelAvatar({
     name,

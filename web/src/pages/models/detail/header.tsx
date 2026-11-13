@@ -1,4 +1,11 @@
 import {
+    CircleAlert,
+    CircleCheck,
+    CircleDashed,
+    LoaderCircle,
+    type LucideIcon,
+} from "lucide-react";
+import {
     Button,
     Dialog,
     DialogContent,
@@ -10,6 +17,7 @@ import {
     Tooltip,
     TooltipContent,
     TooltipTrigger,
+    cn,
 } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
@@ -17,7 +25,7 @@ import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import type { Tone } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted, busyTearingDown, setDeployed } from "~/lib/teardown";
@@ -171,15 +179,31 @@ function deploymentShown(row: ModelRow): Shown {
     }
 }
 
+const STATUS_ICONS: Record<Tone, { icon: LucideIcon; className: string }> = {
+    success: { icon: CircleCheck, className: "text-success" },
+    info: { icon: LoaderCircle, className: "animate-spin text-info motion-reduce:animate-none" },
+    warning: { icon: CircleAlert, className: "text-warning" },
+    destructive: { icon: CircleAlert, className: "text-destructive" },
+    neutral: { icon: CircleDashed, className: "text-muted-foreground" },
+};
+
 export function DeploymentStatus({ row }: { row: ModelRow }) {
     const shown = deploymentShown(row);
+    const { icon: Icon, className } = STATUS_ICONS[shown.tone];
     const text = (
-        <StatusText
-            tone={shown.tone}
-            className={shown.tone === "destructive" ? "text-destructive" : undefined}
+        <span
+            className={cn(
+                "inline-flex items-center gap-1.5",
+                shown.tone === "destructive"
+                    ? "text-destructive"
+                    : shown.tone === "neutral"
+                      ? "text-muted-foreground"
+                      : undefined,
+            )}
         >
+            <Icon aria-hidden="true" className={cn("size-4 shrink-0", className)} />
             {shown.label}
-        </StatusText>
+        </span>
     );
     return shown.href ? (
         <Link href={shown.href} className="text-inherit hover:underline">
