@@ -6,7 +6,7 @@ from typing import Any
 
 from minibrain.maintenance import purge_audit_events
 from minibrain.registry.audit_chain import seal_all
-from minibrain.registry.models import AuditEvent, now
+from minibrain.registry.models import ApiKey, AuditEvent, now
 from tests.conftest import Harness
 
 LEAKED = "sk-live-0123456789abcdef"
@@ -134,3 +134,60 @@ def test_retention_prunes_old_events_and_records_the_prune(harness: Harness) -> 
     assert (events[0]["actor"], events[0]["ip"]) == ("system", None)
     assert (events[0]["detail"]["deleted"], events[0]["detail"]["days"]) == (2, 90)
     assert events[1]["detail"] == {"from": 0, "to": 90, "sign_in": "local"}
+
+
+def test_categories_and_targets_filter_and_count(harness: Harness) -> None:
+    add_events(harness, 2)
+    add_events(harness, 1, action="model.deploy", target="support-bot", detail={"name": "Support bot"})
+    add_events(harness, 1, action="version.promote", target="support-bot@4", detail={"name": "Support bot"})
+    add_events(harness, 1, action="feedback.accept", target="support-bot/feedback/7", detail={})
+    add_events(harness, 1, action="model.deploy", target="support-bot-2", detail={})
+    assert page(harness, category="key")["total"] == 2
+    assert page(harness, category=["model", "version"])["total"] == 3
+    assert page(harness, category="mode")["total"] == 0
+    about = page(harness, target="support-bot")
+    assert [event["target"] for event in about["events"]] == [
+        "support-bot/feedback/7",
+        "support-bot@4",
+        "support-bot",
+    ]
+    assert page(harness, target="support-bot", category="version")["total"] == 1
+    facets = harness.client.get("/api/audit/facets").json()
+    assert {item["value"]: item["count"] for item in facets["categories"]} == {
+        "feedback": 1,
+        "key": 2,
+        "model": 2,
+        "version": 1,
+    }
+
+
+def test_events_name_their_actor_and_say_whether_the_target_still_exists(harness: Harness) -> None:
+    with harness.sessions() as session:
+        key = ApiKey(name="CI pipeline", prefix="mb_live", digest="0" * 64)
+        session.add(key)
+        session.commit()
+        key_id = key.id
+    add_events(harness, 1, action="key.create", target="mb_live")
+    add_events(harness, 1, action="key.revoke", target="mb_gone")
+    add_events(harness, 1, actor=f"api_key:{key_id}", action="safety.block", target="gone-model@2")
+    add_events(harness, 1, actor="command line", action="auth.setup_link", target="/setup")
+    add_events(harness, 1, action="job.cancel", target="job:999", detail={"kind": "train"})
+    add_events(harness, 1, action="account.update", target="admin@example.com")
+    add_events(harness, 1, actor="system", action="audit.prune", target="audit_events")
+    events = {event["action"]: event for event in page(harness)["events"]}
+    assert events["key.create"]["target_ref"] == {"kind": "key", "key": "mb_live", "live": True}
+    assert events["key.revoke"]["target_ref"] == {"kind": "key", "key": "mb_gone", "live": False}
+    assert events["safety.block"]["target_ref"] == {"kind": "version", "key": "gone-model@2", "live": False}
+    assert events["job.cancel"]["target_ref"] == {"kind": "job", "key": "999", "live": False}
+    assert events["account.update"]["target_ref"] == {"kind": "account", "key": "admin@example.com", "live": True}
+    assert events["auth.setup_link"]["target_ref"] is None
+    assert events["audit.prune"]["target_ref"] is None
+    kinds = {action: (event["actor_kind"], event["actor_name"]) for action, event in events.items()}
+    assert kinds["safety.block"] == ("api_key", "CI pipeline")
+    assert kinds["auth.setup_link"] == ("command_line", None)
+    assert kinds["audit.prune"] == ("system", None)
+    assert kinds["key.create"] == ("user", "Admin")
+    one = harness.client.get(f"/api/audit/{events['key.create']['id']}").json()
+    assert one == events["key.create"]
+    exported = json.loads(harness.client.get("/api/audit/export", params={"format": "jsonl"}).text.splitlines()[0])
+    assert set(exported) == {"id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash"}

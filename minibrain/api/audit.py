@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from minibrain.api.access import admin
+from minibrain.api.audit_targets import ActorKind, AuditTarget, actor_kind, actor_names, category_of, targets_of
 from minibrain.api.deps import SessionDep
 from minibrain.policy import load as load_policy
 from minibrain.redaction import redact
@@ -28,6 +29,7 @@ PAGE_SIZE = 50
 PAGE_MAX = 500
 EXPORT_BATCH = 1000
 EXPORT_COLUMNS = ("id", "seq", "at", "actor", "ip", "action", "target", "detail", "prev_hash", "hash")
+EXPORTED: set[str] = set(EXPORT_COLUMNS)
 FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
 MEDIA_TYPES = {"csv": "text/csv; charset=utf-8", "jsonl": "application/x-ndjson"}
 
@@ -56,6 +58,9 @@ class AuditInfo(BaseModel):
     seq: int | None
     prev_hash: str | None
     hash: str | None
+    actor_kind: ActorKind
+    actor_name: str | None = None
+    target_ref: AuditTarget | None = None
 
 
 class AuditPage(BaseModel):
@@ -72,6 +77,7 @@ class AuditFacet(BaseModel):
 
 
 class AuditFacets(BaseModel):
+    categories: list[AuditFacet]
     actions: list[AuditFacet]
     actors: list[AuditFacet]
 
@@ -104,14 +110,20 @@ class AuditChainInfo(BaseModel):
 
 @dataclass(frozen=True)
 class AuditFilter:
+    categories: list[str]
     actions: list[str]
     actors: list[str]
+    targets: list[str]
     since: datetime | None
     until: datetime | None
     search: str
 
     def conditions(self) -> list[ColumnElement[bool]]:
         found: list[ColumnElement[bool]] = []
+        if self.categories:
+            found.append(or_(*(AuditEvent.action.startswith(f"{name}.", autoescape=True) for name in self.categories)))
+        if self.targets:
+            found.append(or_(*(about(target) for target in self.targets)))
         if self.actions:
             found.append(AuditEvent.action.in_(self.actions))
         if self.actors:
@@ -128,20 +140,40 @@ class AuditFilter:
         return found
 
 
+def about(target: str) -> ColumnElement[bool]:
+    return or_(
+        AuditEvent.target == target,
+        AuditEvent.target.startswith(f"{target}@", autoescape=True),
+        AuditEvent.target.startswith(f"{target}/", autoescape=True),
+    )
+
+
 def audit_filter(
+    category: Annotated[list[str] | None, Query()] = None,
     action: Annotated[list[str] | None, Query()] = None,
     actor: Annotated[list[str] | None, Query()] = None,
+    target: Annotated[list[str] | None, Query()] = None,
     since: datetime | None = None,
     until: datetime | None = None,
     q: str = "",
 ) -> AuditFilter:
-    return AuditFilter(actions=action or [], actors=actor or [], since=since, until=until, search=q)
+    return AuditFilter(
+        categories=category or [],
+        actions=action or [],
+        actors=actor or [],
+        targets=target or [],
+        since=since,
+        until=until,
+        search=q,
+    )
 
 
 FilterDep = Annotated[AuditFilter, Depends(audit_filter)]
 
 
-def event_info(event: AuditEvent) -> AuditInfo:
+def event_info(
+    event: AuditEvent, names: dict[str, str] | None = None, targets: dict[int, AuditTarget] | None = None
+) -> AuditInfo:
     return AuditInfo(
         id=event.id,
         at=event.at,
@@ -153,7 +185,16 @@ def event_info(event: AuditEvent) -> AuditInfo:
         seq=event.seq,
         prev_hash=event.prev_hash,
         hash=event.hash,
+        actor_kind=actor_kind(event.actor),
+        actor_name=(names or {}).get(event.actor),
+        target_ref=(targets or {}).get(event.id),
     )
+
+
+def described(session: Session, events: list[AuditEvent]) -> list[AuditInfo]:
+    names = actor_names(session, events)
+    targets = targets_of(session, events)
+    return [event_info(event, names, targets) for event in events]
 
 
 def matching(session: Session, conditions: list[ColumnElement[bool]]) -> int:
@@ -193,7 +234,7 @@ def list_events(
     newer = matching(session, [*conditions, AuditEvent.id > top])
     older = total - newer - len(rows)
     return AuditPage(
-        events=[event_info(event) for event in rows],
+        events=described(session, rows),
         total=total,
         newer=newer,
         older_cursor=bottom if older > 0 else None,
@@ -207,7 +248,16 @@ def facets(session: SessionDep) -> AuditFacets:
         rows = session.execute(select(column, func.count()).group_by(column).order_by(column)).all()
         return [AuditFacet(value=value, count=count) for value, count in rows]
 
-    return AuditFacets(actions=counted(AuditEvent.action), actors=counted(AuditEvent.actor))
+    actions = counted(AuditEvent.action)
+    categories: dict[str, int] = {}
+    for item in actions:
+        name = category_of(item.value)
+        categories[name] = categories.get(name, 0) + item.count
+    return AuditFacets(
+        categories=[AuditFacet(value=name, count=total) for name, total in sorted(categories.items())],
+        actions=actions,
+        actors=counted(AuditEvent.actor),
+    )
 
 
 def safe_cell(value: Any) -> str:
@@ -216,7 +266,7 @@ def safe_cell(value: Any) -> str:
 
 
 def exported(event: AuditEvent) -> dict[str, Any]:
-    return event_info(event).model_dump(mode="json")
+    return event_info(event).model_dump(mode="json", include=EXPORTED)
 
 
 def csv_lines(rows: Iterator[AuditEvent]) -> Iterator[str]:
@@ -300,4 +350,4 @@ def event(event_id: int, session: SessionDep) -> AuditInfo:
     found = session.get(AuditEvent, event_id)
     if found is None:
         raise NotFoundError(f"No audit event {event_id}")
-    return event_info(found)
+    return described(session, [found])[0]

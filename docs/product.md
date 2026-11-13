@@ -495,7 +495,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Keep or drop prompts and answers per model, lockable install-wide.
   UI: Models › model › API, Settings › Security › Request logs and API keys · API: PUT /api/models/{name}/request-bodies · Policy: request_bodies, request_bodies_locked
 - **Audit log** · shipped · admin
-  Search, filter and export every audited change.
+  Search, filter, inspect and export every audited change, linked to its target.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
 - **Tamper-evident audit** · shipped · admin
   Prove no audit event was changed or removed.

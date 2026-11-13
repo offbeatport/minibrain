@@ -1,17 +1,27 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft, ChevronRight, ShieldCheck, Timer } from "lucide-react";
+import {
+    Bot,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    Download,
+    KeyRound,
+    type LucideIcon,
+    SquareTerminal,
+    User,
+    X,
+} from "lucide-react";
 import {
     Badge,
     Button,
     CheckboxSelect,
     DataGrid,
     DataGridDetail,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     Input,
     Label,
     Link,
@@ -21,8 +31,11 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    SettingsGroup,
-    SettingsRow,
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
     Table,
     TableBody,
     TableCell,
@@ -30,51 +43,54 @@ import {
     TableHeader,
     TableRow,
 } from "obp-ui";
-import { type ComponentProps, type ReactNode, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { Facts } from "~/components/Facts";
-import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
+import { ErrorLine, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import {
     AUDIT_KEYS,
     AUDIT_PATH,
     type AuditEvent,
     type AuditQuery,
+    CUSTOM_RANGE,
+    RANGES,
     actionLabel,
     actorLabel,
+    actorOf,
     auditQuery,
+    categoryLabel,
     changesOf,
     exportHref,
     keyLabel,
     otherFields,
     plainValue,
+    resultOf,
     summaryOf,
+    targetHref,
     targetLabel,
+    utcTime,
 } from "~/lib/audit";
 import { count } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { exactTime, relativeTime } from "~/lib/time";
-import { AUDIT } from "~/pages/settings/settingsIndex";
+import { Integrity, RETENTION, Retention } from "~/pages/settings/audit/AuditPolicies";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Policies = Map<string, PolicyInfo>;
-type ChainInfo = components["schemas"]["AuditChainInfo"];
-type SiemInfo = components["schemas"]["SiemInfo"];
+type AuditSearchKey = (typeof AUDIT_KEYS)[number];
 
 const PAGE_SIZE = 50;
-const SECURITY_PATH = "/settings/security";
 const SEARCH_DELAY_MS = 300;
-const RETENTION = "audit_retention_days";
-const DAY_MS = 24 * 3600 * 1000;
-const RETENTION_CHOICES: [number, string][] = [
-    [0, "Keep forever"],
-    [2555, "7 years"],
-    [1095, "3 years"],
-    [365, "1 year"],
-    [180, "180 days"],
-    [90, "90 days"],
-];
+const ALL_TIME = "all";
+
+const ACTOR_ICONS: Record<AuditEvent["actor_kind"], LucideIcon> = {
+    user: User,
+    api_key: KeyRound,
+    command_line: SquareTerminal,
+    system: Bot,
+};
 
 function usePolicies() {
     return useQuery({ queryKey: ["policies"], queryFn: () => unwrap(api.GET("/api/policies")) });
@@ -100,12 +116,46 @@ function useAuditPage(query: AuditQuery, before?: string, after?: string) {
     });
 }
 
-function TimeCell({ at }: { at: string }) {
+function ActorCell({ event }: { event: AuditEvent }) {
+    const Icon = ACTOR_ICONS[event.actor_kind];
     return (
-        <div className="flex flex-col">
-            <span className="tabular-nums">{exactTime(at)}</span>
-            <DataGridDetail className="text-muted-foreground">{relativeTime(at)}</DataGridDetail>
-        </div>
+        <span className="flex min-w-0 items-center gap-2">
+            <Icon aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{actorOf(event)}</span>
+        </span>
+    );
+}
+
+function TargetCell({ event, policies }: { event: AuditEvent; policies: Policies }) {
+    const label = targetLabel(event, policies);
+    const href = targetHref(event);
+    if (href) {
+        return (
+            <Link
+                href={href}
+                onClick={(click) => click.stopPropagation()}
+                className="block min-w-0 truncate text-primary hover:underline"
+            >
+                {label}
+            </Link>
+        );
+    }
+    return (
+        <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate">{label}</span>
+            {event.target_ref && !event.target_ref.live && (
+                <span className="shrink-0 text-sm text-muted-foreground">deleted</span>
+            )}
+        </span>
+    );
+}
+
+function ResultCell({ event }: { event: AuditEvent }) {
+    const result = resultOf(event);
+    return result.failed ? (
+        <Badge variant="destructive">{result.label}</Badge>
+    ) : (
+        <span className="text-muted-foreground">{result.label}</span>
     );
 }
 
@@ -114,30 +164,25 @@ function auditColumns(policies: Policies): ColumnDef<AuditEvent, unknown>[] {
         {
             id: "at",
             header: "Time",
-            cell: ({ row }) => <TimeCell at={row.original.at} />,
+            cell: ({ row }) => (
+                <span title={utcTime(row.original.at)} className="whitespace-nowrap tabular-nums">
+                    {relativeTime(row.original.at)}
+                </span>
+            ),
         },
         {
             id: "actor",
             header: "Actor",
-            cell: ({ row }) => (
-                <div className="flex flex-col">
-                    <span>{actorLabel(row.original.actor)}</span>
-                    {row.original.ip && (
-                        <DataGridDetail className="tabular-nums text-muted-foreground">
-                            {row.original.ip}
-                        </DataGridDetail>
-                    )}
-                </div>
-            ),
+            cell: ({ row }) => <ActorCell event={row.original} />,
         },
         {
             id: "action",
             header: "Action",
             cell: ({ row }) => (
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col">
                     <span>{actionLabel(row.original.action)}</span>
-                    <DataGridDetail className="font-mono text-muted-foreground">
-                        {row.original.action}
+                    <DataGridDetail className="line-clamp-1 whitespace-normal break-words text-muted-foreground">
+                        {summaryOf(row.original, policies)}
                     </DataGridDetail>
                 </div>
             ),
@@ -145,20 +190,12 @@ function auditColumns(policies: Policies): ColumnDef<AuditEvent, unknown>[] {
         {
             id: "target",
             header: "Target",
-            cell: ({ row }) => (
-                <span className="block min-w-36 whitespace-normal break-words">
-                    {targetLabel(row.original, policies)}
-                </span>
-            ),
+            cell: ({ row }) => <TargetCell event={row.original} policies={policies} />,
         },
         {
-            id: "details",
-            header: "Details",
-            cell: ({ row }) => (
-                <span className="line-clamp-2 whitespace-normal break-words">
-                    {summaryOf(row.original, policies)}
-                </span>
-            ),
+            id: "result",
+            header: "Result",
+            cell: ({ row }) => <ResultCell event={row.original} />,
         },
     ];
 }
@@ -204,6 +241,51 @@ function DateFilter({
     );
 }
 
+function RangeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+    return (
+        <Select value={value} onValueChange={(next) => next && onChange(String(next))}>
+            <SelectTrigger aria-label="Time range" className="w-40">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value={ALL_TIME}>All time</SelectItem>
+                {RANGES.map(([range, label]) => (
+                    <SelectItem key={range} value={range}>
+                        {label}
+                    </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM_RANGE}>Custom dates</SelectItem>
+            </SelectContent>
+        </Select>
+    );
+}
+
+function ExportMenu({ query }: { query: AuditQuery }) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline">
+                    <Download />
+                    Export
+                    <ChevronDown aria-hidden />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                    <a href={exportHref(query, "csv")} download>
+                        CSV
+                    </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <a href={exportHref(query, "jsonl")} download>
+                        JSONL
+                    </a>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function Pager({
     page,
     onNewer,
@@ -220,7 +302,7 @@ function Pager({
             <p className="text-sm text-muted-foreground tabular-nums">
                 {page.total === 0
                     ? "No events"
-                    : `${count(first)}–${count(last)} of ${count(page.total)} events, newest first`}
+                    : `${count(first)}–${count(last)} of ${count(page.total)}`}
             </p>
             <div className="flex items-center gap-2">
                 <Button variant="outline" disabled={page.newer_cursor === null} onClick={onNewer}>
@@ -291,7 +373,7 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
                 {`${exactTime(event.at)} (${relativeTime(event.at)})`}
             </span>,
         ],
-        ["Actor", actorLabel(event.actor)],
+        ["Actor", actorOf(event)],
         [
             "IP address",
             <span key="ip" className={event.ip ? "tabular-nums" : "text-muted-foreground"}>
@@ -354,16 +436,18 @@ function EventBody({ event, policies }: { event: AuditEvent; policies: Policies 
     );
 }
 
-function EventDialog({
+function EventSheet({
     id,
     loaded,
     policies,
     onClose,
+    onTarget,
 }: {
     id: number | null;
     loaded: AuditEvent | undefined;
     policies: Policies;
     onClose: () => void;
+    onTarget: (target: string) => void;
 }) {
     const fetched = useQuery({
         queryKey: ["audit", "event", id],
@@ -372,271 +456,43 @@ function EventDialog({
         enabled: id !== null && loaded === undefined,
     });
     const event = loaded ?? fetched.data;
+    const href = event ? targetHref(event) : undefined;
     return (
-        <Dialog open={id !== null} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle>{event ? actionLabel(event.action) : `Event ${id}`}</DialogTitle>
-                    <DialogDescription>
+        <Sheet open={id !== null} onOpenChange={(open) => !open && onClose()}>
+            <SheetContent className="flex flex-col gap-6 overflow-y-auto sm:max-w-xl">
+                <SheetHeader>
+                    <SheetTitle>{event ? actionLabel(event.action) : `Event ${id}`}</SheetTitle>
+                    <SheetDescription>
                         {event
-                            ? `${targetLabel(event, policies)}, by ${actorLabel(event.actor)}`
+                            ? `${targetLabel(event, policies)} · ${actorOf(event)} · ${relativeTime(event.at)}`
                             : "Loading…"}
-                    </DialogDescription>
-                </DialogHeader>
+                    </SheetDescription>
+                </SheetHeader>
                 <ErrorLine error={fetched.error} />
-                {event && <EventBody event={event} policies={policies} />}
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function useChain() {
-    return useQuery({
-        queryKey: ["audit", "chain"],
-        queryFn: () => unwrap(api.GET("/api/audit/chain")),
-    });
-}
-
-function seqRange(first: number, last: number): string {
-    return first === last ? `seq ${count(first)}` : `seq ${count(first)} to ${count(last)}`;
-}
-
-function events(total: number): string {
-    return `${count(total)} ${total === 1 ? "event" : "events"}`;
-}
-
-function queued(total: number): string {
-    return total === 1 ? "1 event waits" : `${count(total)} events wait`;
-}
-
-function chainText(chain: ChainInfo): string {
-    if (chain.broken) {
-        const intact =
-            chain.events > 0 ? ` Events up to seq ${count(chain.last_seq)} are intact.` : "";
-        return `Seq ${count(chain.broken.seq)}: ${chain.broken.reason}.${intact} Compare it with your SIEM's copy or an earlier export to see what changed.`;
-    }
-    const parts: string[] = [];
-    if (chain.events > 0 && chain.first_seq !== null) {
-        parts.push(
-            `${events(chain.events)}, ${seqRange(chain.first_seq, chain.last_seq)}, match their hashes and link to the one before.`,
-        );
-    } else {
-        parts.push("Each event is sealed into the chain within seconds of being recorded.");
-    }
-    if (chain.anchor_seq > 0) {
-        parts.push(
-            `The chain starts where the last prune cut it, after seq ${count(chain.anchor_seq)}.`,
-        );
-    }
-    if (chain.pending > 0) {
-        parts.push(`${events(chain.pending)} not sealed yet.`);
-    }
-    return parts.join(" ");
-}
-
-function ChainBadge({ chain }: { chain: ChainInfo | undefined }) {
-    if (!chain) {
-        return <Badge variant="neutral">Checking</Badge>;
-    }
-    return chain.broken ? (
-        <Badge variant="destructive">{`Broken at seq ${count(chain.broken.seq)}`}</Badge>
-    ) : (
-        <Badge variant="success">Verified</Badge>
-    );
-}
-
-function SettingsLink({ children }: { children: ReactNode }) {
-    return (
-        <Link href={SECURITY_PATH} className="text-primary hover:underline">
-            {children}
-        </Link>
-    );
-}
-
-type SiemState = {
-    variant: ComponentProps<typeof Badge>["variant"];
-    label: string;
-    detail: string;
-};
-
-function siemState(siem: SiemInfo): SiemState {
-    if (!siem.target) {
-        return { variant: "neutral", label: "Off", detail: "Events stay on this install." };
-    }
-    const when = siem.forwarded_at ? `, ${relativeTime(siem.forwarded_at)}` : "";
-    const sent =
-        siem.forwarded_seq > 0
-            ? `Sent up to seq ${count(siem.forwarded_seq)}${when}.`
-            : "Nothing sent yet.";
-    if (siem.error) {
-        return {
-            variant: "destructive",
-            label: "Failing",
-            detail: `${siem.error}. ${sent} ${queued(siem.waiting)} and will go out in order once the SIEM answers.`,
-        };
-    }
-    if (siem.waiting > 0) {
-        return {
-            variant: "info",
-            label: "Sending",
-            detail: `${sent} ${events(siem.waiting)} to go.`,
-        };
-    }
-    return {
-        variant: "success",
-        label: "Up to date",
-        detail: `${sent} Every sealed event is sent.`,
-    };
-}
-
-const CHECKING: SiemState = { variant: "neutral", label: "Checking", detail: "" };
-
-function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
-    const state = siem ? siemState(siem) : CHECKING;
-    return (
-        <SettingsRow
-            anchor={AUDIT.integrity.settings.siem.anchor}
-            label={AUDIT.integrity.settings.siem.label}
-            description={
-                <>
-                    {siem?.target && (
-                        <>
-                            <span className="font-mono break-all">{siem.target}</span>
-                            {". "}
-                        </>
-                    )}
-                    {state.detail}{" "}
-                    <SettingsLink>
-                        {siem?.target ? "Change it in Security" : "Set it up in Security"}
-                    </SettingsLink>
-                    {"."}
-                </>
-            }
-            control={<Badge variant={state.variant}>{state.label}</Badge>}
-        />
-    );
-}
-
-function Integrity() {
-    const chain = useChain();
-    return (
-        <PanelSection
-            icon={ShieldCheck}
-            anchor={AUDIT.integrity.anchor}
-            title={AUDIT.integrity.title}
-            description="Every event carries a SHA-256 hash of its fields and of the event before it, so an edit or a deletion breaks the chain."
-            actions={
-                <Button
-                    variant="outline"
-                    disabled={chain.isFetching}
-                    onClick={() => void chain.refetch()}
-                >
-                    {chain.isFetching ? "Verifying…" : "Verify again"}
-                </Button>
-            }
-        >
-            <SettingsGroup>
-                <SettingsRow
-                    anchor={AUDIT.integrity.settings.hashChain.anchor}
-                    label={AUDIT.integrity.settings.hashChain.label}
-                    description={chain.data ? chainText(chain.data) : "Checking every event…"}
-                    error={errorMessage(chain.error)}
-                    control={<ChainBadge chain={chain.data} />}
-                />
-                <SiemRow siem={chain.data?.siem} />
-            </SettingsGroup>
-        </PanelSection>
-    );
-}
-
-function retentionChoices(days: number): [number, string][] {
-    return RETENTION_CHOICES.some(([value]) => value === days)
-        ? RETENTION_CHOICES
-        : [...RETENTION_CHOICES, [days, `${days.toLocaleString()} days`]];
-}
-
-function retentionText(days: number): string {
-    return retentionChoices(days).find(([value]) => value === days)?.[1] ?? `${days} days`;
-}
-
-function usePrunable(days: number) {
-    const until = useMemo(() => new Date(Date.now() - days * DAY_MS).toISOString(), [days]);
-    return useQuery({
-        queryKey: ["audit", "prunable", days],
-        queryFn: () => unwrap(api.GET("/api/audit", { params: { query: { until, limit: 1 } } })),
-        enabled: days > 0,
-    });
-}
-
-function Retention({ policy }: { policy: PolicyInfo }) {
-    const client = useQueryClient();
-    const days = typeof policy.value === "number" ? policy.value : 0;
-    const prunable = usePrunable(days);
-    const change = useMutation({
-        mutationFn: (value: number) =>
-            unwrap(
-                api.PUT("/api/policies/{name}", {
-                    params: { path: { name: RETENTION } },
-                    body: { value },
-                }),
-            ),
-        onSuccess: async (policies) => {
-            client.setQueryData(["policies"], policies);
-            await client.invalidateQueries({ queryKey: ["audit"] });
-        },
-    });
-    const older = prunable.data?.total ?? 0;
-    const control = policy.locked ? (
-        <>
-            <span>{retentionText(days)}</span>
-            <Badge variant="neutral">
-                {policy.source === "environment" ? "Set by environment" : "Set by config file"}
-            </Badge>
-        </>
-    ) : (
-        <Select value={String(days)} onValueChange={(next) => change.mutate(Number(next))}>
-            <SelectTrigger
-                id="audit-retention"
-                aria-describedby="audit-retention-description"
-                className="w-44"
-            >
-                <SelectValue>{retentionText(days)}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-                {retentionChoices(days).map(([value, label]) => (
-                    <SelectItem key={value} value={String(value)}>
-                        {label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
-    return (
-        <PanelSection icon={Timer} anchor={AUDIT.retention.anchor} title={AUDIT.retention.title}>
-            <SettingsGroup>
-                <SettingsRow
-                    id={policy.locked ? undefined : "audit-retention"}
-                    anchor={AUDIT.retention.settings.keep.anchor}
-                    label={AUDIT.retention.settings.keep.label}
-                    description={
-                        days === 0
-                            ? "Every event is kept. Pick a period to delete older events for good."
-                            : `Events older than ${retentionText(days).toLowerCase()} are deleted for good, checked every hour. Each deletion is itself recorded here.`
-                    }
-                    error={errorMessage(change.error)}
-                    disabled={policy.locked}
-                    control={control}
-                >
-                    {days > 0 && (
-                        <p className="pb-2.5 text-warning">
-                            {older > 0
-                                ? `${count(older)} ${older === 1 ? "event is" : "events are"} older than that and will be deleted within the hour. Export them first if you need a copy.`
-                                : "Deleted events cannot be restored. Export the log first if you need a copy."}
-                        </p>
-                    )}
-                </SettingsRow>
-            </SettingsGroup>
-        </PanelSection>
+                {event && (
+                    <div className="flex flex-wrap gap-2">
+                        {href && (
+                            <Button variant="outline" asChild>
+                                <Link href={href}>Open target</Link>
+                            </Button>
+                        )}
+                        {event.target_ref && (
+                            <Button
+                                variant="outline"
+                                onClick={() => event.target_ref && onTarget(event.target_ref.key)}
+                            >
+                                All events for this target
+                            </Button>
+                        )}
+                    </div>
+                )}
+                {event && (
+                    <div className="pb-panel">
+                        <EventBody event={event} policies={policies} />
+                    </div>
+                )}
+            </SheetContent>
+        </Sheet>
     );
 }
 
@@ -654,37 +510,37 @@ export function AuditLogPage() {
         [policiesQuery.data],
     );
     const columns = useMemo(() => auditColumns(policies), [policies]);
-    const filter = (patch: Partial<Record<(typeof AUDIT_KEYS)[number], string>>) =>
+    const filter = (patch: Partial<Record<AuditSearchKey, string>>) =>
         update({ ...patch, before: "", after: "" });
     const [draft, setDraft] = useDebounced(search.q ?? "", (q) => filter({ q }));
-    const actions = splitList(search.action);
+    const categories = splitList(search.category);
     const actors = splitList(search.actor);
+    const range = search.range || ALL_TIME;
     const filtering = Boolean(
-        search.q || search.action || search.actor || search.from || search.to,
+        search.q ||
+            search.category ||
+            search.action ||
+            search.actor ||
+            search.target ||
+            search.range,
     );
-    const clear = () => filter({ q: "", action: "", actor: "", from: "", to: "" });
+    const clear = () =>
+        filter({
+            q: "",
+            category: "",
+            action: "",
+            actor: "",
+            target: "",
+            range: "",
+            from: "",
+            to: "",
+        });
     const eventId =
         search.event && Number.isInteger(Number(search.event)) ? Number(search.event) : null;
     const loaded = page.data?.events.find((event) => event.id === eventId);
     const retention = policies.get(RETENTION);
     return (
-        <SettingsLayout
-            title="Audit log"
-            actions={
-                <>
-                    <Button variant="outline" asChild>
-                        <a href={exportHref(query, "csv")} download>
-                            Export CSV
-                        </a>
-                    </Button>
-                    <Button variant="outline" asChild>
-                        <a href={exportHref(query, "jsonl")} download>
-                            Export JSONL
-                        </a>
-                    </Button>
-                </>
-            }
-        >
+        <SettingsLayout title="Audit log" actions={<ExportMenu query={query} />}>
             <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <SearchInput
@@ -695,16 +551,16 @@ export function AuditLogPage() {
                         className="w-56"
                     />
                     <CheckboxSelect
-                        label="Action"
-                        allLabel="All actions"
-                        noun="actions"
-                        options={(facets.data?.actions ?? []).map((item) => ({
+                        label="Area"
+                        allLabel="All areas"
+                        noun="areas"
+                        options={(facets.data?.categories ?? []).map((item) => ({
                             value: item.value,
-                            label: actionLabel(item.value),
+                            label: categoryLabel(item.value),
                             count: item.count,
                         }))}
-                        value={actions}
-                        onValueChange={(next) => filter({ action: next.join(",") })}
+                        value={categories}
+                        onValueChange={(next) => filter({ category: next.join(","), action: "" })}
                     />
                     <CheckboxSelect
                         label="Actor"
@@ -718,20 +574,35 @@ export function AuditLogPage() {
                         value={actors}
                         onValueChange={(next) => filter({ actor: next.join(",") })}
                     />
-                    <div className="flex flex-wrap items-center gap-2">
-                        <DateFilter
-                            label="From"
-                            value={search.from ?? ""}
-                            max={search.to}
-                            onChange={(from) => filter({ from })}
-                        />
-                        <DateFilter
-                            label="To"
-                            value={search.to ?? ""}
-                            min={search.from}
-                            onChange={(to) => filter({ to })}
-                        />
-                    </div>
+                    <RangeSelect
+                        value={range}
+                        onChange={(next) =>
+                            filter({ range: next === ALL_TIME ? "" : next, from: "", to: "" })
+                        }
+                    />
+                    {range === CUSTOM_RANGE && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <DateFilter
+                                label="From"
+                                value={search.from ?? ""}
+                                max={search.to}
+                                onChange={(from) => filter({ from })}
+                            />
+                            <DateFilter
+                                label="To"
+                                value={search.to ?? ""}
+                                min={search.from}
+                                onChange={(to) => filter({ to })}
+                            />
+                        </div>
+                    )}
+                    {search.target && (
+                        <Button variant="outline" onClick={() => filter({ target: "" })}>
+                            <span className="text-muted-foreground">Target</span>
+                            <span className="font-mono">{search.target}</span>
+                            <X aria-hidden />
+                        </Button>
+                    )}
                     {filtering && (
                         <Button variant="ghost" onClick={clear}>
                             Clear filters
@@ -745,31 +616,26 @@ export function AuditLogPage() {
                     getRowId={(event) => String(event.id)}
                     loading={page.isLoading}
                     sortable={false}
-                    storageKey="minibrain.audit.columns"
+                    storageKey="minibrain.audit.columns.v2"
                     onOpen={(event) => update({ event: String(event.id) })}
                     rowLabel={(event) =>
                         `${actionLabel(event.action)}, ${targetLabel(event, policies)}, ${exactTime(event.at)}`
                     }
-                    minWidth="min-w-[880px]"
+                    minWidth="min-w-[760px]"
                     empty={
                         filtering ? (
                             <div className="flex flex-wrap items-center gap-2">
-                                <p className="text-muted-foreground">
-                                    No events match these filters.
-                                </p>
+                                <p className="text-muted-foreground">No events match.</p>
                                 <Button variant="outline" onClick={clear}>
                                     Clear filters
                                 </Button>
                             </div>
                         ) : (
-                            <p className="text-muted-foreground">
-                                No events yet. Changes to policies, keys, models and storage show up
-                                here.
-                            </p>
+                            <p className="text-muted-foreground">No events yet.</p>
                         )
                     }
                 />
-                {page.data && (
+                {page.data && page.data.total > 0 && (
                     <Pager
                         page={page.data}
                         onNewer={() =>
@@ -785,11 +651,12 @@ export function AuditLogPage() {
                 <Integrity />
                 {retention && <Retention policy={retention} />}
             </PanelSections>
-            <EventDialog
+            <EventSheet
                 id={eventId}
                 loaded={loaded}
                 policies={policies}
                 onClose={() => update({ event: "" })}
+                onTarget={(target) => filter({ target, event: "" })}
             />
         </SettingsLayout>
     );

@@ -3001,6 +3001,8 @@ export interface components {
         };
         /** AuditFacets */
         AuditFacets: {
+            /** Categories */
+            categories: components["schemas"]["AuditFacet"][];
             /** Actions */
             actions: components["schemas"]["AuditFacet"][];
             /** Actors */
@@ -3033,6 +3035,14 @@ export interface components {
             prev_hash: string | null;
             /** Hash */
             hash: string | null;
+            /**
+             * Actor Kind
+             * @enum {string}
+             */
+            actor_kind: "user" | "api_key" | "command_line" | "system";
+            /** Actor Name */
+            actor_name?: string | null;
+            target_ref?: components["schemas"]["AuditTarget"] | null;
         };
         /** AuditPage */
         AuditPage: {
@@ -3046,6 +3056,18 @@ export interface components {
             older_cursor: number | null;
             /** Newer Cursor */
             newer_cursor: number | null;
+        };
+        /** AuditTarget */
+        AuditTarget: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "model" | "version" | "key" | "account" | "job" | "dataset" | "dataset_folder" | "feedback" | "connection" | "policy";
+            /** Key */
+            key: string;
+            /** Live */
+            live: boolean;
         };
         /** Availability */
         Availability: {
@@ -12692,8 +12714,10 @@ export interface operations {
                 before?: number | null;
                 after?: number | null;
                 limit?: number;
+                category?: string[] | null;
                 action?: string[] | null;
                 actor?: string[] | null;
+                target?: string[] | null;
                 since?: string | null;
                 until?: string | null;
                 q?: string;
@@ -12748,8 +12772,10 @@ export interface operations {
         parameters: {
             query?: {
                 format?: "csv" | "jsonl";
+                category?: string[] | null;
                 action?: string[] | null;
                 actor?: string[] | null;
+                target?: string[] | null;
                 since?: string | null;
                 until?: string | null;
                 q?: string;

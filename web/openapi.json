@@ -4985,6 +4985,25 @@
             }
           },
           {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
             "name": "action",
             "in": "query",
             "required": false,
@@ -5020,6 +5039,25 @@
                 }
               ],
               "title": "Actor"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target"
             }
           },
           {
@@ -5135,6 +5173,25 @@
             }
           },
           {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
             "name": "action",
             "in": "query",
             "required": false,
@@ -5170,6 +5227,25 @@
                 }
               ],
               "title": "Actor"
+            }
+          },
+          {
+            "name": "target",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Target"
             }
           },
           {
@@ -10405,6 +10481,13 @@
       },
       "AuditFacets": {
         "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/AuditFacet"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
           "actions": {
             "items": {
               "$ref": "#/components/schemas/AuditFacet"
@@ -10422,6 +10505,7 @@
         },
         "type": "object",
         "required": [
+          "categories",
           "actions",
           "actors"
         ],
@@ -10498,6 +10582,37 @@
               }
             ],
             "title": "Hash"
+          },
+          "actor_kind": {
+            "type": "string",
+            "enum": [
+              "user",
+              "api_key",
+              "command_line",
+              "system"
+            ],
+            "title": "Actor Kind"
+          },
+          "actor_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Name"
+          },
+          "target_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuditTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -10511,7 +10626,8 @@
           "detail",
           "seq",
           "prev_hash",
-          "hash"
+          "hash",
+          "actor_kind"
         ],
         "title": "AuditInfo"
       },
@@ -10564,6 +10680,41 @@
           "newer_cursor"
         ],
         "title": "AuditPage"
+      },
+      "AuditTarget": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "model",
+              "version",
+              "key",
+              "account",
+              "job",
+              "dataset",
+              "dataset_folder",
+              "feedback",
+              "connection",
+              "policy"
+            ],
+            "title": "Kind"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "key",
+          "live"
+        ],
+        "title": "AuditTarget"
       },
       "Availability": {
         "properties": {

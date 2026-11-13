@@ -65,7 +65,7 @@ export function modelCompareHref(name: string, a: number, b: number): string {
 }
 
 export function auditHref(name: string): string {
-    return `/settings/audit?q=${encodeURIComponent(name)}`;
+    return `/settings/audit?target=${encodeURIComponent(name)}`;
 }
 
 export function requestLogHref(search: Record<string, string>): string {

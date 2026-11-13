@@ -2,17 +2,22 @@ import type { components } from "~/api/schema";
 import { AVATAR_STYLES } from "~/components/avatar/avatarStyles";
 import { TONE_LABELS, type ToneName } from "~/components/avatar/tones";
 import { listHref } from "~/lib/listSearch";
+import { API_KEYS_PATH, jobHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
 import { bytes, exactTime } from "~/lib/time";
 
 export type AuditEvent = components["schemas"]["AuditInfo"];
+export type AuditTarget = components["schemas"]["AuditTarget"];
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Detail = Record<string, unknown>;
 
 export const AUDIT_PATH = "/settings/audit";
 export const AUDIT_KEYS = [
     "q",
+    "category",
     "action",
     "actor",
+    "target",
+    "range",
     "from",
     "to",
     "before",
@@ -22,6 +27,25 @@ export const AUDIT_KEYS = [
 export type AuditSearch = Partial<Record<(typeof AUDIT_KEYS)[number], string>>;
 
 const ACTIONS: Record<string, string> = {
+    "connection.create": "Connection created",
+    "connection.delete": "Connection deleted",
+    "connection.update": "Connection changed",
+    "encryption.key": "Encryption key added",
+    "encryption.retire": "Encryption key retired",
+    "encryption.rotate": "Encryption key rotated",
+    "feedback.example": "Feedback added to test examples",
+    "job.delete": "Job deleted",
+    "model.contract": "Output format changed",
+    "model.create": "Model created",
+    "model.graders": "Graders changed",
+    "model.instructions": "Instructions changed",
+    "model.judge": "Judge changed",
+    "model.labels_dismiss": "Label suggestions dismissed",
+    "model.name_release": "API name released",
+    "model.promotion": "Promotion rule changed",
+    "model.update": "Model changed",
+    "settings.judge": "Default judge changed",
+    "settings.prices": "Compute prices changed",
     "account.create": "Account created",
     "account.password": "Password set",
     "account.reset": "Password link created",
@@ -132,6 +156,25 @@ const ROLES: Record<string, string> = { viewer: "Viewer", builder: "Builder", ad
 const NAMED_VALUES: Record<string, Record<string, string>> = { sign_in: SIGN_INS, role: ROLES };
 const VERSION_KINDS: Record<string, string> = { lora: "LoRA version", prompt: "Prompt version" };
 
+const CATEGORIES: Record<string, string> = {
+    account: "Accounts",
+    audit: "Audit log",
+    auth: "Sign-in",
+    connection: "Connections",
+    dataset: "Datasets",
+    dataset_folder: "Dataset folders",
+    encryption: "Encryption",
+    feedback: "Feedback",
+    job: "Jobs",
+    key: "API keys",
+    model: "Models",
+    policy: "Policies",
+    safety: "Safety",
+    settings: "Settings",
+    storage: "Storage",
+    version: "Versions",
+};
+
 function sentence(text: string): string {
     const words = text.replaceAll(/[._]+/g, " ").trim();
     return words ? words[0].toUpperCase() + words.slice(1) : text;
@@ -141,8 +184,80 @@ export function actionLabel(action: string): string {
     return ACTIONS[action] ?? sentence(action);
 }
 
-export function actorLabel(actor: string): string {
-    return actor === "system" ? "System" : actor;
+export function categoryOf(action: string): string {
+    return action.split(".")[0];
+}
+
+export function categoryLabel(category: string): string {
+    return CATEGORIES[category] ?? sentence(category);
+}
+
+export function actorLabel(actor: string, name?: string | null): string {
+    if (name) {
+        return name;
+    }
+    if (actor === "system") {
+        return "System";
+    }
+    if (actor === "command line") {
+        return "Command line";
+    }
+    if (actor.startsWith("api_key:")) {
+        return `API key #${actor.slice("api_key:".length)}`;
+    }
+    return actor;
+}
+
+export function actorOf(event: AuditEvent): string {
+    return actorLabel(event.actor, event.actor_name);
+}
+
+export type Result = { label: string; failed: boolean };
+
+const OK: Result = { label: "OK", failed: false };
+
+export function resultOf(event: AuditEvent): Result {
+    const detail = event.detail as Detail;
+    if (event.action === "safety.block") {
+        return { label: "Blocked", failed: true };
+    }
+    if (event.action.endsWith("_failed")) {
+        return { label: "Refused", failed: true };
+    }
+    if (detail.outcome === "failed") {
+        return { label: "Failed", failed: true };
+    }
+    return OK;
+}
+
+export function utcTime(value: string): string {
+    return `${new Date(value).toISOString().replace("T", " ").slice(0, 19)} UTC`;
+}
+
+function jobKind(event: AuditEvent): string {
+    const kind = (event.detail as Detail).kind;
+    return typeof kind === "string" ? kind : "";
+}
+
+export function targetHref(event: AuditEvent): string | undefined {
+    const ref = event.target_ref;
+    if (!ref?.live) {
+        return undefined;
+    }
+    const [slug, number] = ref.key.split("@");
+    const links: Record<AuditTarget["kind"], () => string> = {
+        model: () => modelPageHref(ref.key),
+        version: () => modelVersionHref(slug, Number(number)),
+        key: () => listHref(API_KEYS_PATH, { q: ref.key }),
+        account: () => "/settings/accounts",
+        job: () => jobHref({ id: Number(ref.key), kind: jobKind(event) }),
+        dataset: () => "/data",
+        dataset_folder: () => "/data",
+        feedback: () => listHref("/feedback", { item: ref.key.split("/").at(-1) }),
+        connection: () => "/settings/connections",
+        policy: () => "/settings/security",
+    };
+    return links[ref.kind]();
 }
 
 export function keyLabel(key: string): string {
@@ -367,11 +482,28 @@ function startOfDay(day: string, offset = 0): string | undefined {
 
 export type AuditQuery = {
     q?: string;
+    category?: string[];
     action?: string[];
     actor?: string[];
+    target?: string[];
     since?: string;
     until?: string;
 };
+
+export const CUSTOM_RANGE = "custom";
+const HOUR_MS = 3600 * 1000;
+export const RANGES: [string, string, number][] = [
+    ["1h", "Last hour", HOUR_MS],
+    ["24h", "Last 24 hours", 24 * HOUR_MS],
+    ["7d", "Last 7 days", 7 * 24 * HOUR_MS],
+    ["30d", "Last 30 days", 30 * 24 * HOUR_MS],
+    ["90d", "Last 90 days", 90 * 24 * HOUR_MS],
+];
+
+function rangeSince(range: string | undefined): string | undefined {
+    const span = RANGES.find(([value]) => value === range)?.[2];
+    return span === undefined ? undefined : new Date(Date.now() - span).toISOString();
+}
 
 function listOf(value: string | undefined): string[] | undefined {
     const items = value ? value.split(",").filter(Boolean) : [];
@@ -379,12 +511,19 @@ function listOf(value: string | undefined): string[] | undefined {
 }
 
 export function auditQuery(search: AuditSearch): AuditQuery {
+    const custom = search.range === CUSTOM_RANGE;
     return {
         q: search.q || undefined,
+        category: listOf(search.category),
         action: listOf(search.action),
         actor: listOf(search.actor),
-        since: search.from ? startOfDay(search.from) : undefined,
-        until: search.to ? startOfDay(search.to, 1) : undefined,
+        target: listOf(search.target),
+        since: custom
+            ? search.from
+                ? startOfDay(search.from)
+                : undefined
+            : rangeSince(search.range),
+        until: custom && search.to ? startOfDay(search.to, 1) : undefined,
     };
 }
 
