@@ -29,18 +29,33 @@ export function CreateLayout({
         event.preventDefault();
         onSubmit();
     };
+    const actions = (statusClass?: string) => (
+        <>
+            <p
+                aria-live="polite"
+                className={cn(
+                    "min-w-0 flex-1 truncate text-sm tabular-nums",
+                    problem ? "text-destructive" : "text-muted-foreground",
+                    statusClass,
+                )}
+            >
+                {status}
+            </p>
+            <Button type="button" variant="outline" className="ml-auto" onClick={onCancel}>
+                Cancel
+            </Button>
+            <Button type="submit" disabled={disabled}>
+                {submit}
+            </Button>
+        </>
+    );
     return (
         <form noValidate className="@container" onSubmit={send} onKeyDown={onKeyDown}>
             <div className="grid items-start gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex min-w-0 flex-col gap-6">
                     {form}
-                    <div className="hidden items-center gap-2 @3xl:flex">
-                        <Button type="submit" disabled={disabled}>
-                            {submit}
-                        </Button>
-                        <Button type="button" variant="outline" onClick={onCancel}>
-                            Cancel
-                        </Button>
+                    <div className="hidden items-center gap-3 border-t pt-4 @3xl:flex">
+                        {actions()}
                     </div>
                 </div>
                 <aside aria-label={summaryLabel} className="min-w-0 @3xl:sticky @3xl:top-6">
@@ -53,28 +68,14 @@ export function CreateLayout({
                     "pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] @3xl:hidden",
                 )}
             >
-                <p
-                    aria-live="polite"
-                    className={cn(
-                        "min-w-0 flex-1 truncate tabular-nums",
-                        problem ? "text-destructive" : "text-muted-foreground",
-                    )}
-                >
-                    {status}
-                </p>
-                <Button type="button" variant="outline" onClick={onCancel}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={disabled}>
-                    {submit}
-                </Button>
+                {actions("@max-md:sr-only")}
             </div>
         </form>
     );
 }
 
 export function FormCard({ children }: { children: ReactNode }) {
-    return <Card className="gap-panel p-panel">{children}</Card>;
+    return <Card className="gap-field p-panel">{children}</Card>;
 }
 
 export function SummaryCard({ children }: { children: ReactNode }) {

@@ -16,22 +16,29 @@ export function FormRows({
     children: ReactNode;
 }) {
     return (
-        <div className={cn("grid grid-cols-1 gap-x-6 gap-y-1 sm:gap-y-3", COLUMNS[labels])}>
+        <div
+            className={cn(
+                "grid grid-cols-1 gap-x-6 gap-y-label sm:gap-y-panel-gap",
+                COLUMNS[labels],
+            )}
+        >
             {children}
         </div>
     );
 }
 
-export function FormGroup({ title, children }: { title: string; children: ReactNode }) {
+export function FormGroup({ title, children }: { title?: string; children: ReactNode }) {
     const id = useId();
     return (
         <section
-            aria-labelledby={id}
-            className="flex flex-col gap-3 border-t pt-panel first:border-t-0 first:pt-0"
+            aria-labelledby={title ? id : undefined}
+            className="flex flex-col gap-4 border-t pt-field first:border-t-0 first:pt-0"
         >
-            <h3 id={id} className="font-medium">
-                {title}
-            </h3>
+            {title && (
+                <h3 id={id} className="font-medium">
+                    {title}
+                </h3>
+            )}
             <FormRows labels="narrow">{children}</FormRows>
         </section>
     );

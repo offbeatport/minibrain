@@ -305,7 +305,7 @@ export function AddModelPage() {
     const showFormat = plan.target.kind === "catalogue" && Boolean(plan.variant);
     const form = (
         <FormCard>
-            <FormGroup title="Base and data">
+            <FormGroup>
                 <FormRow id="base-model" label="Base" align="start">
                     <FormControl>
                         <BasePicker
@@ -369,8 +369,6 @@ export function AddModelPage() {
                         <ErrorLine error={datasets.error} />
                     </FormControl>
                 </FormRow>
-            </FormGroup>
-            <FormGroup title="Identity">
                 <FormRow id="create-name" label="Name" align="start">
                     <FormControl width="text">
                         <NameAvatarField
