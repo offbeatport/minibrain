@@ -275,7 +275,7 @@ def read_custom(settings: Settings, model: Model) -> ModelDetail:
     return found.model_copy(update={"dataset_version": found.dataset_version.model_copy(update={"checks": checks})})
 
 
-SAMPLE_FILE = "travel_intents.jsonl"
+SAMPLE_FILE = "demo_travel_intents.jsonl"
 SAMPLE_PRESET = "general"
 
 

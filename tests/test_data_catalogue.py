@@ -97,13 +97,17 @@ def test_splits_come_from_the_latest_version(harness: Harness) -> None:
 
 def test_samples_are_listed_and_can_be_added_again_after_a_delete(harness: Harness) -> None:
     samples = harness.client.get("/api/samples").json()
-    assert [sample["file"] for sample in samples] == ["travel_intents.jsonl", "banking77.csv", "clinc150.parquet"]
-    first = harness.client.post("/api/samples/banking77.csv").json()
-    assert first["filename"] == "banking77.csv"
+    assert [sample["file"] for sample in samples] == [
+        "demo_travel_intents.jsonl",
+        "demo_banking77.csv",
+        "demo_clinc150.parquet",
+    ]
+    first = harness.client.post("/api/samples/demo_banking77.csv").json()
+    assert first["filename"] == "demo_banking77.csv"
     assert first["tags"] == ["minibrain:sample"]
     assert first["rows"] == 13_083
     assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
-    again = harness.client.post("/api/samples/banking77.csv").json()
+    again = harness.client.post("/api/samples/demo_banking77.csv").json()
     assert again["id"] > first["id"]
     assert again["rows"] == 13_083
 
@@ -115,7 +119,7 @@ def test_unknown_sample_is_not_found(harness: Harness) -> None:
 def test_a_new_file_never_reads_a_deleted_file_staging(harness: Harness) -> None:
     first = upload(harness)
     assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
-    second = harness.client.post("/api/samples/travel_intents.jsonl").json()
+    second = harness.client.post("/api/samples/demo_travel_intents.jsonl").json()
     assert second["rows"] == 750
     assert {column["name"] for column in second["columns"]} != {column["name"] for column in first["columns"]}
 
@@ -133,7 +137,7 @@ def test_tags_keep_key_value_form_and_refuse_the_system_prefix(harness: Harness)
 
 
 def test_editing_tags_keeps_the_system_tags(harness: Harness) -> None:
-    sample = harness.client.post("/api/samples/travel_intents.jsonl").json()
+    sample = harness.client.post("/api/samples/demo_travel_intents.jsonl").json()
     assert sample["tags"] == ["minibrain:sample"]
     edited = harness.client.patch(f"/api/sources/{sample['id']}", json={"tags": ["demo"]}).json()
     assert edited["tags"] == ["minibrain:sample", "demo"]

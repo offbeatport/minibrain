@@ -101,7 +101,7 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     assert (body["name"], body["preset"], body["source"]["file"]) == (
         "Travel intents",
         "general",
-        "travel_intents.jsonl",
+        "demo_travel_intents.jsonl",
     )
     assert body["mapping"]["template"] == {"user": "{message}", "assistant": "{intent}"}
     assert body["dataset_version"]["rows"] == 750

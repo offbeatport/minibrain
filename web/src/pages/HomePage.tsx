@@ -50,7 +50,7 @@ function GetStarted() {
                     .
                 </li>
                 <li>
-                    On Data, upload <span className="font-mono">samples/travel_intents.jsonl</span>{" "}
+                    On Data, upload <span className="font-mono">samples/demo_travel_intents.jsonl</span>{" "}
                     and build the dataset.
                 </li>
                 <li>

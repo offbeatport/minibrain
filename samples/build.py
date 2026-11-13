@@ -45,9 +45,9 @@ def main() -> None:
     banking = load_rows("PolyAI/banking77", None, "1846984189f2bc0ac51c6fc3a600fa9e1714e0c6", "label")
     clinc = load_rows("clinc/clinc_oos", "plus", "155b9c710419136e17307b80d0a13e68cd46b4ec", "intent")
     travel = [row for row in clinc if row[1] in TRAVEL_INTENTS]
-    write_csv(OUT / "banking77.csv", ("text", "category"), banking)
-    write_parquet(OUT / "clinc150.parquet", ("text", "intent"), clinc)
-    write_jsonl(OUT / "travel_intents.jsonl", ("message", "intent"), travel)
+    write_csv(OUT / "demo_banking77.csv", ("text", "category"), banking)
+    write_parquet(OUT / "demo_clinc150.parquet", ("text", "intent"), clinc)
+    write_jsonl(OUT / "demo_travel_intents.jsonl", ("message", "intent"), travel)
     print(f"banking77={len(banking)} clinc150={len(clinc)} travel_intents={len(travel)}")
 
 

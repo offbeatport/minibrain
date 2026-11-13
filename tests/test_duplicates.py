@@ -145,9 +145,9 @@ def test_deleting_an_upload_removes_its_stored_file(harness: Harness) -> None:
 
 
 def test_samples_are_added_once(harness: Harness) -> None:
-    first = harness.client.post("/api/samples/travel_intents.jsonl")
+    first = harness.client.post("/api/samples/demo_travel_intents.jsonl")
     assert first.status_code == 201 and first.json()["outcome"] == "created"
-    again = harness.client.post("/api/samples/travel_intents.jsonl")
+    again = harness.client.post("/api/samples/demo_travel_intents.jsonl")
     assert again.status_code == 200
     assert (again.json()["outcome"], again.json()["id"]) == ("existing", first.json()["id"])
     assert len(harness.client.get("/api/sources").json()) == 1

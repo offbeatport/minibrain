@@ -27,7 +27,7 @@ class Sample:
 
 SAMPLES = (
     Sample(
-        file="travel_intents.jsonl",
+        file="demo_travel_intents.jsonl",
         name="Travel intents",
         format="JSON Lines",
         rows=750,
@@ -36,7 +36,7 @@ SAMPLES = (
         credit="Filtered from CLINC150 (Larson et al., EMNLP 2019), CC BY 3.0.",
     ),
     Sample(
-        file="banking77.csv",
+        file="demo_banking77.csv",
         name="Banking77",
         format="CSV",
         rows=13_083,
@@ -45,7 +45,7 @@ SAMPLES = (
         credit="Casanueva et al., PolyAI 2020, CC BY 4.0.",
     ),
     Sample(
-        file="clinc150.parquet",
+        file="demo_clinc150.parquet",
         name="CLINC150",
         format="Parquet",
         rows=23_850,
