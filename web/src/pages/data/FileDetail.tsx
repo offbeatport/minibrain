@@ -137,7 +137,7 @@ function Columns({ source }: { source: SourceSummary }) {
             : `${origin}; empty and distinct counts over every row.`;
     return (
         <Section title="Columns" caption={caption} flush>
-            <ErrorLine error={stats.error} />
+            <ErrorLine error={stats.error} onRetry={stats.refetch} />
             <DataGrid
                 columns={statColumns(
                     sampled,
@@ -161,7 +161,7 @@ function Preview({ source }: { source: SourceSummary }) {
             caption={`The first ${count(rows.data?.rows.length ?? 50)} rows as stored.`}
             flush
         >
-            <ErrorLine error={rows.error} />
+            <ErrorLine error={rows.error} onRetry={rows.refetch} />
             <DataGrid
                 columns={rows.data ? rowColumns(rows.data) : []}
                 rows={rows.data?.rows ?? []}

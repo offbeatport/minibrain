@@ -1,5 +1,6 @@
-import type { LucideIcon } from "lucide-react";
+import { CircleAlert, type LucideIcon, RotateCw } from "lucide-react";
 import {
+    Button,
     Card,
     CardAction,
     CardContent,
@@ -126,12 +127,25 @@ export function errorMessage(error: unknown): string | undefined {
     return error instanceof Error ? error.message : String(error);
 }
 
-export function ErrorLine({ error }: { error: unknown }) {
+export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => unknown }) {
     const message = errorMessage(error);
     if (!message) {
         return null;
     }
-    return <p className="text-destructive">{message}</p>;
+    return (
+        <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="flex min-w-0 items-start gap-2 text-destructive">
+                <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+                <span className="min-w-0 break-words">{message}</span>
+            </p>
+            {onRetry && (
+                <Button variant="outline" size="sm" onClick={() => void onRetry()}>
+                    <RotateCw aria-hidden="true" />
+                    Retry
+                </Button>
+            )}
+        </div>
+    );
 }
 
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {

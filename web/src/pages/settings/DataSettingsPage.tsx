@@ -160,7 +160,7 @@ export function DataSettingsPage() {
     const data = settings.data;
     return (
         <SettingsLayout title="Data">
-            <ErrorLine error={settings.error} />
+            <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <PanelSections>
                 <PanelSection
                     icon={Rows3}

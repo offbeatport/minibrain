@@ -24,6 +24,7 @@ import {
     useFeedbackItem,
     useReview,
 } from "~/api/feedbackQueries";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { ErrorLine } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import {
@@ -389,7 +390,20 @@ function Review({ item, ids, hasMore, loadMore, onOpen }: Props & { item: Feedba
 export function FeedbackReview(props: Props) {
     const item = useFeedbackItem(props.id);
     if (item.error) {
-        return <ErrorLine error={item.error} />;
+        return (
+            <QueryError
+                error={item.error}
+                retry={item.refetch}
+                notFound={
+                    <NotFoundState
+                        title="Feedback not found"
+                        primary={{ label: "Go to Feedback", onClick: () => props.onOpen(null) }}
+                    >
+                        {`There is no feedback #${props.id}. It may have been deleted.`}
+                    </NotFoundState>
+                }
+            />
+        );
     }
     if (!item.data) {
         return <p className="text-muted-foreground">Loading…</p>;

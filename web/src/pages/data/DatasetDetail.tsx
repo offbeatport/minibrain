@@ -108,7 +108,7 @@ export function DatasetMapping({ slug }: { slug: string }) {
     const mapped = Boolean(dataset.data?.mapping.sql);
     const preview = useDatasetPreview(slug, mapped);
     if (!dataset.data) {
-        return <ErrorLine error={dataset.error} />;
+        return <ErrorLine error={dataset.error} onRetry={dataset.refetch} />;
     }
     return (
         <>

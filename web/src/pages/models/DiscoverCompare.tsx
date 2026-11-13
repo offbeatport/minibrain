@@ -853,7 +853,7 @@ export function DiscoverComparePage() {
             {copy === "failed" && <CopyFallback href={window.location.href} />}
             {catalog.error && (
                 <div className="flex flex-wrap items-center gap-3">
-                    <ErrorLine error={catalog.error} />
+                    <ErrorLine error={catalog.error} onRetry={catalog.refetch} />
                     <Button
                         variant="outline"
                         size="sm"

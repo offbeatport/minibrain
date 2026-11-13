@@ -217,7 +217,7 @@ function Answers({ row, a, b }: { row: ModelRow; a: VersionInfo; b: VersionInfo 
                     : "Held-out answers of both versions, row by row."
             }
         >
-            <ErrorLine error={answers.error} />
+            <ErrorLine error={answers.error} onRetry={answers.refetch} />
             {answers.isLoading ? (
                 <p className="text-muted-foreground">Comparing answers…</p>
             ) : differing.length === 0 ? (
@@ -279,7 +279,7 @@ export function CompareView({ row }: { row: ModelRow }) {
         return (
             <Page wide>
                 <Crumbs items={crumbs} />
-                <ErrorLine error={versions.error} />
+                <ErrorLine error={versions.error} onRetry={versions.refetch} />
                 {versions.data && (
                     <p className="text-muted-foreground">Pick two versions of this model.</p>
                 )}

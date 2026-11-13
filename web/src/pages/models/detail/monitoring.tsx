@@ -406,7 +406,7 @@ function RequestLogSection({ row }: { row: ModelRow }) {
             }
             flush
         >
-            <ErrorLine error={latest.error} />
+            <ErrorLine error={latest.error} onRetry={latest.refetch} />
             {items.length === 0 ? (
                 <p className="p-panel text-muted-foreground">No requests yet.</p>
             ) : (
@@ -485,7 +485,7 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                     All models in Monitor →
                 </Link>
             </div>
-            <ErrorLine error={traffic.error} />
+            <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
             <PanelSections>
                 <PanelSection
                     icon={ChartLine}

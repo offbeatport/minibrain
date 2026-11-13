@@ -44,7 +44,7 @@ export function ApiKeys({
             bare
         >
             <div className="flex flex-col gap-3">
-                <ErrorLine error={list.error} />
+                <ErrorLine error={list.error} onRetry={list.refetch} />
                 <KeysTable
                     rows={rows}
                     loading={list.isLoading}

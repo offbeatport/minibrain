@@ -9,8 +9,9 @@ import { type ComponentProps, useMemo, useSyncExternalStore } from "react";
 import { usePerson } from "~/api/authQueries";
 import { type ModelRow, api, unwrap, withCsrf } from "~/api/client";
 import { useAllModels } from "~/api/queries";
+import { QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page } from "~/components/Section";
+import { Page } from "~/components/Section";
 import { ROLE_LABELS, useCan } from "~/lib/access";
 import { API_KEYS_PATH, API_REFERENCE_PATH, MANAGEMENT_REFERENCE_PATH } from "~/lib/modelLinks";
 import {
@@ -169,7 +170,7 @@ export function ApiReferencePage() {
                 }
             />
             <TabNav label="API reference pages" tabs={TABS} />
-            <ErrorLine error={error} />
+            {!document && <QueryError heading="h2" error={error} />}
             {document && <Reference key={kind} kind={kind} document={document} />}
         </Page>
     );

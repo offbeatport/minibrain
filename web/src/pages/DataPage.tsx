@@ -24,10 +24,12 @@ import {
     unwrap,
 } from "~/api/client";
 import { keys, useDatasets, useGolden, useModel, useModels, usePreview } from "~/api/queries";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section, Stat } from "~/components/Section";
 import { asCode, count, dateTime } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
+import { modelsHref } from "~/lib/modelsSearch";
 import { sqlProblem } from "~/lib/sqlError";
 import { DataExplorer } from "./data/Explorer";
 import { itemHref } from "./data/catalogue";
@@ -492,9 +494,20 @@ function ModelData({ slug }: { slug: string }) {
                 title="Data"
                 caption={`The dataset ${model?.name ?? "this model"} trains on, its mapping and its latest version.`}
             />
-            <ErrorLine error={models.error} />
+            {models.error && !models.data && (
+                <QueryError heading="h2" error={models.error} retry={models.refetch} />
+            )}
             {models.data && !model && (
-                <p className="text-muted-foreground">No custom model called {slug}.</p>
+                <NotFoundState
+                    heading="h2"
+                    title="Model not found"
+                    primary={{ label: "Go to Data", href: "/data" }}
+                    secondary={{ label: "Go to Models", href: modelsHref() }}
+                >
+                    {"No custom model is called "}
+                    <code className="font-mono text-foreground">{slug}</code>
+                    {". It may have been deleted or renamed."}
+                </NotFoundState>
             )}
             {model && <DataSections key={slug} slug={slug} />}
         </Page>

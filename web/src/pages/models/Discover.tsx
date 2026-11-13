@@ -737,7 +737,7 @@ export function Discover({
     if (catalog.error || !data) {
         return (
             <div className="flex items-center gap-2">
-                <ErrorLine error={catalog.error} />
+                <ErrorLine error={catalog.error} onRetry={catalog.refetch} />
                 <Button variant="outline" size="sm" onClick={() => catalog.refetch()}>
                     Try again
                 </Button>

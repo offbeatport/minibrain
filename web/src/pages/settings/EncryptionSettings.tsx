@@ -437,7 +437,7 @@ export function EncryptionSettings() {
             title={SECURITY.encryption.title}
             description="Each stored file has its own data key; the master key here wraps it. Uploads, dataset versions, adapters, logs and staging copies are encrypted."
         >
-            <ErrorLine error={status.error} />
+            <ErrorLine error={status.error} onRetry={status.refetch} />
             {status.data && (
                 <div className="flex flex-col gap-field">
                     <CurrentKey status={status.data} />

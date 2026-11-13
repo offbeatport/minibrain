@@ -512,7 +512,7 @@ export function SecurityPage() {
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
         <SettingsLayout title="Security">
-            <ErrorLine error={policies.error} />
+            <ErrorLine error={policies.error} onRetry={policies.refetch} />
             <PanelSections>
                 {policies.data &&
                     GROUPS.map((group) => (

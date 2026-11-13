@@ -7,6 +7,7 @@ import {
     lazyRouteComponent,
 } from "@tanstack/react-router";
 import type { Role } from "./api/authQueries";
+import { CrashPage, NotFoundPage } from "./components/ErrorState";
 import { NeedsRole } from "./components/NeedsRole";
 import { redirectTo } from "./components/Redirect";
 import { Shell } from "./components/Shell";
@@ -188,7 +189,12 @@ const routeTree = rootRoute.addChildren([
     ...prototypePages(),
 ]);
 
-export const router = createRouter({ routeTree, defaultPreload: "intent" });
+export const router = createRouter({
+    routeTree,
+    defaultPreload: "intent",
+    defaultNotFoundComponent: NotFoundPage,
+    defaultErrorComponent: CrashPage,
+});
 
 declare module "@tanstack/react-router" {
     interface Register {

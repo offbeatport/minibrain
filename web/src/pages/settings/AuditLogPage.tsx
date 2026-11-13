@@ -468,7 +468,7 @@ function EventSheet({
                             : "Loading…"}
                     </SheetDescription>
                 </SheetHeader>
-                <ErrorLine error={fetched.error} />
+                <ErrorLine error={fetched.error} onRetry={fetched.refetch} />
                 {event && (
                     <div className="flex flex-wrap gap-2">
                         {href && (

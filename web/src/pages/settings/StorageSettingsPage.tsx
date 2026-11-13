@@ -255,7 +255,7 @@ export function StorageSettingsPage() {
     });
     return (
         <SettingsLayout title="Storage">
-            <ErrorLine error={settings.error} />
+            <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <PanelSections>
                 <PanelSection
                     icon={HardDrive}

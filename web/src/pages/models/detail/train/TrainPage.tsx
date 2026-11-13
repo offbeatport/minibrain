@@ -5,10 +5,12 @@ import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useModel, useVersions } from "~/api/queries";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
 import { PageHeader } from "~/components/PageHeader";
 import { PickSelect } from "~/components/PickSelect";
-import { ErrorLine, Page } from "~/components/Section";
+import { Page } from "~/components/Section";
+import { ModelNotFound } from "~/components/models/ModelNotFound";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { type TrainMethod, modelPageHref } from "~/lib/modelLinks";
@@ -371,7 +373,6 @@ function Loaded({
     const start = useStart(list ?? []);
     return (
         <>
-            <ErrorLine error={detail.error ?? versions.error} />
             {detail.data && list ? (
                 <TrainForm
                     row={row}
@@ -386,7 +387,13 @@ function Loaded({
             ) : (
                 <>
                     <PageHeader title={title} />
-                    {!detail.error && !versions.error && (
+                    {detail.error || versions.error ? (
+                        <QueryError
+                            heading="h2"
+                            error={detail.error ?? versions.error}
+                            retry={() => Promise.all([detail.refetch(), versions.refetch()])}
+                        />
+                    ) : (
                         <p className="text-muted-foreground">Loading…</p>
                     )}
                 </>
@@ -410,14 +417,24 @@ export function TrainPage() {
                         { label: "Train" },
                     ]}
                 />
-                <ErrorLine error={models.error} />
-                <p className="text-muted-foreground">
-                    {models.isLoading
-                        ? "Loading…"
-                        : row
-                          ? `${row.name} is a base model. Add a custom model on it to train.`
-                          : `No model called ${name}.`}
-                </p>
+                {models.isLoading ? (
+                    <p className="text-muted-foreground">Loading…</p>
+                ) : models.error ? (
+                    <QueryError error={models.error} retry={models.refetch} />
+                ) : row ? (
+                    <NotFoundState
+                        title="Base models can't be trained"
+                        primary={{
+                            label: "Add model",
+                            href: `/models/new?base=${encodeURIComponent(row.key)}`,
+                        }}
+                        secondary={{ label: `Go to ${row.name}`, href: modelPageHref(row.key) }}
+                    >
+                        {`${row.name} is a base model. Add a custom model on it, then train that.`}
+                    </NotFoundState>
+                ) : (
+                    <ModelNotFound name={name} />
+                )}
             </Page>
         );
     }

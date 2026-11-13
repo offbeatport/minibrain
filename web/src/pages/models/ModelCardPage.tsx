@@ -17,9 +17,10 @@ import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useModel, useVersions } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Page, PanelSections, Stat } from "~/components/Section";
+import { ErrorLine, Page, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
@@ -295,7 +296,35 @@ export function ModelCardPage() {
     return (
         <Page>
             {card.isLoading && <p className="text-muted-foreground">Loading…</p>}
-            <ErrorLine error={card.error} />
+            {card.error && !card.data && (
+                <>
+                    <Breadcrumbs
+                        items={[
+                            { label: "Models", href: modelsHref() },
+                            { label: target.slug, href: modelPageHref(target.slug) },
+                            { label: `v${params.number ?? ""}` },
+                            { label: "Model card" },
+                        ]}
+                    />
+                    <QueryError
+                        error={card.error}
+                        retry={card.refetch}
+                        notFound={
+                            <NotFoundState
+                                title="Model card not found"
+                                primary={{
+                                    label: "Go to Versions",
+                                    href: modelPageHref(target.slug, "versions"),
+                                }}
+                                secondary={{ label: "Go to Models", href: modelsHref() }}
+                                detail={errorMessage(card.error)}
+                            >
+                                {`There is no card for ${target.slug} v${params.number ?? ""}. The model or the version may have been deleted.`}
+                            </NotFoundState>
+                        }
+                    />
+                </>
+            )}
             {card.data && (
                 <CardView
                     target={target}

@@ -310,7 +310,7 @@ export function RequestDialog({
                             : "Loading…"}
                     </DialogDescription>
                 </DialogHeader>
-                <ErrorLine error={detail.error} />
+                <ErrorLine error={detail.error} onRetry={detail.refetch} />
                 {row && (
                     <div className="flex min-w-0 flex-col gap-6">
                         <Facts items={facts(row)} />

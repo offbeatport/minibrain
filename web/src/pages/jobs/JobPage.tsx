@@ -16,6 +16,7 @@ import { useJobMetrics } from "~/api/jobPageQueries";
 import { isActiveJob, useJob } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { DeleteJobsDialog, deleteRefusal, deleteSummary } from "~/components/DeleteJobs";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
 import { canCancel, canRetry } from "~/components/JobSelection";
@@ -497,7 +498,7 @@ function JobView({ job }: { job: JobDetail }) {
             <Summary job={job} />
             <Failure job={job} />
             <Serving job={job} />
-            <ErrorLine error={metrics.error} />
+            <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
             <PanelSections>
                 <div className="grid items-start gap-x-6 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                     <ProgressSection job={job} metrics={metrics.data} />
@@ -524,6 +525,17 @@ function useCanonical(job: JobDetail | undefined, pathname: string) {
     }, [canonical, here, onJobPage, router]);
 }
 
+function JobNotFound({ id, section }: { id: string; section: { label: string; href: string } }) {
+    return (
+        <NotFoundState
+            title="Job not found"
+            primary={{ label: `Go to ${section.label}`, href: section.href }}
+        >
+            {`There is no job #${id}. It may have been deleted.`}
+        </NotFoundState>
+    );
+}
+
 export function JobPage() {
     const { id } = useParams({ strict: false }) as { id?: string };
     const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -534,9 +546,19 @@ export function JobPage() {
     return (
         <Page>
             <Breadcrumbs items={[section, { label: `Job #${id ?? ""}` }]} />
-            {jobId === null && <p className="text-muted-foreground">No job called {id}.</p>}
-            <ErrorLine error={job.error} />
-            {job.data && <JobView job={job.data} />}
+            {job.data ? (
+                <JobView job={job.data} />
+            ) : jobId === null ? (
+                <JobNotFound id={id ?? ""} section={section} />
+            ) : job.error ? (
+                <QueryError
+                    error={job.error}
+                    retry={job.refetch}
+                    notFound={<JobNotFound id={id ?? ""} section={section} />}
+                />
+            ) : (
+                <p className="text-muted-foreground">Loading…</p>
+            )}
         </Page>
     );
 }

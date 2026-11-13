@@ -364,7 +364,7 @@ function FreeTextResults({ slug, version }: { slug: string; version: VersionInfo
                     <span className="tabular-nums">{`Worse than live (${worse.length})`}</span>
                 </label>
             </div>
-            <ErrorLine error={answers.error} />
+            <ErrorLine error={answers.error} onRetry={answers.refetch} />
             {answers.isLoading && <p className="text-muted-foreground">Loading…</p>}
             {found && rows.length === 0 && (
                 <p className="text-muted-foreground">

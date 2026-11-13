@@ -180,7 +180,7 @@ function Scores({ slug, number }: { slug: string; number: number }) {
     const line = row?.versions?.find((item) => item.number === number);
     const live = row?.versions?.find((item) => item.live);
     if (!info) {
-        return <ErrorLine error={versions.error} />;
+        return <ErrorLine error={versions.error} onRetry={versions.refetch} />;
     }
     const metric = metricName(info.main_metric).toLowerCase();
     return (

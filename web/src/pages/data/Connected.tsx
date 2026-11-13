@@ -433,7 +433,7 @@ export function AddDatabaseDialog({
                             <option key={item} value={item} />
                         ))}
                     </datalist>
-                    <ErrorLine error={tables.error} />
+                    <ErrorLine error={tables.error} onRetry={tables.refetch} />
                 </Field>
             ) : (
                 <Field
@@ -500,7 +500,7 @@ export function ConnectedGroup({
                 <h2 className="text-2xl font-semibold">{group.title}</h2>
                 <p className="text-muted-foreground">{group.body}</p>
             </header>
-            <ErrorLine error={connections.error} />
+            <ErrorLine error={connections.error} onRetry={connections.refetch} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Sources" value={count(members.length)} />
                 <Stat label="Datasets" value={count(built.length)} />

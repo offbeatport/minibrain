@@ -6,11 +6,12 @@ import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { Page, PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { discoverListHref } from "~/lib/modelsSearch";
@@ -234,7 +235,7 @@ export function DiscoverModelPage() {
                     { label: entry?.name ?? "Model" },
                 ]}
             />
-            <ErrorLine error={catalog.error} />
+            {catalog.error && !data && <QueryError error={catalog.error} retry={catalog.refetch} />}
             {catalog.isLoading && (
                 <div className="flex flex-col gap-8 pt-2">
                     <div className="flex items-center gap-3">
@@ -249,7 +250,14 @@ export function DiscoverModelPage() {
                 </div>
             )}
             {data && !entry && (
-                <p className="text-muted-foreground">No model {id} in the catalogue.</p>
+                <NotFoundState
+                    title="Not in the catalogue"
+                    primary={{ label: "Go to Discover", href: discoverListHref() }}
+                >
+                    {"Nothing in the catalogue is called "}
+                    <code className="font-mono text-foreground">{id}</code>
+                    {". It may have been removed from the catalogue."}
+                </NotFoundState>
             )}
             {data && entry && (
                 <>

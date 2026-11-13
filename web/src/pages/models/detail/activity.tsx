@@ -342,7 +342,7 @@ export function ActivityPanel({ row }: { row: ModelRow }) {
     return (
         <PanelSection icon={History} title="Activity">
             <div className="flex min-w-0 flex-col gap-3">
-                <ErrorLine error={activity.error} />
+                <ErrorLine error={activity.error} onRetry={activity.refetch} />
                 {activity.isLoading ? (
                     <p className="text-muted-foreground">Loading…</p>
                 ) : shown.length === 0 ? (

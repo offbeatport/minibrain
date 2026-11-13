@@ -159,7 +159,7 @@ export function CustomFiles({
         <div className="flex flex-col gap-4">
             {trained !== null && (
                 <>
-                    <ErrorLine error={files.error} />
+                    <ErrorLine error={files.error} onRetry={files.refetch} />
                     <FileTable
                         files={files.data?.files ?? []}
                         loading={files.isLoading}

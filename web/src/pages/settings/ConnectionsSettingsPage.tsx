@@ -538,7 +538,7 @@ function Extensions() {
             title={CONNECTIONS.extensions.title}
             description="S3, database, Iceberg and Delta Lake sources read through DuckDB extensions. minibrain never downloads them; an admin installs them from a folder or an internal mirror."
         >
-            <ErrorLine error={extensions.error} />
+            <ErrorLine error={extensions.error} onRetry={extensions.refetch} />
             {data && (
                 <div className="flex flex-col gap-3">
                     <ul className="flex flex-col divide-y rounded-lg border">
@@ -605,7 +605,7 @@ export function ConnectionsSettingsPage() {
                 </Link>
                 .
             </p>
-            <ErrorLine error={connections.error} />
+            <ErrorLine error={connections.error} onRetry={connections.refetch} />
             <PanelSections>
                 <PanelSection
                     icon={Cable}

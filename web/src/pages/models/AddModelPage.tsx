@@ -351,7 +351,7 @@ export function AddModelPage() {
                                 Loading the catalogue…
                             </span>
                         )}
-                        <ErrorLine error={catalog.error} />
+                        <ErrorLine error={catalog.error} onRetry={catalog.refetch} />
                         <BaseSummary option={option} plan={plan} />
                         <FieldError text={shownFor("model")} />
                     </FormControl>
@@ -391,7 +391,7 @@ export function AddModelPage() {
                             onChange={setDataset}
                             onUpload={() => router.history.push(UPLOAD_HREF)}
                         />
-                        <ErrorLine error={datasets.error} />
+                        <ErrorLine error={datasets.error} onRetry={datasets.refetch} />
                         <FieldError text={shownFor("dataset")} />
                     </FormControl>
                 </FormRow>

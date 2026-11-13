@@ -72,7 +72,7 @@ export function TestExamples({ slug }: { slug: string }) {
                 rowLabel={(item) => `Test example ${lastMessage(item)}`}
                 empty="No test examples yet. In the Playground, use Save as test example on an answer from this model."
             />
-            <ErrorLine error={examples.error} />
+            <ErrorLine error={examples.error} onRetry={examples.refetch} />
         </div>
     );
 }

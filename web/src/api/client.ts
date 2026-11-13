@@ -150,6 +150,37 @@ type Outcome<T> = { data?: T; error?: unknown; response: Response };
 const UNREACHABLE = "minibrain isn't responding. It may be restarting; try again in a moment.";
 const GATEWAY_ERRORS = new Set([502, 503, 504]);
 
+export class ApiError extends Error {
+    readonly status: number | null;
+
+    constructor(message: string, status: number | null) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+    }
+
+    get unreachable(): boolean {
+        return this.status === null || this.message === UNREACHABLE;
+    }
+}
+
+export function errorStatus(error: unknown): number | null {
+    return error instanceof ApiError ? error.status : null;
+}
+
+export function isUnreachable(error: unknown): boolean {
+    return error instanceof ApiError && error.unreachable;
+}
+
+export function retryable(failures: number, error: unknown): boolean {
+    const status = errorStatus(error);
+    return failures < 3 && (status === null || status >= 500 || status === 429);
+}
+
+function failed(error: unknown, response: Response): ApiError {
+    return new ApiError(describeError(error, response), response.status);
+}
+
 function describeError(error: unknown, response: Response): string {
     const detail = (error as Failure | undefined)?.detail;
     const message = (error as Failure | undefined)?.error?.message;
@@ -176,14 +207,14 @@ async function settled<T>(request: Promise<T>): Promise<T> {
     try {
         return await request;
     } catch (error) {
-        throw error instanceof TypeError ? new Error(UNREACHABLE) : error;
+        throw error instanceof TypeError ? new ApiError(UNREACHABLE, null) : error;
     }
 }
 
 export async function unwrap<T>(request: Promise<Outcome<T>>): Promise<T> {
     const { data, error, response } = await settled(request);
     if (!response.ok || data === undefined) {
-        throw new Error(describeError(error, response));
+        throw failed(error, response);
     }
     return data;
 }
@@ -191,14 +222,14 @@ export async function unwrap<T>(request: Promise<Outcome<T>>): Promise<T> {
 export async function succeed(request: Promise<Outcome<unknown>>): Promise<void> {
     const { error, response } = await settled(request);
     if (!response.ok) {
-        throw new Error(describeError(error, response));
+        throw failed(error, response);
     }
 }
 
 export async function removed(request: Promise<Outcome<unknown>>): Promise<void> {
     const { error, response } = await settled(request);
     if (!response.ok && response.status !== 404) {
-        throw new Error(describeError(error, response));
+        throw failed(error, response);
     }
 }
 
@@ -221,7 +252,7 @@ export async function uploadFile(
         return { outcome: "name_taken", taken: body };
     }
     if (!response.ok) {
-        throw new Error(describeError(body, response));
+        throw failed(body, response);
     }
     return body as SourceAdded;
 }

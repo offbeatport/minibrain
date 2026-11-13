@@ -3,15 +3,10 @@ import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { TabNav } from "obp-ui";
 import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
-import {
-    keys,
-    useAllModels,
-    useBaseModel,
-    useModel,
-    useReservedName,
-    useVersions,
-} from "~/api/queries";
-import { ErrorLine, Page, PanelSections } from "~/components/Section";
+import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
+import { Page, PanelSections } from "~/components/Section";
+import { ModelNotFound } from "~/components/models/ModelNotFound";
 import { useCan } from "~/lib/access";
 import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
@@ -36,13 +31,22 @@ import { UsagePanel } from "./usage";
 import { VersionView, useVersionNumber } from "./version";
 import { VersionsTab } from "./versions";
 
-function useRow(): { row: ModelRow | undefined; loading: boolean; error: unknown; name: string } {
+type Lookup = {
+    row: ModelRow | undefined;
+    loading: boolean;
+    error: unknown;
+    retry: () => unknown;
+    name: string;
+};
+
+function useRow(): Lookup {
     const { name = "" } = useParams({ strict: false }) as { name?: string };
     const models = useAllModels();
     return {
         row: models.data?.find((item) => item.key === name),
         loading: models.isLoading,
         error: models.error,
+        retry: models.refetch,
         name,
     };
 }
@@ -63,17 +67,29 @@ function useScrollToHash(ready: boolean) {
     }, [ready, hash]);
 }
 
-function Missing({ name, loading, error }: { name: string; loading: boolean; error: unknown }) {
-    const reserved = useReservedName(loading || error ? null : name);
+function Missing({ lookup }: { lookup: Lookup }) {
+    const { row, loading, error, retry, name } = lookup;
     return (
         <Page wide>
-            <Crumbs items={[{ label: "Models", href: "/models" }, { label: name }]} />
-            {(loading || reserved.isLoading) && <p className="text-muted-foreground">Loading…</p>}
-            <ErrorLine error={error} />
-            {!loading && !error && !reserved.isLoading && (
-                <p className="text-muted-foreground">
-                    {reserved.data ? `${reserved.data.message}.` : `No model called ${name}.`}
-                </p>
+            <Crumbs
+                items={[
+                    { label: "Models", href: modelsHref() },
+                    { label: row?.name ?? name, href: row ? modelPageHref(row.key) : undefined },
+                ]}
+            />
+            {loading ? (
+                <p className="text-muted-foreground">Loading…</p>
+            ) : error ? (
+                <QueryError error={error} retry={retry} />
+            ) : row ? (
+                <NotFoundState
+                    title="Base models have no versions"
+                    primary={{ label: `Go to ${row.name}`, href: modelPageHref(row.key) }}
+                >
+                    {`${row.name} is a base model. Versions belong to the custom models built on it.`}
+                </NotFoundState>
+            ) : (
+                <ModelNotFound name={name} />
             )}
         </Page>
     );
@@ -293,28 +309,28 @@ function Loaded({ row }: { row: ModelRow }) {
 }
 
 export function ModelPage() {
-    const { row, loading, error, name } = useRow();
-    if (!row) {
-        return <Missing name={name} loading={loading} error={error} />;
+    const lookup = useRow();
+    if (!lookup.row) {
+        return <Missing lookup={lookup} />;
     }
-    return <Loaded key={row.key} row={row} />;
+    return <Loaded key={lookup.row.key} row={lookup.row} />;
 }
 
 export function ModelVersionPage() {
-    const { row, loading, error, name } = useRow();
+    const lookup = useRow();
     const number = useVersionNumber();
-    if (!row || row.kind !== "custom") {
-        return <Missing name={name} loading={loading} error={error} />;
+    if (!lookup.row || lookup.row.kind !== "custom") {
+        return <Missing lookup={lookup} />;
     }
-    return <VersionView row={row} number={number} />;
+    return <VersionView row={lookup.row} number={number} />;
 }
 
 export function ModelComparePage() {
-    const { row, loading, error, name } = useRow();
-    if (!row || row.kind !== "custom") {
-        return <Missing name={name} loading={loading} error={error} />;
+    const lookup = useRow();
+    if (!lookup.row || lookup.row.kind !== "custom") {
+        return <Missing lookup={lookup} />;
     }
-    return <CompareView row={row} />;
+    return <CompareView row={lookup.row} />;
 }
 
 export function OldModelLink() {

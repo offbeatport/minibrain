@@ -82,7 +82,7 @@ function KeyList({ manager }: { manager: Manager }) {
                     </Button>
                 )}
             </div>
-            <ErrorLine error={list.error} />
+            <ErrorLine error={list.error} onRetry={list.refetch} />
             <KeysTable
                 rows={rows}
                 loading={list.isLoading}

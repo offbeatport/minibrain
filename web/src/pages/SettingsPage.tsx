@@ -232,7 +232,7 @@ function ComputePrices() {
             title={PRICES.title}
             description="Scoring measures GPU time per request. A price per hour turns it into cost per 1,000 requests; without one, Evaluations and model cards show the time."
         >
-            <ErrorLine error={prices.error} />
+            <ErrorLine error={prices.error} onRetry={prices.refetch} />
             <SettingsGroup>
                 <CurrencyRow value={data?.currency} locked={data?.currency_locked} />
                 {(data?.pools ?? []).map((pool) => (

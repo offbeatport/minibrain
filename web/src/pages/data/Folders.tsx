@@ -218,7 +218,7 @@ export function FoldersGroup({
                     Parquet file of one format in a folder and its subfolders is one table.
                 </p>
             </header>
-            <ErrorLine error={roots.error} />
+            <ErrorLine error={roots.error} onRetry={roots.refetch} />
             <div className="flex flex-wrap gap-x-8 gap-y-3">
                 <Stat label="Folders" value={count(members.length)} />
                 <Stat label="Datasets" value={count(used.length)} />

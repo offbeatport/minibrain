@@ -13,13 +13,10 @@ import {
 } from "lucide-react";
 import {
     Badge,
-    Button,
     DropZone,
     DropdownMenuItem,
     DropdownMenuSeparator,
-    EmptyState,
     FileName,
-    Link,
     SearchInput,
     Tooltip,
     TooltipContent,
@@ -43,6 +40,7 @@ import {
 import type { DatasetSummary, SourceAdded, SourceSummary } from "~/api/client";
 import { type DatasetFolder, useDatasetFolders, useFolderRoots } from "~/api/dataQueries";
 import { useDatasets, useSources } from "~/api/queries";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Stat } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
@@ -348,20 +346,22 @@ function DeleteItem({ blocked, onSelect }: { blocked: string | null; onSelect: (
     );
 }
 
+const MISSING_TITLE: Record<ItemRef["kind"], string> = {
+    group: "Group not found",
+    source: "Source not found",
+    folder: "Folder not found",
+    dataset: "Dataset not found",
+};
+
 function Missing({ item }: { item: ItemRef }) {
     return (
-        <EmptyState
-            variant="panel"
-            title="Not found"
-            className="mx-0 mt-0"
-            action={
-                <Button asChild variant="outline" size="sm" className="mt-3">
-                    <Link href="/data">All data</Link>
-                </Button>
-            }
+        <NotFoundState
+            heading="h2"
+            title={MISSING_TITLE[item.kind]}
+            primary={{ label: "Go to Data", href: "/data" }}
         >
-            {`No ${item.kind === "group" ? "group" : item.kind} matches this link. It may have been deleted.`}
-        </EmptyState>
+            {`No ${item.kind} matches this link. It may have been deleted or moved.`}
+        </NotFoundState>
     );
 }
 
@@ -687,8 +687,13 @@ export function DataExplorer() {
         select({ kind: "dataset", id: dataset.slug });
     };
 
+    const listError = sources.error ?? datasets.error ?? folders.error;
+    const retryLists = () =>
+        Promise.all([sources.refetch(), datasets.refetch(), folders.refetch()]);
     let detail: ReactNode = null;
-    if (!loading) {
+    if (listError) {
+        detail = <QueryError heading="h2" error={listError} retry={retryLists} />;
+    } else if (!loading) {
         if (selected.kind === "group" && selected.id === "datasets") {
             detail = (
                 <div className="flex flex-col gap-6">
@@ -798,9 +803,7 @@ export function DataExplorer() {
                         />
                     }
                 />
-                <ErrorLine
-                    error={sources.error ?? datasets.error ?? folders.error ?? adder.error}
-                />
+                <ErrorLine error={adder.error} />
                 {adder.picker}
             </div>
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t @3xl:flex-row @3xl:overflow-hidden">

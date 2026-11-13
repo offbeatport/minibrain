@@ -299,7 +299,7 @@ export function VersionsSection({ dataset }: { dataset: DatasetSummary }) {
             }
             flush
         >
-            <ErrorLine error={datasetVersions.error} />
+            <ErrorLine error={datasetVersions.error} onRetry={datasetVersions.refetch} />
             <DataGrid
                 columns={VERSION_COLUMNS}
                 rows={rows}

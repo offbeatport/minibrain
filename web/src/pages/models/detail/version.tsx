@@ -56,6 +56,7 @@ import {
     useVersions,
 } from "~/api/queries";
 import { CopyButton } from "~/components/CopyButton";
+import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
 import { PoolLink } from "~/components/PoolLink";
@@ -292,7 +293,7 @@ function Differs({
             tip={`Against ${reference.label}, on ${count(all.length)} held-out rows.`}
         >
             <div className="flex flex-col gap-3">
-                <ErrorLine error={answers.error} />
+                <ErrorLine error={answers.error} onRetry={answers.refetch} />
                 {answers.isLoading ? (
                     <p className="text-muted-foreground">Comparing answers…</p>
                 ) : (
@@ -856,7 +857,7 @@ function Curves({ job }: { job: JobDetail }) {
     const metrics = useJobMetrics(job.id, isActiveJob(job));
     return (
         <>
-            <ErrorLine error={metrics.error} />
+            <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
             <LossSection job={job} metrics={metrics.data} />
             <RateSection metrics={metrics.data} />
         </>
@@ -877,9 +878,23 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
         return (
             <Page wide>
                 <Crumbs items={crumbs} />
-                <ErrorLine error={versions.error} />
-                {versions.data && (
-                    <p className="text-muted-foreground">{`${row.name} has no v${number}.`}</p>
+                {versions.isLoading ? (
+                    <p className="text-muted-foreground">Loading…</p>
+                ) : versions.error ? (
+                    <QueryError error={versions.error} retry={versions.refetch} />
+                ) : (
+                    <NotFoundState
+                        title="Version not found"
+                        primary={{
+                            label: "Go to Versions",
+                            href: modelPageHref(row.key, "versions"),
+                        }}
+                        secondary={{ label: `Go to ${row.name}`, href: modelPageHref(row.key) }}
+                    >
+                        {Number.isInteger(number) && number >= 0
+                            ? `${row.name} has no v${number}. It may have been deleted.`
+                            : `${row.name} has no version with that number.`}
+                    </NotFoundState>
                 )}
             </Page>
         );

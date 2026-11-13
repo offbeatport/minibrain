@@ -16,8 +16,9 @@ import type { ReactNode } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { CopyButton } from "~/components/CopyButton";
+import { QueryError } from "~/components/ErrorState";
 import { PoolLink } from "~/components/PoolLink";
-import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
+import { PanelSection, PanelSections } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SoftwareMark } from "~/components/SoftwareMark";
 import { count } from "~/lib/format";
@@ -508,7 +509,7 @@ export function InstallSettingsPage() {
                 </>
             }
         >
-            <ErrorLine error={install.error} />
+            {!info && <QueryError heading="h2" error={install.error} retry={install.refetch} />}
             {info && (
                 <PanelSections>
                     <Software info={info} />

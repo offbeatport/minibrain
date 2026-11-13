@@ -220,7 +220,7 @@ export function UsagePanel({ row, versions }: { row: ModelRow; versions: Version
                     onMetric={setMetric}
                     emptyHint={isDeployed(row) ? null : "Deploy it to start receiving requests"}
                 />
-                <ErrorLine error={traffic.error} />
+                <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
                 <p className="text-sm text-muted-foreground tabular-nums">
                     <Footer row={row} report={traffic.data} />
                 </p>
