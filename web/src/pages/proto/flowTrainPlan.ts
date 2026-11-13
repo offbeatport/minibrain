@@ -1,10 +1,10 @@
 import {
     CATALOG,
     DEVICE,
+    type Dataset,
     type FlowModel,
     type FlowState,
     TRAIN_MS,
-    datasetOf,
     findVersion,
     liveVersion,
 } from "./modelsFlowData";
@@ -350,8 +350,8 @@ const LONGEST: Record<string, number> = {
     "finance-questions": 976,
 };
 
-export function longestExample(model: FlowModel): number {
-    return LONGEST[model.dataset ?? ""] ?? 1024;
+export function longestExample(dataset: string | null): number {
+    return LONGEST[dataset ?? ""] ?? 1024;
 }
 
 export function rowsCut(longest: number, seq: number, rows: number): number {
@@ -371,8 +371,7 @@ export type DataPick = {
 
 const DATA_AGES = [0, 2 * 24, 5 * 24];
 
-export function dataPicks(model: FlowModel): DataPick[] {
-    const source = datasetOf(model);
+export function dataPicks(model: FlowModel, source: Dataset | undefined): DataPick[] {
     if (!source) {
         return [];
     }

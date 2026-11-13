@@ -50,9 +50,6 @@ export function trainBlock(model: FlowModel): string | null {
     if (model.serveOnly) {
         return `${model.base} is serve-only: GGUF weights cannot be trained.`;
     }
-    if (!model.dataset) {
-        return "Attach a dataset first: training needs examples.";
-    }
     return null;
 }
 
@@ -441,9 +438,7 @@ export function TrainingJobsList({ scope, actions }: { scope?: FlowModel; action
                                         className="py-6 text-center text-muted-foreground"
                                     >
                                         {all.length === 0
-                                            ? scope?.dataset === null
-                                                ? "No training runs yet. Attach a dataset on the Data page first."
-                                                : "No training runs yet."
+                                            ? "No training runs yet."
                                             : "No jobs match these filters."}
                                     </TableCell>
                                 </TableRow>
@@ -476,7 +471,7 @@ function TrainPicker({ open, onClose }: { open: boolean; onClose: () => void }) 
                 <DialogHeader>
                     <DialogTitle>Train which model?</DialogTitle>
                     <DialogDescription>
-                        Its next version trains from its base on its attached data.
+                        Its next version trains from its base on its dataset.
                     </DialogDescription>
                 </DialogHeader>
                 {custom.length === 0 ? (

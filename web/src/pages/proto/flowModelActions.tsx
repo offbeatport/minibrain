@@ -103,7 +103,7 @@ function MoreMenu({ model }: { model: FlowModel }) {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     onSelect={later(
-                                        `Would copy ${model.name} with its data and settings.`,
+                                        `Would copy ${model.name} with its settings; pick another dataset for the copy.`,
                                     )}
                                 >
                                     <CopyPlus />

@@ -23,6 +23,7 @@ import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "~/components/CopyButton";
 import { PanelSection, PanelSections } from "~/components/Section";
 import { StatusText } from "~/components/models/StatusText";
+import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { Inline } from "./flowHeader";
 import { useCan } from "./flowOverlays";
@@ -35,6 +36,8 @@ import {
     applyUpdate,
     compareHref,
     createKey,
+    datasetHref,
+    datasetOf,
     deleteVariantFiles,
     deleteVersions,
     deployVariants,
@@ -59,7 +62,24 @@ import { MakeLiveButton, ScoreBadge, Tip, VersionName, openConnect } from "./mod
 export function TrainingTab({ model }: { model: FlowModel }) {
     const state = useFlowState();
     const pending = pendingFeedback(state, model.slug).length;
+    const dataset = datasetOf(model);
     const facts = [
+        <span key="dataset">
+            {"Dataset "}
+            {dataset ? (
+                <>
+                    <Link
+                        href={datasetHref(dataset.slug)}
+                        className="font-medium text-foreground hover:underline"
+                    >
+                        {dataset.name}
+                    </Link>
+                    {` v${dataset.version} · ${count(dataset.rows)} rows`}
+                </>
+            ) : (
+                <span className="text-foreground">none yet</span>
+            )}
+        </span>,
         pending > 0 ? (
             <span key="pending" className="flex items-baseline gap-2">
                 {`${pending} feedback ${pending === 1 ? "row" : "rows"} to review`}
@@ -79,11 +99,9 @@ export function TrainingTab({ model }: { model: FlowModel }) {
     ];
     return (
         <div className="flex flex-col gap-2">
-            {(pending > 0 || model.accepted > 0) && (
-                <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-muted-foreground tabular-nums">
-                    <Inline items={facts} />
-                </p>
-            )}
+            <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-muted-foreground tabular-nums">
+                <Inline items={facts} />
+            </p>
             <PanelSections>
                 <TrainingChart model={model} />
                 <TrainingJobsList scope={model} actions={<TrainButton model={model} />} />

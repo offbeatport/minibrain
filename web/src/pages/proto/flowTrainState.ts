@@ -27,6 +27,7 @@ import {
 } from "./flowTrainPlan";
 import {
     type FlowModel,
+    attachDataset,
     datasetOf,
     jobHref,
     jobOfVersion,
@@ -58,21 +59,35 @@ export function useTrainer(model: FlowModel) {
     const router = useRouter();
     const toast = useToast();
     const state = useFlowState();
-    const picks: DataPick[] = dataPicks(model);
-    const dataset = datasetOf(model);
+    const bound = datasetOf(model);
+    const [choice, setChoice] = useState<string | null>(null);
+    const dataset = bound ?? state.datasets.find((item) => item.slug === choice);
+    const picks: DataPick[] = dataPicks(model, dataset);
     const [picked, setPicked] = useState(picks[0]?.number ?? 0);
     const [basis, setBasis] = useState<Quality>("balanced");
     const [recipe, setRecipe] = useState<Recipe>(presetRecipe("balanced"));
-    const [compute, setCompute] = useState<ComputeChoice>("auto");
+    const [computeChoice, setCompute] = useState<ComputeChoice | null>(null);
 
     const base = baseOf(model);
     const pick = picks.find((item) => item.number === picked) ?? picks[0] ?? null;
     const live = liveData(model);
-    const heldOut = model.heldOut;
+    const heldOut = bound ? model.heldOut : (dataset?.split[1] ?? model.heldOut);
     const trainRows = Math.max(0, (pick?.rows ?? 0) - heldOut);
     const available = trainRows + model.accepted;
-    const longest = longestExample(model);
-    const input = { base, available, heldOut, longest, compute, busy: busyOf(state, model.slug) };
+    const longest = longestExample(dataset?.slug ?? null);
+    const busy = busyOf(state, model.slug);
+    const best = makePlan({
+        base,
+        available,
+        heldOut,
+        longest,
+        compute: "auto",
+        busy,
+        recipe,
+    }).pick;
+    const compute: ComputeChoice =
+        computeChoice ?? (best ? `machine:${best.machine.name}` : "auto");
+    const input = { base, available, heldOut, longest, compute, busy };
     const plan = makePlan({ ...input, recipe });
     const quality = qualityOf(recipe);
     const minutes = Object.fromEntries(
@@ -84,7 +99,7 @@ export function useTrainer(model: FlowModel) {
     const issues = errorsOf(recipe, base, plan);
     const blocker: Issue | null = pick
         ? (issues[0] ?? null)
-        : { field: "data", text: "No dataset", detail: null };
+        : { field: "data", text: "Pick a dataset", detail: null };
     const number = nextNumber(model);
     const shown = shownMachine(plan, compute);
     const option: Option | null = shown ? (shown.chosen ?? shown.smallest) : null;
@@ -102,8 +117,11 @@ export function useTrainer(model: FlowModel) {
 
     const start = () => {
         const target = plan.pick;
-        if (!ready || !pick || !target?.chosen) {
+        if (!ready || !pick || !dataset || !target?.chosen) {
             return;
+        }
+        if (!bound) {
+            attachDataset(model.slug, dataset.slug);
         }
         const made = startTraining(
             model.slug,
@@ -120,12 +138,13 @@ export function useTrainer(model: FlowModel) {
         );
         const job = jobOfVersion(model.slug, made);
         closeTrain();
+        const where =
+            target.wait > 0 && target.after
+                ? `Job #${job} queued on ${target.machine.name} after ${target.after}.`
+                : `Job #${job} on ${target.machine.name}.`;
         toast({
             title: `Training v${made} of ${model.name}`,
-            description:
-                target.wait > 0 && target.after
-                    ? `Job #${job} queued on ${target.machine.name} after ${target.after}.`
-                    : `Job #${job} on ${target.machine.name}.`,
+            description: bound ? where : `Bound to ${dataset.name}. ${where}`,
             tone: "success",
         });
         if (job) {
@@ -138,6 +157,9 @@ export function useTrainer(model: FlowModel) {
         number,
         base,
         dataset,
+        binding: !bound,
+        choice,
+        setChoice,
         picks,
         pick,
         setPicked,

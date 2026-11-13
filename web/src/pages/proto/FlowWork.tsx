@@ -219,8 +219,11 @@ export function FlowDatasetPage() {
     const toast = useToast();
     const target = useSearchParam("for");
     const item = state.datasets.find((entry) => entry.slug === slug);
-    const custom = state.models.filter((model) => model.kind === "custom");
-    const [model, setModel] = useState(target ?? state.focus ?? custom[0]?.slug ?? "");
+    const unbound = state.models.filter((entry) => entry.kind === "custom" && !entry.dataset);
+    const [picked, setModel] = useState(target ?? state.focus ?? "");
+    const model = unbound.some((entry) => entry.slug === picked)
+        ? picked
+        : (unbound[0]?.slug ?? "");
     if (!item) {
         return (
             <Page>
@@ -252,20 +255,30 @@ export function FlowDatasetPage() {
                 }
                 actions={
                     <>
-                        <Select value={model} onValueChange={(value) => setModel(String(value))}>
-                            <SelectTrigger aria-label="Model" className="w-auto min-w-48">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {custom.map((entry) => (
-                                    <SelectItem key={entry.slug} value={entry.slug}>
-                                        {entry.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <Button disabled={!model} onClick={attach}>
-                            Use for this model
+                        {unbound.length > 0 && (
+                            <>
+                                <Select
+                                    value={model}
+                                    onValueChange={(value) => setModel(String(value))}
+                                >
+                                    <SelectTrigger aria-label="Model" className="w-auto min-w-48">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {unbound.map((entry) => (
+                                            <SelectItem key={entry.slug} value={entry.slug}>
+                                                {entry.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button variant="outline" disabled={!model} onClick={attach}>
+                                    Use for this model
+                                </Button>
+                            </>
+                        )}
+                        <Button asChild>
+                            <Link href={`${FLOW}/models/new?dataset=${item.slug}`}>New model</Link>
                         </Button>
                     </>
                 }

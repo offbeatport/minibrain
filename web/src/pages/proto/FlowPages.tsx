@@ -24,6 +24,7 @@ import { type Identity, NameAvatarField, newIdentity } from "~/components/avatar
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
+import { DatasetPicker } from "./flowDatasetPicker";
 import { useCan } from "./flowOverlays";
 import {
     CATALOG,
@@ -33,6 +34,7 @@ import {
     RECIPES,
     type Recipe,
     applyUpdate,
+    attachDataset,
     catalogEntry,
     createFromRecipe,
     createModel,
@@ -408,6 +410,10 @@ export function FlowAddModelPage() {
     const initial = catalogEntry(useSearchParam("base"))?.id ?? CATALOG[0].id;
     const [base, setBase] = useState(initial);
     const state = useFlowState();
+    const wanted = useSearchParam("dataset");
+    const [dataset, setDataset] = useState<string | null>(
+        () => state.datasets.find((item) => item.slug === wanted)?.slug ?? null,
+    );
     const names = new Set(state.models.map((model) => model.name.toLowerCase()));
     const taken = (name: string) => names.has(name.toLowerCase());
     const [identity, setIdentity] = useState<Identity>(() => newIdentity(taken));
@@ -424,16 +430,16 @@ export function FlowAddModelPage() {
     const create = (event: FormEvent) => {
         event.preventDefault();
         const slug = createModel(display, base, identity.avatar);
+        if (dataset) {
+            attachDataset(slug, dataset);
+        }
         markVisited("infra-add");
         router.history.push(modelHref(slug));
     };
     return (
         <Page>
             <Crumbs items={[{ label: "Models", href: `${FLOW}/models` }, { label: "Add model" }]} />
-            <PageHeader
-                title="Add model"
-                caption="Pick a base and a name. Data and training come next, on its Training tab."
-            />
+            <PageHeader title="Add model" caption="Pick a base, its dataset and a name." />
             <form onSubmit={create} className="flex max-w-2xl flex-col gap-field">
                 <fieldset className="flex flex-col gap-label">
                     <legend className="mb-2 font-medium">Base</legend>
@@ -454,6 +460,13 @@ export function FlowAddModelPage() {
                     >
                         More bases in Discover →
                     </Link>
+                </fieldset>
+                <fieldset className="flex flex-col gap-label">
+                    <legend className="mb-2 font-medium">
+                        Dataset{" "}
+                        <span className="font-normal text-muted-foreground">· optional</span>
+                    </legend>
+                    <DatasetPicker value={dataset} onChange={setDataset} later />
                 </fieldset>
                 <NameAvatarField
                     id="add-name"

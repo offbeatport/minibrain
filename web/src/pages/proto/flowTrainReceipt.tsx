@@ -14,6 +14,7 @@ import {
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { count } from "~/lib/format";
+import { DatasetPicker } from "./flowDatasetPicker";
 import { ComputeFields, DataFields, FieldGrid, QualityFields } from "./flowTrainAdvanced";
 import {
     FOCUS_RING,
@@ -155,7 +156,7 @@ function General({ t }: { t: Trainer }) {
             value: item.id,
             icon: QUALITY_ICON[item.id],
             title: item.label,
-            primary: qualityTime(t.minutes[item.id]),
+            primary: t.pick ? qualityTime(t.minutes[item.id]) : "–",
             secondary: `rank ${preset.rank} · ${plural(preset.epochs, "epoch")}`,
         };
     });
@@ -170,23 +171,13 @@ function General({ t }: { t: Trainer }) {
             .join(" · "),
     }));
     const computeCards: Card<ComputeChoice>[] = [
-        {
-            value: "auto",
-            icon: Gauge,
-            title: "Auto",
-            primary: auto ? (
-                approx(auto.minutes)
-            ) : (
-                <span className="text-destructive">nothing fits</span>
-            ),
-            secondary: auto?.machine.name,
-            disabled: !auto,
-        },
         ...t.plan.machines.map((item) => ({
             value: `machine:${item.machine.name}` as ComputeChoice,
             icon: item.machine.device === "cpu" ? Cpu : Server,
             title: item.machine.name,
-            primary: item.chosen ? (
+            primary: !t.pick ? (
+                "–"
+            ) : item.chosen ? (
                 approx(item.minutes)
             ) : (
                 <span className="text-destructive">{item.reason}</span>
@@ -194,9 +185,32 @@ function General({ t }: { t: Trainer }) {
             secondary: `${item.machine.memoryGb} GB · ${item.machine.accelerator.replace("NVIDIA ", "")}`,
             disabled: !item.chosen,
         })),
+        {
+            value: "auto",
+            icon: Gauge,
+            title: "Auto",
+            primary: !t.pick ? (
+                "–"
+            ) : auto ? (
+                approx(auto.minutes)
+            ) : (
+                <span className="text-destructive">nothing fits</span>
+            ),
+            secondary: auto?.machine.name,
+            disabled: !auto,
+        },
     ];
     return (
         <>
+            {t.binding && (
+                <Section id="train-data" label="Dataset">
+                    <DatasetPicker
+                        value={t.choice}
+                        onChange={t.setChoice}
+                        className="sm:grid-cols-2"
+                    />
+                </Section>
+            )}
             <Section id="train-quality" label="Quality">
                 <Cards<Quality>
                     label="Quality"
@@ -206,23 +220,23 @@ function General({ t }: { t: Trainer }) {
                     className="grid-cols-1 sm:grid-cols-3"
                 />
             </Section>
-            <Section
-                id="train-data"
-                label={t.dataset ? `Data · ${t.dataset.slug}` : "Data"}
-                aside={<HeldOutNote t={t} />}
-            >
-                {t.pick ? (
-                    <Cards<string>
-                        label="Data version"
-                        value={String(t.pick.number)}
-                        cards={dataCards}
-                        onChange={(next) => t.setPicked(Number(next))}
-                        className="grid-cols-1 sm:grid-cols-3"
-                    />
-                ) : (
-                    <p className="text-destructive">No dataset</p>
-                )}
-            </Section>
+            {!t.binding && (
+                <Section
+                    id="train-data"
+                    label={t.dataset ? `Data · ${t.dataset.slug}` : "Data"}
+                    aside={<HeldOutNote t={t} />}
+                >
+                    {t.pick && (
+                        <Cards<string>
+                            label="Data version"
+                            value={String(t.pick.number)}
+                            cards={dataCards}
+                            onChange={(next) => t.setPicked(Number(next))}
+                            className="grid-cols-1 sm:grid-cols-3"
+                        />
+                    )}
+                </Section>
+            )}
             <Section id="train-compute" label="Compute">
                 <Cards<ComputeChoice>
                     label="Compute"
@@ -295,9 +309,9 @@ function Settings({ t }: { t: Trainer }) {
 }
 
 function Receipt({ t }: { t: Trainer }) {
-    const pick = t.plan.pick;
-    const shown = t.shown;
-    const option = t.option;
+    const pick = t.pick ? t.plan.pick : null;
+    const shown = t.pick ? t.shown : null;
+    const option = t.pick ? t.option : null;
     const queue =
         pick && pick.ahead > 0
             ? `#${pick.ahead + 1} · ${duration(pick.wait)} wait`
@@ -358,9 +372,15 @@ function Receipt({ t }: { t: Trainer }) {
                     </Stat>
                     {shown && option && <MemoryTrack option={option} machine={shown.machine} />}
                 </div>
-                <Stat label="Rows">{count(t.plan.rows)}</Stat>
+                <Stat label="Rows">{t.pick ? count(t.plan.rows) : "–"}</Stat>
                 <Stat label="Held out">
-                    <span className={cn(t.lowHeldOut && "text-warning")}>{count(t.heldOut)}</span>
+                    {t.pick ? (
+                        <span className={cn(t.lowHeldOut && "text-warning")}>
+                            {count(t.heldOut)}
+                        </span>
+                    ) : (
+                        "–"
+                    )}
                 </Stat>
                 <Stat label="Steps">{pick ? count(pick.steps) : "–"}</Stat>
                 <Stat label="Queue">{queue}</Stat>

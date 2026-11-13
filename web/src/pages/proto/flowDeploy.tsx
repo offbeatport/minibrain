@@ -361,10 +361,18 @@ export function DeployForm({
                             </span>
                         </span>
                     </label>
-                    {[...serving, ...jobsOnly].map((fit) => (
+                    {serving.map((fit) => (
                         <PoolOption key={fit.pool.name} fit={fit} value={fit.pool.name} />
                     ))}
                 </RadioGroup>
+                {jobsOnly.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                        {"Jobs only, not for serving: "}
+                        <span className="font-mono">
+                            {jobsOnly.map((fit) => fit.pool.name).join(", ")}
+                        </span>
+                    </p>
+                )}
             </Field>
             <Field
                 id="deploy-replicas"
