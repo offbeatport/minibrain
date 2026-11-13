@@ -259,10 +259,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Versions, Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
-  UI: Models › model › Train › Compute · API: GET /api/models/{name}/training-plan
+  UI: Models › model › Train › Pool · API: GET /api/models/{name}/training-plan
 - **Training pool** · shipped · ml, admin
   Train on a chosen pool; only its workers claim the job.
-  UI: Models › model › Train › Compute, Models › model › Train › Training › Machine · API: GET /api/models/{name}/training-plan, POST /api/models/{name}/versions
+  UI: Models › model › Train › Pool, Models › model › Train › Training › Machine · API: GET /api/models/{name}/training-plan, POST /api/models/{name}/versions
 - **QLoRA training** · partial · ml, admin
   Train a 4-bit base with bitsandbytes on CUDA, ROCm or Intel GPUs.
   UI: Models › model › Train · Roadmap: Training memory

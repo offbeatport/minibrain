@@ -155,7 +155,7 @@ function InstructionsRow({
 
 function ComputeRow({ run }: { run: TrainRun }) {
     return (
-        <FormRow id="train-compute" label="Compute">
+        <FormRow id="train-compute" label="Pool">
             <FormControl>
                 <PickSelect
                     id="train-compute"
