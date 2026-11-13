@@ -7,3 +7,6 @@ web/node_modules/
 web/dist/
 dist/
 sbom/
+
+CLAUDE.md
+CLAUDE.local.md
