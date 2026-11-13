@@ -409,10 +409,13 @@ export function AddModelPage() {
                                     <FormControl width="text">{node}</FormControl>
                                 </FormRow>
                                 <FormRow
+                                    id="create-api-name"
                                     label="API name"
                                     tip="Apps call the model by this name. It never changes, and is never reused."
                                 >
-                                    <ApiNameHint name={name} bare />
+                                    <FormControl width="text">
+                                        <ApiNameHint name={name} bare />
+                                    </FormControl>
                                 </FormRow>
                             </>
                         ),

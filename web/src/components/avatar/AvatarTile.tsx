@@ -4,12 +4,13 @@ import { styleById } from "./avatarStyles";
 import { type AvatarChoice, avatarSvg, useDicebear } from "./avatarSvg";
 import { usePalette } from "./palette";
 
-export type AvatarSize = "sm" | "md" | "lg" | "xl" | "hero" | "fill";
+export type AvatarSize = "sm" | "md" | "lg" | "field" | "xl" | "hero" | "fill";
 
 const AVATAR_TILE: Record<AvatarSize, string> = {
     sm: "size-5",
     md: "size-8",
     lg: "size-12",
+    field: "size-16",
     xl: "size-24",
     hero: "size-[calc(3rem*var(--hero-scale))] rounded-[calc((var(--radius)_-_2px)*var(--hero-scale))] border-[length:calc(1px*var(--hero-scale))]",
     fill: "size-full",
@@ -19,6 +20,7 @@ const AVATAR_PX: Record<AvatarSize, number> = {
     sm: 20,
     md: 32,
     lg: 48,
+    field: 64,
     xl: 96,
     hero: 120,
     fill: 40,

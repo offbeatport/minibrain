@@ -16,7 +16,7 @@ import { TONE_KEYS, TONE_LABELS } from "~/components/avatar/tones";
 import { type Lowest, RENDER_SIZES, type RenderedRow, measureRendered } from "./avatarContrast";
 import { MODELS, type SampleModel } from "./modelIcons";
 
-const SIZES: Exclude<AvatarSize, "xl" | "hero" | "fill">[] = ["lg", "md", "sm"];
+const SIZES: Exclude<AvatarSize, "field" | "xl" | "hero" | "fill">[] = ["lg", "md", "sm"];
 
 function Strip({ style }: { style: AvatarStyle }) {
     return (
@@ -102,9 +102,10 @@ function LogoLabel({ logo, name }: { logo: ReactNode; name: string }) {
 
 function MixedRow({ style }: { style: AvatarStyle }) {
     const [first, second, third] = [MODELS[0], MODELS[2], MODELS[4]];
-    const tile = (model: SampleModel, size: Exclude<AvatarSize, "xl" | "hero" | "fill">) => (
-        <AvatarTile choice={choiceFor(style.id, model.name)} name={model.name} size={size} />
-    );
+    const tile = (
+        model: SampleModel,
+        size: Exclude<AvatarSize, "field" | "xl" | "hero" | "fill">,
+    ) => <AvatarTile choice={choiceFor(style.id, model.name)} name={model.name} size={size} />;
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <span className="text-sm text-muted-foreground">

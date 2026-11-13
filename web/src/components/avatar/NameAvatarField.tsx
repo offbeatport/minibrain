@@ -126,7 +126,7 @@ export function NameAvatarField({
             setLocks((held) => ({ ...held, name: null }));
         }
     };
-    const avatarButton = (size: "md" | "xl") => (
+    const avatarButton = (size: "md" | "field") => (
         <Tooltip>
             <TooltipTrigger asChild>
                 <button
@@ -217,7 +217,7 @@ export function NameAvatarField({
         return (
             <>
                 {rows.name(field)}
-                {rows.avatar(avatarButton("xl"))}
+                {rows.avatar(avatarButton("field"))}
                 {picker}
             </>
         );

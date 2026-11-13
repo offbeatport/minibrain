@@ -1,3 +1,4 @@
+import { Input } from "obp-ui";
 import { useDeferredValue } from "react";
 import { useApiName } from "~/api/queries";
 
@@ -10,8 +11,15 @@ export function ApiNameHint({ name, bare = false }: { name: string; bare?: boole
     }
     if (bare) {
         return (
-            <span className="flex flex-wrap items-baseline gap-x-2">
-                <span className="font-mono">{found.api_name}</span>
+            <span className="flex flex-col gap-1">
+                <Input
+                    id="create-api-name"
+                    value={found.api_name}
+                    disabled
+                    readOnly
+                    aria-label="API name"
+                    className="font-mono"
+                />
                 {found.reserved && (
                     <span className="text-sm text-muted-foreground">
                         {`${found.reserved.name} belonged to a deleted model`}
