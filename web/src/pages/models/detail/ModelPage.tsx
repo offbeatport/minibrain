@@ -32,7 +32,6 @@ import { MonitoringTab } from "./monitoring";
 import { HealthNotice, TeardownNotice } from "./parts";
 import { SettingsTab } from "./settings";
 import { TAB_LABELS, tabsFor, useModelTab } from "./tabs";
-import { TrainingTab } from "./training";
 import { UsagePanel } from "./usage";
 import { VersionView, useVersionNumber } from "./version";
 import { VersionsTab } from "./versions";
@@ -281,9 +280,6 @@ function Loaded({ row }: { row: ModelRow }) {
                 )}
                 {tab === "versions" && (
                     <VersionsTab row={row} detail={modelDetail} versions={list} />
-                )}
-                {tab === "training" && (
-                    <TrainingTab row={row} detail={modelDetail} versions={list} />
                 )}
                 {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
                 {tab === "api" && <KeysTab row={row} detail={modelDetail} />}

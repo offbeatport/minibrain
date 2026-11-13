@@ -33,7 +33,7 @@ import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { TRAIN_KIND, jobPageHref } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
-import { TRAINING_PATH, jobHref, modelPageHref, trainHref, trainingHref } from "~/lib/modelLinks";
+import { TRAINING_PATH, jobHref, modelPageHref, trainHref } from "~/lib/modelLinks";
 import { JobPage } from "../jobs/JobPage";
 import {
     ATTEMPT_COLUMN,
@@ -371,5 +371,5 @@ export function TrainingItemPage() {
     if (/^\d+$/.test(id)) {
         return <JobPage />;
     }
-    return <Redirect to={trainingHref(id)} />;
+    return <Redirect to={modelPageHref(id, "versions")} />;
 }

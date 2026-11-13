@@ -166,7 +166,7 @@ export function LossSection({ job, metrics }: { job: JobDetail; metrics: JobMetr
         <PanelSection
             icon={ChartLine}
             title="Loss"
-            description={
+            tip={
                 previous && previous.points.length > 0
                     ? "Training and held-out loss per step, with the previous run behind them."
                     : "Training loss per step, held-out loss at each evaluation."
@@ -218,7 +218,7 @@ export function RateSection({ metrics }: { metrics: JobMetrics | undefined }) {
         <PanelSection
             icon={TrendingDown}
             title="Learning rate"
-            description="How far each step moves the weights: it warms up, then decays."
+            tip="How far each step moves the weights: it warms up, then decays."
         >
             <StepChart
                 rows={rows}

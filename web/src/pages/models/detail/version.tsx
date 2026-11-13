@@ -38,15 +38,26 @@ import {
 import { type ReactNode, useState } from "react";
 import {
     type ExampleAnswer,
+    type JobDetail,
     type JobInfo,
     type ModelRow,
     type VersionInfo,
     api,
     unwrap,
 } from "~/api/client";
-import { keys, useAllModels, useJobs, useVersionFiles, useVersions } from "~/api/queries";
+import { useJobMetrics } from "~/api/jobPageQueries";
+import {
+    isActiveJob,
+    keys,
+    useAllModels,
+    useJob,
+    useJobs,
+    useVersionFiles,
+    useVersions,
+} from "~/api/queries";
 import { CopyButton } from "~/components/CopyButton";
 import { Facts } from "~/components/Facts";
+import { JobLogsSection } from "~/components/JobLogs";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
@@ -61,6 +72,7 @@ import {
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
+import { LossSection, RateSection } from "../../jobs/TrainingPanel";
 import { ConfirmAction, type Confirmation } from "../dialogs";
 import { CompactHeader, Crumbs, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
 import {
@@ -71,7 +83,7 @@ import {
     points,
     versionLabel,
 } from "./makeLive";
-import { VersionStatus } from "./versions";
+import { VersionStatus, runJob, trainingText } from "./versions";
 
 export function useAnswers(slug: string, number: number, against: number | null, enabled: boolean) {
     return useQuery({
@@ -312,7 +324,7 @@ function Progress({
         <PanelSection
             icon={Hourglass}
             title="Progress"
-            tip={`Scored against ${live ? `live v${live.number} and ` : ""}v0 · Baseline when it finishes; loss and logs are on the job page.`}
+            tip={`Scored against ${live ? `deployed v${live.number} and ` : ""}v0 · Baseline when it finishes.`}
         >
             <div className="flex flex-col gap-2">
                 <VersionStatus row={row} version={version} />
@@ -375,22 +387,28 @@ function jobText(job: JobInfo): string {
     return `${job.kind === "train" ? "Training" : "Scoring"} job #${job.id}${took ? ` · ${took}` : ""} →`;
 }
 
-function madeBy(version: VersionInfo, jobs: JobInfo[]): JobInfo | undefined {
-    const own = jobs.filter((job) => job.version === version.number);
-    return (
-        own.find((job) => job.kind === "train") ??
-        own.find((job) => job.kind === "eval") ??
-        version.job ??
-        undefined
-    );
+function machineText(version: VersionInfo, job: JobDetail | undefined): string | null {
+    const parts = [job?.host, job?.device].filter(Boolean);
+    if (parts.length > 0) {
+        return parts.join(" · ");
+    }
+    const plan = (version.recipe as { plan?: { machine?: unknown } }).plan;
+    return typeof plan?.machine === "string" ? plan.machine : null;
 }
 
 function MadeFrom({
     row,
     versions,
     version,
-}: { row: ModelRow; versions: VersionInfo[]; version: VersionInfo }) {
-    const jobs = useJobs(row.key);
+    job,
+    detail,
+}: {
+    row: ModelRow;
+    versions: VersionInfo[];
+    version: VersionInfo;
+    job: JobInfo | undefined;
+    detail: JobDetail | undefined;
+}) {
     const live = isDeployed(row) ? liveOf(versions) : undefined;
     const since =
         live && live.number !== version.number && live.dataset_version_rows
@@ -410,7 +428,9 @@ function MadeFrom({
         [
             "Method",
             version.kind === "prompt" ? (
-                <span key="method">Prompt only: the base with the instructions, no training</span>
+                <span key="method">
+                    Instructions only: the base with its instructions, no training
+                </span>
             ) : (
                 <Tip
                     key="method"
@@ -423,8 +443,18 @@ function MadeFrom({
             ),
         ],
     ];
+    parts.push(["Training", <span key="training">{trainingText(version)}</span>]);
     if (version.kind !== "prompt") {
         parts.push(["Settings", <span key="settings">{settingsText(version)}</span>]);
+    }
+    const machine = machineText(version, detail);
+    if (machine) {
+        parts.push([
+            "Machine",
+            <span key="machine" className="font-mono text-sm">
+                {machine}
+            </span>,
+        ]);
     }
     if (version.duplicated_from) {
         parts.push([
@@ -438,7 +468,6 @@ function MadeFrom({
             </Link>,
         ]);
     }
-    const job = madeBy(version, jobs.data ?? []);
     if (job) {
         parts.push([
             "Job",
@@ -816,11 +845,26 @@ function LiveButton({
     );
 }
 
+function Curves({ job }: { job: JobDetail }) {
+    const metrics = useJobMetrics(job.id, isActiveJob(job));
+    return (
+        <>
+            <ErrorLine error={metrics.error} />
+            <LossSection job={job} metrics={metrics.data} />
+            <RateSection metrics={metrics.data} />
+        </>
+    );
+}
+
 export function VersionView({ row, number }: { row: ModelRow; number: number }) {
     const models = useAllModels();
     const versions = useVersions(row.key);
+    const jobs = useJobs(row.key);
     const list = versions.data ?? [];
     const version = list.find((item) => item.number === number);
+    const run = version ? runJob(version, jobs.data ?? []) : undefined;
+    const runDetail = useJob(run?.id ?? null);
+    const job = runDetail.data;
     const crumbs = modelCrumbs(row, [{ label: `v${number}` }]);
     if (!version) {
         return (
@@ -868,10 +912,12 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
                     <Progress row={row} versions={list} version={version} />
                 )}
                 {version.status === "failed" && <Failure version={version} />}
+                {job?.kind === "train" && <Curves key={job.id} job={job} />}
                 <Differs row={row} versions={list} version={version} />
-                <MadeFrom row={row} versions={list} version={version} />
+                <MadeFrom row={row} versions={list} version={version} job={run} detail={job} />
                 <Identifiers row={row} version={version} />
                 <Exports row={row} version={version} />
+                {run && <JobLogsSection key={run.id} job={job ?? run} anchor="logs" />}
             </PanelSections>
         </Page>
     );

@@ -54,7 +54,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › dataset › Versions › Compare · API: GET /api/dataset-versions/{dataset_version_id}/diff/{other_id}
 - **Change detection** · shipped · product, ml
   Know when sources or the query changed since the last version.
-  UI: Data › dataset, Models › model › Training
+  UI: Data › dataset, Models › model › Train › Data
 - **Version checks** · shipped · product, ml
   Catch duplicates, conflicts, imbalance, leakage and personal data before training.
   UI: Data › dataset › Checks · API: PUT /api/datasets/{slug}/checks/{check}/dismissal, DELETE /api/datasets/{slug}/checks/{check}/dismissal · Config: data.checks_off, data.majority_share, data.min_label_rows
@@ -139,7 +139,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Score history, a week of traffic and the next step.
   UI: Models › Quick look · API: GET /api/models/{name}/overview, GET /api/requests
 - **Model page** · shipped · product, ml, admin
-  One page per model: Overview, Versions, Training, Monitoring and API keys.
+  One page per model: Overview, Versions, Monitoring, API keys and Settings.
   UI: Models › model · API: GET /api/models/{name}/overview, GET /api/models/{name}, PATCH /api/models/{name}
 - **Model overview** · shipped · product, ml
   Usage by version, its facts, details and activity.
@@ -151,8 +151,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Traffic, latency, errors, versions, callers and requests of one model.
   UI: Models › model › Monitoring · API: GET /api/models/{name}/traffic, GET /api/requests
 - **Version page** · shipped · product, ml
-  A version's score, where it differs from live, its recipe and files.
-  UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers
+  A version's score, differences from live, its run, loss, logs and files.
+  UI: Models › model › Versions › version · API: GET /api/models/{name}/versions, GET /api/models/{name}/versions/{number}/answers, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events
 - **Model files** · shipped · ml, admin
   List weights or the live adapter's files with their SHA-256.
   UI: Models › model › View files · API: GET /api/models/{name}, GET /api/models/{name}/versions/{number}/files
@@ -203,7 +203,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Settings · API: PATCH /api/models/{name}, PUT /api/models/{name}/avatar
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
-  UI: Models › model › Training › How it's judged › Answers, Evaluations › version · API: GET /api/presets
+  UI: Models › model › Settings › Evaluation › Answers, Evaluations › version · API: GET /api/presets
 - **Label proposal** · shipped · product, ml
   Offer to restrict a chat assistant to labels found in its data.
   UI: Models › model · API: PUT /api/models/{name}/label-proposal/dismissal, PUT /api/models/{name}/contract
@@ -215,22 +215,22 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Task types
 - **General preset** · partial · product, ml
   A chat assistant in the organisation's language, formats and policies.
-  UI: Models › Add model, Models › model › How it's judged, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
+  UI: Models › Add model, Models › model › Settings › Evaluation, Evaluations › version, Playground · API: GET /api/presets, POST /api/models · Roadmap: Task types
 - **Text-to-SQL preset** · planned · ml
   Answer questions with SQL on your own schema.
   Roadmap: Task types
 - **Custom preset** · shipped · ml
   Bring chat JSONL with your own contract and graders.
-  UI: Models › model › Training › How it's judged › Answers · API: PUT /api/models/{name}/graders
+  UI: Models › model › Settings › Evaluation › Answers · API: PUT /api/models/{name}/graders
 - **Instructions** · shipped · product, ml
-  Write the system prompt; a prompt-only version tries it at once.
-  UI: Models › model › Training › Instructions · API: PUT /api/models/{name}/instructions, POST /api/models/{name}/versions
+  Edit the system prompt with each new version, which keeps its copy.
+  UI: Models › model › Train › Instructions · API: POST /api/models/{name}/versions, PUT /api/models/{name}/instructions
 - **Task engine** · shipped · ml
   One engine for chat examples, contracts, graders and promotion rules.
-  UI: Models › model › Training › How it's judged
+  UI: Models › model › Settings › Evaluation
 - **Contracts** · shipped · engineer, ml
   Free text or a JSON schema; breaking changes confirmed once live.
-  UI: Models › model › Training › How it's judged · API: POST /api/models/{name}/contract/check, PUT /api/models/{name}/contract
+  UI: Models › model › Settings › Evaluation › Answers · API: POST /api/models/{name}/contract/check, PUT /api/models/{name}/contract
 - **Chat template parity** · planned · ml
   Prove training and serving render the same prompt per base.
   Roadmap: Base model registry
@@ -243,8 +243,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
 
 ## Training
 - **Training data per model** · shipped · product, ml
-  Pick or map the dataset a model trains on.
-  UI: Models › model › Training › Training data · API: PUT /api/models/{name}/dataset, PUT /api/models/{name}/mapping, POST /api/models/{name}/query, GET /api/models/{name}/preview
+  One dataset per model, picked at creation; each run picks its version.
+  UI: Models › Add model, Models › model › Train › Data · API: PUT /api/models/{name}/dataset, PUT /api/models/{name}/mapping, POST /api/models/{name}/query, GET /api/models/{name}/preview
 - **LoRA training** · shipped · product, ml
   Train a LoRA version, fresh or from an earlier version's settings.
   UI: Models › model › Train, Versions › Train again · API: POST /api/models/{name}/versions
@@ -255,8 +255,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Tick jobs to cancel, retry or delete them together, each one audited.
   UI: Training › select runs, Jobs › select jobs · API: POST /api/jobs/cancel, POST /api/jobs/retry, POST /api/jobs/delete
 - **Versions** · shipped · product, ml
-  Keep immutable prompt-only and trained versions per model.
-  UI: Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}
+  One table of every version and its run, prompt-only or trained.
+  UI: Models › model › Versions, Evaluations · API: GET /api/models/{name}/versions, DELETE /api/models/{name}/versions/{number}
 - **Training memory planner** · shipped · ml, admin
   Pick LoRA or QLoRA, checkpointing and batch to fit the worker's memory.
   UI: Models › model › Train › Compute · API: GET /api/models/{name}/training-plan
@@ -291,7 +291,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Evaluation
 - **Prompt-only versions** · shipped · product, ml
   Get a scored version 0 the moment a model exists.
-  UI: Models › model › Training, Playground · API: POST /api/models/{name}/versions, POST /api/models/{name}/versions/{number}/test
+  UI: Models › model › Train › Instructions only, Playground · API: POST /api/models/{name}/versions, POST /api/models/{name}/versions/{number}/test
 - **Scores** · shipped · product, ml
   Score every version on the test set and held-out split.
   UI: Evaluations · API: GET /api/models/{name}/golden
@@ -426,10 +426,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
 - **Playground test examples** · shipped · product, ml
   Turn a wrong Playground answer into a test the next version faces.
-  UI: Playground › Save as test example, Models › model › Training › Test examples, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples
+  UI: Playground › Save as test example, Models › model › Settings › Test examples, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
-  UI: Models › model › Training › Feedback · API: GET /api/models/{name}/feedback/summary
+  UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary
 - **Retrain on new data** · planned · product, ml
   Retrain in one click when sources change.
   Roadmap: v2
@@ -553,7 +553,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Jobs · API: GET /api/jobs, GET /api/jobs/facets, GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, GET /api/artifacts/{artifact_id}
 - **Job page** · shipped · product, ml, admin
   One job's progress, settings, data, loss and log; delete it.
-  UI: Training › job, Jobs › job · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, DELETE /api/jobs/{job_id}
+  UI: Training › job, Jobs › job, Models › model › Versions › version · API: GET /api/jobs/{job_id}, GET /api/jobs/{job_id}/metrics, GET /api/jobs/{job_id}/events, POST /api/jobs/{job_id}/cancel, POST /api/jobs/{job_id}/retry, DELETE /api/jobs/{job_id}
 - **Job log** · shipped · ml, admin
   Read a job's own events apart from library output, by level.
   UI: Jobs › job › Logs · API: GET /api/jobs/{job_id}/events

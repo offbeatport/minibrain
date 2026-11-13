@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Gauge, Power, Settings2, TriangleAlert } from "lucide-react";
+import { Gauge, ListChecks, Power, Settings2, TriangleAlert } from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -29,6 +29,7 @@ import { CopyButton } from "~/components/CopyButton";
 import { FormRow, FormRows } from "~/components/FormRows";
 import { ErrorLine, PanelSection, PanelSections, errorMessage } from "~/components/Section";
 import { TAGS_HINT, editableTags } from "~/components/Tags";
+import { TestExamples } from "~/components/TestExamples";
 import { useCan } from "~/lib/access";
 import { JOBS_PATH, modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
@@ -36,6 +37,7 @@ import { beingDeleted, busyTearingDown, deleteModel, rowId } from "~/lib/teardow
 import { ChangeAvatarDialog } from "../ChangeAvatarDialog";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
 import { DuplicateModelDialog } from "../DuplicateModelDialog";
+import { AnswersRow, RubricRow } from "../JudgedRows";
 import { SwitchBaseDialog } from "../SwitchBaseDialog";
 import { PromotionEditor, metricsFor } from "../TaskFields";
 import { ConfirmAction, type Confirmation, splitTags, useModelsRefresh } from "../dialogs";
@@ -340,6 +342,7 @@ function Evaluation({
             }
         >
             <FormRows>
+                <AnswersRow detail={detail} />
                 <FormRow
                     label="Graders"
                     tip="The judge, when picked, comes first and gives the main score. Otherwise the first grader does."
@@ -378,6 +381,7 @@ function Evaluation({
                         </Select>
                     </FormRow>
                 )}
+                <RubricRow detail={detail} />
                 <FormRow
                     id="settings-rule"
                     label="Promotion rule"
@@ -541,6 +545,17 @@ export function SettingsTab({
                     detail={detail}
                     versions={versions}
                 />
+            )}
+            {custom && can.build && (
+                <PanelSection
+                    icon={ListChecks}
+                    anchor="test-examples"
+                    title="Test examples"
+                    tip="Saved from the Playground with the answer they should get. Each joins the held-out rows of the next version's data."
+                    bare
+                >
+                    <TestExamples slug={row.key} />
+                </PanelSection>
             )}
             {isDeployed(row) && <Deployment row={row} />}
             <Danger row={row} detail={detail} />

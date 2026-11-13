@@ -3,11 +3,9 @@ export const JOBS_PATH = "/jobs";
 export const API_KEYS_PATH = "/api-keys";
 const TRAIN_KIND = "train";
 
-export function trainingHref(slug: string): string {
-    return `/models/${encodeURIComponent(slug)}/training`;
-}
+export type TrainMethod = "sft" | "instructions";
 
-export type TrainFrom = { from?: number; data?: number };
+export type TrainFrom = { from?: number; data?: number; method?: TrainMethod };
 
 export function trainHref(slug: string, opts: TrainFrom = {}): string {
     const search = new URLSearchParams();
@@ -16,6 +14,9 @@ export function trainHref(slug: string, opts: TrainFrom = {}): string {
     }
     if (opts.data !== undefined) {
         search.set("data", String(opts.data));
+    }
+    if (opts.method === "instructions") {
+        search.set("method", opts.method);
     }
     const query = search.toString();
     return `/models/${encodeURIComponent(slug)}/train${query ? `?${query}` : ""}`;
@@ -59,14 +60,7 @@ export function jobHref(job: { id: number; kind: string }): string {
     return `${job.kind === TRAIN_KIND ? TRAINING_PATH : JOBS_PATH}/${job.id}`;
 }
 
-export type ModelTab =
-    | "overview"
-    | "versions"
-    | "training"
-    | "monitoring"
-    | "api"
-    | "settings"
-    | "files";
+export type ModelTab = "overview" | "versions" | "monitoring" | "api" | "settings" | "files";
 
 export function modelPageHref(name: string, tab: ModelTab = "overview"): string {
     const page = `/models/${encodeURIComponent(name)}`;

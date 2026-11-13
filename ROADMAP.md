@@ -71,7 +71,7 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
     labels, its graders and its view, and scores a prompt-only version with them when the data splits; Dismiss keeps
     it a Chat assistant and is remembered for that dataset version (`PUT
     /api/models/<slug>/label-proposal/dismissal`), so a later dataset version asks again.
-  - By hand: How it's judged → Answers → Edit picks free text (Chat assistant), one of these labels (Classify) or a
+  - By hand: Settings → Evaluation → Answers → Edit picks free text (Chat assistant), one of these labels (Classify) or a
     JSON schema (Custom), all through `PUT /api/models/<slug>/contract`. A new kind of answer moves the model to that
     kind's preset and resets its graders and promotion rule to the preset's defaults; the same kind keeps the preset.
 - The contract lives on each version and evolves additively: a new version may add enum values or optional fields
@@ -135,7 +135,7 @@ organisation, with per-person history, retrieval over company documents, sharing
 stays the tool for trying models with the API's settings and turning bad answers into test examples.
 
 Add model asks for a base, a dataset and a name; every model starts as a Chat assistant and narrows later (labels
-proposed when the dataset looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
+proposed when the dataset looks like a label set, or set in Settings › Evaluation › Answers; see Task types). Built (2026-11-06).
 
 ### Order
 
@@ -161,7 +161,7 @@ the mapping template, the version 0 prompt and the trained prompt per contract k
 checks, the default promotion rule and at most a results view. Adding Extract is one such file plus its
 view in the UI; `GET /api/presets` lists the presets, the ones coming and the graders.
 
-- Classify: a label set from the accepted proposal or the labels typed in How it's judged, joined by those found in
+- Classify: a label set from the accepted proposal or the labels typed in Settings › Evaluation › Answers, joined by those found in
   the data (new ones join it on the next version); mapping `input` → user, `label` → assistant; a version 0 prompt
   listing the labels and a trained prompt without them; graders `label_accuracy` (with `macro_f1`); checks at least
   two labels and label balance; the results view shows per-label counts and the confusion matrix, and feedback picks
@@ -176,7 +176,7 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
   teacher`, which will fill them from a teacher model. Try with sample data on the empty Models page creates a Chat
   assistant on the travel intents sample (base and name, like Add model); its model page then proposes the five
   intents as labels, which shows the narrowing flow rather than skipping it.
-- Custom: a JSON schema pasted in How it's judged (free text or labels through the API), any graders that fit it
+- Custom: a JSON schema pasted in Settings › Evaluation › Answers (free text or labels through the API), any graders that fit it
   (free text: exact match and text similarity; JSON: JSON valid and field match by default), optional instructions as
   the system prompt, chat JSONL (`messages`) as data.
 
@@ -210,8 +210,8 @@ dataset (2026-11-13). v0 is created at once as the untrained baseline (the base 
 on the dataset's held-out rows and deployable at once.
 
 A custom or base model's Settings tab (Builders, last tab) replaces the header's ⋯ menu: General (name, API name,
-avatar, description, tags), Evaluation (graders, judge, promotion rule) and a Danger zone (Switch base, Duplicate,
-Delete). Changing the graders or the judge asks to re-score every version and runs it as a `score` job, so versions
+avatar, description, tags), Evaluation (answers, graders, judge, judge rubric, promotion rule), Test examples and a
+Danger zone (Switch base, Duplicate, Delete). Changing the graders or the judge asks to re-score every version and runs it as a `score` job, so versions
 stay comparable; changing the promotion rule saves without re-scoring (2026-11-13).
 
 | Term | Meaning |
@@ -233,7 +233,7 @@ stay comparable; changing the promotion rule saves without re-scoring (2026-11-1
 ## Flow
 
 base + dataset + name → version 0 as a Chat assistant: prompt-only on the base at once, scored on the held-out rows
-→ narrow the answers (labels proposed from the data, or set in How it's judged) → stop here if it passes the promotion
+→ narrow the answers (labels proposed from the data, or set in Settings › Evaluation) → stop here if it passes the promotion
 rule and the cost is acceptable.
 
 Otherwise: source → DuckDB (query in place or stage) → mapping / SQL → built-in steps → teacher labels + human review
@@ -878,8 +878,7 @@ once it matches; only deleting a base removes its files.
 - The judge model is a setting: Settings → General → Judge model for the install (`GET`/`PUT /api/settings/judge`,
   audited as `settings.judge`) and a per-model override (`PUT /api/models/<slug>/judge`), any base on this install.
   The per-model judge, the graders and the promotion rule are set in the model's Settings tab; changing the judge or
-  the graders re-scores every version in one `score` job, and the Versions and Training tabs show "Scored by …" with
-  a link there.
+  the graders re-scores every version in one `score` job, and the Versions tab shows "Scored by …" with a link there.
   A preset with a default rubric (General) adds the judge to its graders once either is set, ahead of its other
   graders, so the judge score becomes the main metric. A judge turned on without a judge model uses the model's own
   base, and the model page says so.
@@ -966,14 +965,15 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
    shows "Version 3, plus N rows from feedback"); dataset versions themselves never hold feedback, so models that
    share a dataset do not see each other's. Feedback rows fall into the derived splits like any
    other row; sending the worst failures to the golden set waits for golden set authoring.
-5. The model page and the Training page show "Feedback since vN: total (accepted)" and the reviews still waiting;
-   "Train with feedback" trains a new version with the last trained version's recipe.
+5. The model's Overview shows the feedback waiting for review and the accepted rows, and every run from the Train page
+   merges the accepted rows into its training data (the old "Train with feedback" button left with the Training tab,
+   2026-11-13).
 6. Test examples (built 2026-11-06): Save as test example in the Playground, on the whole conversation or on one
    answer, opens the conversation up to that answer with the expected answer to fix first (the model's answer, or a
    label picked from the model's labels). `POST /api/models/<slug>/test-examples` (Builders) stores it as accepted
    feedback, with its turns (`feedback.messages`) and `split = 'eval'`, audited as `feedback.example`; it goes through
-   step 4 like any accepted row and lands in the held-out split of the next version's data. The model page lists
-   them (Test examples: conversation, expected answer, the model's answer, the version it was found on, who saved it),
+   step 4 like any accepted row and lands in the held-out split of the next version's data. The model's Settings tab
+   lists them (Test examples: conversation, expected answer, the model's answer, the version it was found on, who saved it),
    the Data page says per model in Used by how many it adds, and the Feedback page marks them as Playground test
    examples, where rejecting one takes it out again.
 
@@ -1150,7 +1150,7 @@ keys, and `/v1` stays key-only.
     and method filters (`?method=sft`; DPO, continued pretraining and reinforcement learning show as coming soon),
     a search, ticks with bulk Cancel and Retry. A row opens the job's page; the old `?job=<id>` redirects there.
     "Train a model" asks which model and opens `/models/<slug>/train`, the model's Train page.
-    `/training/<slug>`, the old per-model workspace, redirects to `/models/<slug>/training`.
+    `/training/<slug>`, the old per-model workspace, redirects to `/models/<slug>/versions`.
   - Evaluations lists every version: model, version, kind, held-out accuracy, change against the live version, created,
     status. A row opens its scores and held-out mistakes (`?version=<slug>@<n>`); Deploy sits on the row and in that
     view.
@@ -1251,10 +1251,12 @@ keys, and `/v1` stays key-only.
   avatar, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
   On base). Its actions, for Builders, are Train · Deploy · Use ▾ on a custom model and Create custom model · Deploy ·
   Use ▾ on a base (Use: Playground, Connect); Viewers get Use ▾. There is no ⋯ menu and no state-driven primary
-  button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Training · Monitoring · API keys ·
-  Settings for a custom model (Viewers lose Training and Settings), Overview · Monitoring · API keys · Settings for a
-  base (one installed format is one base, so there is no Variants tab); `data` and `keys` redirect to Training and API keys, and an unknown
-  tab to Overview.
+  button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Monitoring · API keys · Settings for a
+  custom model (Viewers lose Settings), Overview · Monitoring · API keys · Settings for a base (one installed format is
+  one base, so there is no Variants tab); `training` and `data` redirect to Versions, `keys` to API keys, and an
+  unknown tab to Overview. One training run makes exactly one version, so the Training tab merged into Versions
+  (2026-11-13): its runs and score columns are the Versions table, its loss curves and logs are on each version's page,
+  its instructions are on the Train page, and its answers, rubric and test examples are in Settings.
   - Overview: Usage, About and Details in sections titled outside their panels, Activity in a right column. Usage
     starts with a status line of one action computed on the server (`ModelPage.status`), broken first, then ship, then
     improve, then start: a failed teardown or bad health, errors at three times the usual rate, a failed newest
@@ -1270,28 +1272,37 @@ keys, and `/v1` stays key-only.
     base's SHA-256 with copy, the model card). Activity is the audit log filtered to the model, its versions, keys and
     jobs (`/api/models/<name>/activity`), as sentences with day separators and runs of three or more folded; All
     activity opens the audit log searched for it (Admins).
-  - Versions: a table with a Status column (dot and text), the main score and a badge against live ("beats live +1.4"
-    or "below rule", none on v0 · Baseline), Watch, Retry and Make vN live; ticking two compares them, ticking any
-    deletes them (the live one is kept), under a "Scored by" line. Then Instructions and How it's judged.
+  - Versions: one table of versions and their runs, under a "Scored by … · Change in Settings" line: Version (v0 ·
+    Baseline marked untrained), Status (Training 45% with a small progress bar, Queued, Scoring, Ready, Deployed,
+    Failed linked to its job), the main score with a badge against the deployed version ("beats live +1.4" or "below
+    rule", none on v0), Data (the dataset version, v10), Training (Fast, Balanced, Best, Custom, or Instructions for a
+    prompt-only version), Started and Duration of its run. A row has Deploy vN and Retry (the newest failed one), and a
+    ⋯ menu with Compare with…, Train again (`/models/<slug>/train?from=N`), Logs (its job) and Delete; ticking two
+    compares them, ticking any deletes them (the deployed one is kept).
   - A version's page (`/models/<name>/versions/<n>`): a breadcrumb, Make vN live (its confirmation says the direction,
     "v5 scores +1.4 over live v4" or "v4 replaces live v5 (−1.4)") and a ⋯ menu (Try in Playground as `name@N`, Compare
     with…, Copy the name, Model card, Export…, Delete version); then Score (against live and v0 · Baseline), Where it
-    differs (better and worse counts from the held-out answers, then the rows), Made from (data version, method,
-    settings, the training job), Identifiers and Exports. Export offers the adapter as a download today; merged
+    differs (better and worse counts from the held-out answers, then the rows), its run's loss (training and held-out
+    loss by step, with the previous run behind) and learning rate while or after it trains, Made from (dataset version,
+    method, training preset, settings, the machine, the job), Identifiers, Exports and the job's logs. Export offers the adapter as a download today; merged
     safetensors and GGUF say Coming soon. Compare (`/models/<name>/compare?a=&b=`) puts two versions in a
     `CompareTable` (scores, latency, data, settings), their differing answers (the answers API takes `against`) and a
     link to the data diff.
-  - Training: Score by version (the promotion rule as a dashed level, live marked) or Loss curves (the running job and
-    the last three runs, by share of training done); the model's training and scoring jobs, each opening
-    `/training/<job>`, with Train vN and Score prompt only; then training data, feedback and test examples.
-    Train vN opens the Train page (`/models/<slug>/train`, Builders): on the left Method (SFT), Data (dataset version,
-    its rows, held out and difference against the deployed version), Training (Fast · Balanced · Best, each with rank,
-    epochs and the planner's time, or Custom) and Compute (Automatic, then every training machine by pool, one that
-    does not fit disabled with the reason); under them Parameters in two columns (adapter, optimisation, sequence,
-    memory, evaluation, seed), locked unless Custom, with a reset, re-planned live. On the right a sticky run summary:
-    the time, machine and pool, GPU-hours, the queue, the memory bar, rows, held out, the version it creates, planner
-    errors in red, and Train vN. Narrow screens stack it and keep Train vN in a bottom bar. The plan comes from the
-    real planner (`/training-plan` returns every machine, the time and the queue).
+  - Train (the header's Train) opens the Train page (`/models/<slug>/train`, Builders): on the left Method (Supervised
+    fine-tuning (SFT) or Instructions only (no training), `?method=instructions`), Instructions (the system prompt's
+    first line and Edit, which opens it; saved with the new version through `POST /api/models/<slug>/versions
+    {instructions}`, and each version keeps its own snapshot), Data (the model's dataset, fixed, and the version to
+    use, with the changed-since notice and its Update), Training (Fast · Balanced · Best, each with rank, epochs and the
+    planner's time, or Custom) and Compute (Automatic, then every training machine by pool, one that does not fit
+    disabled with the reason); under them Parameters in two columns (adapter, optimisation, sequence, memory,
+    evaluation, seed), locked unless Custom, with a reset, re-planned live; then Train vN and Cancel, with the first
+    problem beside a disabled Train vN. On the right a sticky run summary without buttons: the time, machine and pool,
+    GPU-hours, the queue, the memory bar, rows, held out, the version it creates and planner errors in red. Narrow
+    screens stack it and keep the buttons in a bottom bar. The plan comes from the real planner (`/training-plan`
+    returns every machine, the time and the queue). Instructions only hides Training, Compute and Parameters, makes a
+    prompt-only version scored at once, and its summary reads "Scores in ≈ N s on N held-out rows", timed from the
+    last prompt-only version's scoring job. A serve-only model (its base cannot train here) opens it in Instructions
+    only.
   - Monitoring: the range switch, then Traffic (requests, p95, p99, error rate and cost per 1,000 against the period
     before, and the shared chart), Latency (p50, p95, p99), Errors (the rate against the usual one and a table by
     status linking to the request log), By version, Callers (API keys) and the latest requests, all from
@@ -1307,11 +1318,10 @@ keys, and `/v1` stays key-only.
   and noun ("Brisk Heron") never held by a base or custom model, with an inline error when a typed one is taken.
   Typing a name or picking an avatar keeps it ("Name kept · Undo"), and Shuffle then rerolls only the other. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat
   assistant, 7B+ works best." The picker lists base models only; to start from one of your models, Duplicate it
-  (below). The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
-  part as a plain default with an Edit action, collapsed until opened: the answers (free text, one of these labels or
-  a JSON schema) with the contract number (after going live, a breaking change asks to confirm) and the judge's rubric;
-  graders, judge model and rule are in Settings. Its Instructions section edits the system prompt; saving makes a
-  prompt-only version that tries it at once.
+  (below). The model page proposes labels found in its data (see Task types), and Settings › Evaluation shows the
+  answers (free text, one of these labels or a JSON schema, with the contract number; after going live, a breaking
+  change asks to confirm) and the judge's rubric as plain defaults with an Edit action, beside the graders, judge
+  model and rule. The Train page's Instructions edit the system prompt with the next version.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for a chat assistant (capability, size tier favouring 7B and up, the catalogue's tested default; superseded
     models left out), then popularity. Being downloaded is not a ranking factor.

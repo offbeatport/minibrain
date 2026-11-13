@@ -6,14 +6,17 @@ import { type ModelTab, modelPageHref } from "~/lib/modelLinks";
 export const TAB_LABELS: Record<ModelTab, string> = {
     overview: "Overview",
     versions: "Versions",
-    training: "Training",
     monitoring: "Monitoring",
     api: "API keys",
     settings: "Settings",
     files: "Files",
 };
 
-const ALIASES: Record<string, ModelTab> = { data: "training", keys: "api" };
+const ALIASES: Record<string, ModelTab> = {
+    data: "versions",
+    training: "versions",
+    keys: "api",
+};
 
 export function tabsFor(row: ModelRow, builder: boolean): ModelTab[] {
     if (row.kind === "base") {
@@ -22,7 +25,7 @@ export function tabsFor(row: ModelRow, builder: boolean): ModelTab[] {
             : ["overview", "monitoring", "api"];
     }
     return builder
-        ? ["overview", "versions", "training", "monitoring", "api", "settings"]
+        ? ["overview", "versions", "monitoring", "api", "settings"]
         : ["overview", "versions", "monitoring", "api"];
 }
 

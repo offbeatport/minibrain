@@ -29,7 +29,7 @@ import { TAGS_HINT, editableTags, isSystemTag } from "~/components/Tags";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { metricName } from "~/lib/metrics";
-import { modelCardHref, modelPageHref, modelVersionHref } from "~/lib/modelLinks";
+import { modelCardHref, modelPageHref, modelVersionHref, trainHref } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import { splitTags, useModelsRefresh } from "../dialogs";
 import { Clipped, Fact, Group, Mono, Muted, Row, parametersText } from "./facts";
@@ -235,10 +235,7 @@ export function About({
     return (
         <AboutSection>
             <Fact label="Task">
-                <Clipped
-                    text={taskText(detail, preset?.label)}
-                    href={`${modelPageHref(row.key, "training")}#how-its-judged`}
-                />
+                <Clipped text={taskText(detail, preset?.label)} href={settingsHref(row.key)} />
             </Fact>
             <Fact label="Live">
                 {live ? (
@@ -260,7 +257,7 @@ export function About({
                         href={datasetHref(detail.dataset)}
                     />
                 ) : (
-                    <Clipped text="Add data" href={modelPageHref(row.key, "training")} />
+                    <Clipped text="Add data" href={trainHref(row.key)} />
                 )}
             </Fact>
             <Fact label="Deployed">
@@ -356,7 +353,6 @@ export function Details({
     const instructions = detail.instructions || detail.default_instructions;
     const firstLine = instructions.split("\n").find((line) => line.trim()) ?? "";
     const versionsHref = modelPageHref(row.key, "versions");
-    const trainingHref = modelPageHref(row.key, "training");
     const editLink = (href: string, label: string) =>
         can.build ? <EditLink href={href} label={label} /> : undefined;
     const splits = splitsText(detail);
@@ -373,7 +369,7 @@ export function Details({
                 </Row>
                 <Row
                     label="Instructions"
-                    edit={editLink(`${trainingHref}#instructions`, "Edit instructions")}
+                    edit={editLink(`${trainHref(row.key)}#instructions`, "Edit instructions")}
                 >
                     {firstLine ? (
                         <Clipped
@@ -407,7 +403,7 @@ export function Details({
                     <Row label="Test examples">
                         <Clipped
                             text={count(examples.data?.length ?? 0)}
-                            href={`${modelPageHref(row.key, "training")}#test-examples`}
+                            href={`${modelPageHref(row.key, "settings")}#test-examples`}
                         />
                     </Row>
                 )}

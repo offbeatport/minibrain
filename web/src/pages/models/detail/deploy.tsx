@@ -185,13 +185,20 @@ function TrainButton({
     base: BaseModelDetail | undefined;
 }) {
     const router = useRouter();
-    const blocked = trainBlock(row, detail, base);
+    const found = trainBlock(row, detail, base);
+    const serveOnly = detail?.serve_only ?? row.serve_only;
+    const promptOnly = Boolean(serveOnly) && found === serveOnly?.reason;
+    const blocked = promptOnly ? null : found;
     return (
-        <Tip tip={blocked}>
+        <Tip tip={promptOnly ? `${found} Instructions only.` : blocked}>
             <Button
                 variant="outline"
                 disabled={Boolean(blocked)}
-                onClick={() => router.history.push(trainHref(row.key))}
+                onClick={() =>
+                    router.history.push(
+                        trainHref(row.key, promptOnly ? { method: "instructions" } : {}),
+                    )
+                }
             >
                 <GraduationCap />
                 Train

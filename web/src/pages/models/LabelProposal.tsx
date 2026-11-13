@@ -4,7 +4,7 @@ import { Button, useToast } from "obp-ui";
 import { type LabelProposal, type ModelDetail, api, unwrap } from "~/api/client";
 import { ErrorLine, errorMessage } from "~/components/Section";
 import { evaluationsHref } from "~/lib/modelLinks";
-import { useContractChange } from "./JudgedSection";
+import { useContractChange } from "./JudgedRows";
 
 const SHOWN = 3;
 

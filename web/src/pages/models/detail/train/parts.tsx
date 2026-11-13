@@ -44,22 +44,6 @@ export function timeText(time: number | null | undefined): string {
           : `≈ ${duration(time)}`;
 }
 
-function signed(value: number): string {
-    return `${value >= 0 ? "+" : "−"}${count(Math.abs(value))}`;
-}
-
-export type DataRef = { id: number; number: number | null | undefined; rows: number };
-
-export function versusLive(pick: DataRef, live: DataRef | null): string | null {
-    if (!live) {
-        return null;
-    }
-    if (live.id === pick.id) {
-        return "live's data";
-    }
-    return `${signed(pick.rows - live.rows)} rows vs live's v${live.number ?? "–"}`;
-}
-
 const SEGMENTS = [
     {
         key: "weights",

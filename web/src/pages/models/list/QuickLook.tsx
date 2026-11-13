@@ -17,7 +17,7 @@ import { Sparkline } from "~/components/Sparkline";
 import { Requests } from "~/components/models/ModelMetrics";
 import { StatusText } from "~/components/models/StatusText";
 import type { Abilities } from "~/lib/access";
-import { playgroundHref, trainHref, trainingHref } from "~/lib/modelLinks";
+import { playgroundHref, trainHref } from "~/lib/modelLinks";
 import { REQUESTS_PATH, STATUS_TONES } from "~/lib/requests";
 import { bytes, relativeTime } from "~/lib/time";
 import { LiveStatus, ModelAvatar, Muted, StatusLineText } from "./cells";
@@ -199,7 +199,7 @@ function NextStep({ model, on }: { model: ListModel; on: Handlers }) {
         deploy: () => on.deploy([row]),
         review_feedback: () =>
             on.open(`/feedback?model=${encodeURIComponent(row.key)}&status=pending`),
-        add_data: () => on.open(trainingHref(row.key)),
+        add_data: () => on.open(trainHref(row.key)),
         train: () => on.open(trainHref(row.key)),
         switch_base: () => on.switchBase(row, next.base ?? null),
         create_custom: () => on.createFrom(row),

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
-import { Logs, MoreHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
+import { MoreHorizontal, SlidersHorizontal, Trash2 } from "lucide-react";
 import {
     Button,
     DropdownMenu,
@@ -8,7 +8,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Link,
-    LogViewer,
     useToast,
 } from "obp-ui";
 import { type ReactNode, useEffect, useState } from "react";
@@ -18,6 +17,7 @@ import { isActiveJob, useJob } from "~/api/queries";
 import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { DeleteJobsDialog, deleteRefusal, deleteSummary } from "~/components/DeleteJobs";
 import { Facts } from "~/components/Facts";
+import { JobLogsSection } from "~/components/JobLogs";
 import { canCancel, canRetry } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
@@ -25,15 +25,14 @@ import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components
 import { StatusText } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
+import { MODEL_JOB_KINDS, TRAIN_KIND, jobDuration, kindNoun, kindVerb } from "~/lib/jobs";
 import {
-    MODEL_JOB_KINDS,
-    TRAIN_KIND,
-    jobDuration,
-    kindNoun,
-    kindVerb,
-    useJobEvents,
-} from "~/lib/jobs";
-import { JOBS_PATH, TRAINING_PATH, jobHref, modelPageHref } from "~/lib/modelLinks";
+    JOBS_PATH,
+    TRAINING_PATH,
+    jobHref,
+    modelPageHref,
+    modelVersionHref,
+} from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
 import { ProgressSection, ScoresSection } from "./ProgressPanels";
 import { LossSection, RateSection } from "./TrainingPanel";
@@ -367,7 +366,15 @@ function versionFacts(job: JobDetail, setup: Setup): Fact[] {
         facts.push([
             job.kind === TRAIN_KIND ? "Produces" : "Version",
             job.model && !job.deleted ? (
-                <Link key="version" href={modelPageHref(job.model, "versions")} className={LINK}>
+                <Link
+                    key="version"
+                    href={
+                        job.version === null
+                            ? modelPageHref(job.model, "versions")
+                            : modelVersionHref(job.model, job.version)
+                    }
+                    className={LINK}
+                >
                     {`${version} of ${modelLabel(job)}`}
                 </Link>
             ) : (
@@ -449,7 +456,7 @@ function SettingsSection({ job }: { job: JobDetail }) {
         <PanelSection
             icon={SlidersHorizontal}
             title="Settings and data"
-            description="What this job read and the settings it ran with."
+            tip="What this job read and the settings it ran with."
         >
             {facts.length > 0 ? (
                 <Facts items={facts} />
@@ -458,29 +465,6 @@ function SettingsSection({ job }: { job: JobDetail }) {
                     <Context job={job} />
                 </p>
             )}
-        </PanelSection>
-    );
-}
-
-function LogsSection({ job }: { job: JobDetail }) {
-    const entries = useJobEvents(job.id);
-    return (
-        <PanelSection
-            icon={Logs}
-            title="Logs"
-            description="What the job printed, newest at the bottom."
-            bare
-        >
-            <LogViewer
-                entries={entries}
-                live={isActiveJob(job)}
-                quietSource="library"
-                quietLabel="Show library output"
-                fileName={`job-${job.id}.log`}
-                label={`Log of job ${job.id}`}
-                empty={isActiveJob(job) ? "Waiting for output." : "No output recorded."}
-                maxHeight="28rem"
-            />
         </PanelSection>
     );
 }
@@ -507,7 +491,7 @@ function JobView({ job }: { job: JobDetail }) {
                 {training && <LossSection job={job} metrics={metrics.data} />}
                 {training && <RateSection metrics={metrics.data} />}
                 {job.kind === "eval" && <ScoresSection job={job} />}
-                <LogsSection key={job.id} job={job} />
+                <JobLogsSection key={job.id} job={job} />
             </PanelSections>
         </>
     );

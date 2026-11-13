@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Scale } from "lucide-react";
 import {
     Button,
     ConfirmDialog,
@@ -8,14 +7,13 @@ import {
     Label,
     RadioGroup,
     RadioGroupItem,
-    SettingsGroup,
-    SettingsRow,
     Textarea,
     useToast,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
 import { type ContractInfo, type GraderConfig, type ModelDetail, api, unwrap } from "~/api/client";
-import { ErrorLine, PanelSection, errorMessage } from "~/components/Section";
+import { FormRow } from "~/components/FormRows";
+import { ErrorLine, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { contractSentence } from "~/lib/judging";
 import { EXAMPLE_SCHEMA, schemaProblem, splitLabels } from "./TaskFields";
@@ -306,7 +304,7 @@ function RubricEditor({ detail, onDone }: { detail: ModelDetail; onDone: () => v
 function JudgedRow({
     part,
     label,
-    description,
+    summary,
     open,
     editable,
     onToggle,
@@ -314,83 +312,79 @@ function JudgedRow({
 }: {
     part: Part;
     label: string;
-    description: ReactNode;
+    summary: ReactNode;
     open: boolean;
     editable: boolean;
     onToggle: () => void;
     children: ReactNode;
 }) {
     return (
-        <SettingsRow
-            anchor={`judged-${part}`}
-            label={label}
-            description={description}
-            control={
-                editable ? (
-                    <Button
-                        variant="outline"
-                        aria-expanded={open}
-                        aria-controls={`judged-${part}-editor`}
-                        onClick={onToggle}
-                    >
-                        {open ? "Close" : "Edit"}
-                    </Button>
-                ) : null
-            }
-        >
-            {open && (
-                <div id={`judged-${part}-editor`} className="pb-4">
-                    {children}
+        <FormRow label={label} align="start">
+            <div id={`judged-${part}`} className="flex w-full min-w-0 flex-col gap-3">
+                <div className="flex min-h-8 items-center justify-between gap-3">
+                    <span className="line-clamp-3 min-w-0 whitespace-pre-wrap">{summary}</span>
+                    {editable && (
+                        <Button
+                            variant="outline"
+                            aria-expanded={open}
+                            aria-controls={`judged-${part}-editor`}
+                            onClick={onToggle}
+                        >
+                            {open ? "Close" : "Edit"}
+                        </Button>
+                    )}
                 </div>
-            )}
-        </SettingsRow>
+                {open && <div id={`judged-${part}-editor`}>{children}</div>}
+            </div>
+        </FormRow>
     );
 }
 
-export function JudgedSection({ detail }: { detail: ModelDetail }) {
+export function AnswersRow({ detail }: { detail: ModelDetail }) {
     const can = useCan();
-    const [open, setOpen] = useState<Part | null>(null);
-    const close = () => setOpen(null);
-    const toggle = (part: Part) => () => setOpen(open === part ? null : part);
-    const judged = detail.graders.some((item) => item.name === JUDGE);
+    const [open, setOpen] = useState(false);
     return (
-        <PanelSection icon={Scale} anchor="how-its-judged" title="How it's judged">
-            <SettingsGroup>
-                <JudgedRow
-                    part="answer"
-                    label="Answers"
-                    description={contractSentence(
-                        detail.contract,
-                        detail.contract_number,
-                        detail.preset === "general",
-                    )}
-                    open={open === "answer"}
-                    editable={can.build}
-                    onToggle={toggle("answer")}
-                >
-                    <ContractEditor
-                        key={JSON.stringify(detail.contract)}
-                        detail={detail}
-                        onDone={close}
-                    />
-                </JudgedRow>
-                {judged && (
-                    <JudgedRow
-                        part="rubric"
-                        label="Judge rubric"
-                        description={detail.judge.rubric ?? detail.judge.default_rubric ?? ""}
-                        open={open === "rubric"}
-                        editable={can.build}
-                        onToggle={toggle("rubric")}
-                    >
-                        <RubricEditor
-                            key={JSON.stringify(detail.graders)}
-                            detail={detail}
-                            onDone={close}
-                        />
-                    </JudgedRow>
-                )}
-            </SettingsGroup>
-        </PanelSection>
+        <JudgedRow
+            part="answer"
+            label="Answers"
+            summary={contractSentence(
+                detail.contract,
+                detail.contract_number,
+                detail.preset === "general",
+            )}
+            open={open}
+            editable={can.build}
+            onToggle={() => setOpen(!open)}
+        >
+            <ContractEditor
+                key={JSON.stringify(detail.contract)}
+                detail={detail}
+                onDone={() => setOpen(false)}
+            />
+        </JudgedRow>
+    );
+}
+
+export function RubricRow({ detail }: { detail: ModelDetail }) {
+    const can = useCan();
+    const [open, setOpen] = useState(false);
+    if (!detail.graders.some((item) => item.name === JUDGE)) {
+        return null;
+    }
+    return (
+        <JudgedRow
+            part="rubric"
+            label="Judge rubric"
+            summary={detail.judge.rubric ?? detail.judge.default_rubric ?? ""}
+            open={open}
+            editable={can.build}
+            onToggle={() => setOpen(!open)}
+        >
+            <RubricEditor
+                key={JSON.stringify(detail.graders)}
+                detail={detail}
+                onDone={() => setOpen(false)}
+            />
+        </JudgedRow>
     );
 }

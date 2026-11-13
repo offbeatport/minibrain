@@ -1,10 +1,28 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
-import { Eye, GitCompare, History, Repeat, Rocket, RotateCcw, Trash2, X } from "lucide-react";
+import {
+    GitCompare,
+    History,
+    Logs,
+    MoreHorizontal,
+    Repeat,
+    Rocket,
+    RotateCcw,
+    Trash2,
+    X,
+} from "lucide-react";
 import {
     Badge,
     Button,
     Checkbox,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
     Link,
     Table,
     TableBody,
@@ -18,11 +36,20 @@ import {
     useToast,
 } from "obp-ui";
 import { useState } from "react";
-import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
+import {
+    type JobInfo,
+    type ModelDetail,
+    type ModelRow,
+    type VersionInfo,
+    api,
+    unwrap,
+} from "~/api/client";
+import { useJobs } from "~/api/queries";
 import { PanelSection, PanelSections } from "~/components/Section";
-import { StatusText, type Tone } from "~/components/models/StatusText";
+import { ProgressBar, StatusText, type Tone } from "~/components/models/StatusText";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
+import { durationText, jobSeconds } from "~/lib/jobs";
 import { metricName } from "~/lib/metrics";
 import { jobHref, modelCompareHref, modelVersionHref, trainHref } from "~/lib/modelLinks";
 import { relativeTime } from "~/lib/time";
@@ -39,10 +66,11 @@ import {
     versionLabel,
 } from "./makeLive";
 import { ScoredBy } from "./scoredBy";
+import { labelOf, startFrom } from "./train/recipe";
 
 export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone; label: string } {
     if (version.current && isDeployed(row)) {
-        return { tone: "success", label: "Live" };
+        return { tone: "success", label: "Deployed" };
     }
     if (version.status === "training") {
         const progress = version.job?.progress ?? 0;
@@ -61,7 +89,7 @@ export function versionStatus(row: ModelRow, version: VersionInfo): { tone: Tone
         return { tone: "neutral", label: "Deleting" };
     }
     if (version.live_at) {
-        return { tone: "neutral", label: "Was live" };
+        return { tone: "neutral", label: "Was deployed" };
     }
     return { tone: "neutral", label: "Ready" };
 }
@@ -77,17 +105,75 @@ export function VersionStatus({ row, version }: { row: ModelRow; version: Versio
     return error ? <Tip tip={error}>{text}</Tip> : text;
 }
 
+function RunStatus({ row, version }: { row: ModelRow; version: VersionInfo }) {
+    const job = version.job;
+    if (version.status === "training" && job?.status === "queued") {
+        return <StatusText tone="neutral">Queued</StatusText>;
+    }
+    if (version.status === "training") {
+        return (
+            <span className="flex items-center gap-2">
+                <VersionStatus row={row} version={version} />
+                <ProgressBar
+                    value={job?.progress ?? 0}
+                    label={`v${version.number} training`}
+                    className="w-16"
+                />
+            </span>
+        );
+    }
+    if (version.status === "failed" && job) {
+        return (
+            <Tip tip={job.error ?? "No reason was recorded."}>
+                <Link href={jobHref(job)} className="hover:underline">
+                    <StatusText tone="destructive">{`Failed · job #${job.id}`}</StatusText>
+                </Link>
+            </Tip>
+        );
+    }
+    return <VersionStatus row={row} version={version} />;
+}
+
+const PRESET_SETTINGS = new Set(["rank", "epochs", "learning_rate", "max_rows", "seed"]);
+
+export function trainingText(version: VersionInfo): string {
+    if (version.kind === "prompt") {
+        return "Instructions";
+    }
+    const recipe = version.recipe as Record<string, unknown>;
+    const overrides = Array.isArray(recipe.overrides) ? (recipe.overrides as string[]) : [];
+    if (overrides.length === 0) {
+        return "Default";
+    }
+    const start = startFrom(recipe);
+    if (start.custom || overrides.some((name) => !PRESET_SETTINGS.has(name))) {
+        return "Custom";
+    }
+    return labelOf(start.basis);
+}
+
 export function recipeText(version: VersionInfo): string {
     const data =
         version.dataset_version_number !== null && version.dataset_version_number !== undefined
             ? `data v${version.dataset_version_number}`
             : "no data";
     if (version.kind === "prompt") {
-        return `Prompt only · ${data}`;
+        return `Instructions only · ${data}`;
     }
     const recipe = version.recipe as { strategy?: string; rank?: number };
     const adapter = recipe.strategy === "qlora" ? "QLoRA" : "LoRA";
     return `SFT · ${adapter}${recipe.rank ? ` r${recipe.rank}` : ""} · ${data}`;
+}
+
+export function runJob(version: VersionInfo, jobs: JobInfo[]): JobInfo | undefined {
+    const own = jobs.filter((job) => job.version === version.number);
+    const wanted = version.kind === "lora" ? "train" : "eval";
+    return (
+        own.find((job) => job.kind === wanted) ??
+        own.find((job) => job.kind === "eval") ??
+        version.job ??
+        undefined
+    );
 }
 
 export function ScoreBadge({
@@ -132,21 +218,134 @@ function retry(jobId: number) {
     return unwrap(api.POST("/api/jobs/{job_id}/retry", { params: { path: { job_id: jobId } } }));
 }
 
+function busy(version: VersionInfo): boolean {
+    return version.status === "training" || version.status === "evaluating";
+}
+
+function durationOf(job: JobInfo | undefined): string {
+    const seconds = job ? jobSeconds(job) : -1;
+    return seconds < 0 ? "–" : durationText(seconds);
+}
+
+function RowMenu({
+    row,
+    version,
+    versions,
+    job,
+    onDelete,
+}: {
+    row: ModelRow;
+    version: VersionInfo;
+    versions: VersionInfo[];
+    job: JobInfo | undefined;
+    onDelete: () => void;
+}) {
+    const can = useCan();
+    const router = useRouter();
+    const others = versions
+        .filter(
+            (item) =>
+                item.number !== version.number && item.status === "ready" && item.score !== null,
+        )
+        .sort((a, b) => b.number - a.number);
+    const comparable = version.status === "ready" && version.score !== null && others.length > 0;
+    const isLive = isDeployed(row) && row.current_version === version.number;
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`More actions for v${version.number}`}
+                >
+                    <MoreHorizontal />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger disabled={!comparable}>
+                        <GitCompare />
+                        Compare with…
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent className="w-48">
+                        {others.map((item) => (
+                            <DropdownMenuItem
+                                key={item.number}
+                                onSelect={() =>
+                                    router.history.push(
+                                        modelCompareHref(
+                                            row.key,
+                                            Math.min(item.number, version.number),
+                                            Math.max(item.number, version.number),
+                                        ),
+                                    )
+                                }
+                            >
+                                {versionLabel(item)}
+                                {item.current && isDeployed(row) && (
+                                    <span className="ml-auto text-sm text-muted-foreground">
+                                        Deployed
+                                    </span>
+                                )}
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                {can.build && version.kind === "lora" && (
+                    <DropdownMenuItem
+                        disabled={busy(version)}
+                        onSelect={() =>
+                            router.history.push(trainHref(row.key, { from: version.number }))
+                        }
+                    >
+                        <Repeat />
+                        Train again
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                    disabled={!job}
+                    onSelect={() => job && router.history.push(jobHref(job))}
+                >
+                    <Logs />
+                    {job ? `Logs · job #${job.id}` : "Logs"}
+                </DropdownMenuItem>
+                {can.build && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            variant="destructive"
+                            disabled={isLive}
+                            onSelect={onDelete}
+                        >
+                            <Trash2 />
+                            {isLive ? "Delete (deployed)" : "Delete"}
+                        </DropdownMenuItem>
+                    </>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function VersionRow({
     row,
     version,
     versions,
+    job,
     picked,
     onPick,
     onLive,
+    onDelete,
     newest,
 }: {
     row: ModelRow;
     version: VersionInfo;
     versions: VersionInfo[];
+    job: JobInfo | undefined;
     picked: boolean;
     onPick: (on: boolean) => void;
     onLive: () => void;
+    onDelete: () => void;
     newest: boolean;
 }) {
     const can = useCan();
@@ -154,14 +353,15 @@ function VersionRow({
     const client = useQueryClient();
     const again = useMutation({
         mutationFn: retry,
-        onSuccess: async (job) => {
+        onSuccess: async (started) => {
             await client.invalidateQueries();
-            router.history.push(jobHref(job));
+            router.history.push(jobHref(started));
         },
     });
-    const jobId = version.job?.id;
+    const failedJob = version.status === "failed" ? version.job : null;
     const live = canGoLive(row, version);
     const blocked = live ? liveBlock(row, version) : null;
+    const data = version.dataset_version_number;
     return (
         <TableRow data-state={picked ? "selected" : undefined}>
             <TableCell className="w-10 pl-4">
@@ -171,71 +371,65 @@ function VersionRow({
                     onCheckedChange={(value) => onPick(value === true)}
                 />
             </TableCell>
+            <TableCell className="whitespace-nowrap">
+                <Link
+                    href={modelVersionHref(row.key, version.number)}
+                    className="font-medium tabular-nums hover:underline"
+                >
+                    {versionLabel(version)}
+                </Link>
+                {isBaseline(version) && (
+                    <span className="ml-2 text-sm text-muted-foreground">untrained</span>
+                )}
+            </TableCell>
             <TableCell>
-                <span className="flex min-w-0 flex-col">
-                    <Link
-                        href={modelVersionHref(row.key, version.number)}
-                        className="font-medium tabular-nums hover:underline"
-                    >
-                        {versionLabel(version)}
-                    </Link>
-                    <span className="truncate text-sm text-muted-foreground tabular-nums">
-                        {recipeText(version)}
-                    </span>
+                <RunStatus row={row} version={version} />
+            </TableCell>
+            <TableCell className="text-right">
+                <span className="inline-flex items-center justify-end gap-2 tabular-nums">
+                    <ScoreBadge row={row} version={version} versions={versions} />
+                    {version.score === null ? "–" : percent(version.score)}
                 </span>
             </TableCell>
-            <TableCell>
-                <VersionStatus row={row} version={version} />
+            <TableCell className="tabular-nums">
+                {data === null || data === undefined ? (
+                    <span className="text-muted-foreground">–</span>
+                ) : (
+                    `v${data}`
+                )}
             </TableCell>
-            <TableCell className="text-right tabular-nums">
-                {version.score === null ? "–" : percent(version.score)}
+            <TableCell className="whitespace-nowrap">{trainingText(version)}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
+                {relativeTime(job?.started_at ?? version.created_at)}
             </TableCell>
-            <TableCell>
-                <ScoreBadge row={row} version={version} versions={versions} />
-            </TableCell>
-            <TableCell className="text-muted-foreground tabular-nums">
-                {relativeTime(version.created_at)}
+            <TableCell className="text-right whitespace-nowrap tabular-nums">
+                {durationOf(job)}
             </TableCell>
             <TableCell className="pr-4 text-right">
-                <span className="inline-flex items-center gap-2">
-                    {(version.status === "training" || version.status === "evaluating") &&
-                        jobId && (
-                            <Button variant="outline" asChild>
-                                <Link href={jobHref(version.job ?? { id: jobId, kind: "train" })}>
-                                    <Eye aria-hidden="true" />
-                                    Watch
-                                </Link>
-                            </Button>
-                        )}
-                    {can.build && version.status === "failed" && newest && jobId && (
+                <span className="inline-flex items-center gap-1">
+                    {can.build && failedJob && newest && (
                         <Button
                             variant="outline"
                             disabled={again.isPending}
-                            onClick={() => again.mutate(jobId)}
+                            onClick={() => again.mutate(failedJob.id)}
                         >
                             <RotateCcw aria-hidden="true" />
                             Retry
                         </Button>
                     )}
-                    {can.build &&
-                        version.kind === "lora" &&
-                        version.status !== "training" &&
-                        version.status !== "evaluating" && (
-                            <Tip tip={`Train again with the settings of v${version.number}`}>
-                                <Button variant="outline" asChild>
-                                    <Link href={trainHref(row.key, { from: version.number })}>
-                                        <Repeat aria-hidden="true" />
-                                        Train again
-                                    </Link>
-                                </Button>
-                            </Tip>
-                        )}
                     {can.build && live && !blocked && (
                         <Button variant="outline" onClick={onLive}>
                             <Rocket aria-hidden="true" />
                             {`Deploy v${version.number}`}
                         </Button>
                     )}
+                    <RowMenu
+                        row={row}
+                        version={version}
+                        versions={versions}
+                        job={job}
+                        onDelete={onDelete}
+                    />
                 </span>
             </TableCell>
         </TableRow>
@@ -259,6 +453,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
     const toast = useToast();
     const client = useQueryClient();
     const can = useCan();
+    const jobs = useJobs(row.key);
     const [picked, setPicked] = useState<number[]>([]);
     const [promoting, setPromoting] = useState<number | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -278,29 +473,27 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                 ? [...picked.filter((n) => n !== number), number]
                 : picked.filter((n) => n !== number),
         );
-    const remove = () =>
+    const remove = (doomed: VersionInfo[], kept: boolean) =>
         setConfirmation({
             title:
-                deletable.length === 1
-                    ? `Delete v${deletable[0].number} of ${row.name}?`
-                    : `Delete ${deletable.length} versions of ${row.name}?`,
+                doomed.length === 1
+                    ? `Delete ${versionLabel(doomed[0])} of ${row.name}?`
+                    : `Delete ${doomed.length} versions of ${row.name}?`,
             description: (
                 <p>
-                    {`${deletable.map((version) => `${row.key}@${version.number}`).join(", ")} stop answering; adapters, scores and cards are removed, and their running jobs are cancelled.`}
-                    {chosen.length > deletable.length && ` Live v${liveNumber} is kept.`}
+                    {`${doomed.map((version) => `${row.key}@${version.number}`).join(", ")} stop answering; adapters, scores and cards are removed, and their running jobs are cancelled.`}
+                    {kept && ` Deployed v${liveNumber} is kept.`}
                 </p>
             ),
-            confirmLabel: deletable.length === 1 ? "Delete version" : "Delete versions",
+            confirmLabel: doomed.length === 1 ? "Delete version" : "Delete versions",
             destructive: true,
             run: async () => {
-                await deleteVersions(
-                    row,
-                    deletable.map((version) => version.number),
-                );
+                const numbers = doomed.map((version) => version.number);
+                await deleteVersions(row, numbers);
                 await client.invalidateQueries();
-                setPicked([]);
+                setPicked(picked.filter((number) => !numbers.includes(number)));
                 toast({
-                    title: `Deleted ${deletable.length} ${deletable.length === 1 ? "version" : "versions"}`,
+                    title: `Deleted ${doomed.length} ${doomed.length === 1 ? "version" : "versions"}`,
                     tone: "success",
                 });
             },
@@ -342,14 +535,16 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                             <Tip
                                 tip={
                                     deletable.length === 0
-                                        ? "The live version cannot be deleted."
+                                        ? "The deployed version cannot be deleted."
                                         : null
                                 }
                             >
                                 <Button
                                     variant="destructive"
                                     disabled={deletable.length === 0}
-                                    onClick={remove}
+                                    onClick={() =>
+                                        remove(deletable, chosen.length > deletable.length)
+                                    }
                                 >
                                     <Trash2 aria-hidden="true" />
                                     {deletable.length > 0 ? `Delete ${deletable.length}` : "Delete"}
@@ -362,10 +557,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
             flush
         >
             {versions.length === 0 ? (
-                <p className="p-panel text-muted-foreground">
-                    No versions yet. Add training data on the Training tab and v0 · Baseline is
-                    scored at once.
-                </p>
+                <p className="p-panel text-muted-foreground">No versions yet.</p>
             ) : (
                 <Table>
                     <TableHeader>
@@ -386,8 +578,10 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                             <TableHead>Version</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead className="text-right">{metric}</TableHead>
-                            <TableHead>Against live</TableHead>
-                            <TableHead>Created</TableHead>
+                            <TableHead>Data</TableHead>
+                            <TableHead>Training</TableHead>
+                            <TableHead>Started</TableHead>
+                            <TableHead className="text-right">Duration</TableHead>
                             <TableHead className="pr-4">
                                 <span className="sr-only">Actions</span>
                             </TableHead>
@@ -400,9 +594,11 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                                 row={row}
                                 version={version}
                                 versions={versions}
+                                job={runJob(version, jobs.data ?? [])}
                                 picked={picked.includes(version.number)}
                                 onPick={(on) => pick(version.number, on)}
                                 onLive={() => setPromoting(version.number)}
+                                onDelete={() => remove([version], false)}
                                 newest={index === 0}
                             />
                         ))}

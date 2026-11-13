@@ -1,6 +1,7 @@
 import { Card, cn } from "obp-ui";
 import type { ReactNode } from "react";
 import { count } from "~/lib/format";
+import { durationText } from "~/lib/jobs";
 import { MemorySummary } from "./parts";
 import { duration, hoursText } from "./recipe";
 import type { TrainRun } from "./useTrainRun";
@@ -20,6 +21,9 @@ function problemsOf(run: TrainRun, blocked: string | null): string[] {
     if (blocked) {
         return [blocked];
     }
+    if (!run.training) {
+        return run.failure ? [run.failure] : [];
+    }
     if (!run.chosen) {
         return ["Add training data first: training needs examples."];
     }
@@ -37,20 +41,85 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
     );
 }
 
-export function RunSummary({
+function scoreTime(run: TrainRun): string {
+    return run.scoreSeconds === null ? "–" : `≈ ${durationText(run.scoreSeconds)}`;
+}
+
+function Problems({
     run,
     blocked,
-    actions,
+    note,
 }: {
     run: TrainRun;
     blocked: string | null;
-    actions: ReactNode;
+    note?: string | null;
 }) {
+    const problems = problemsOf(run, blocked);
+    if (problems.length === 0 && !note) {
+        return null;
+    }
+    return (
+        <div className="flex flex-col gap-3 p-panel">
+            {problems.length > 0 && (
+                <ul role="alert" className="flex flex-col gap-1.5 text-destructive">
+                    {problems.map((text) => (
+                        <li key={text}>{text}</li>
+                    ))}
+                </ul>
+            )}
+            {note && <p className="text-sm text-muted-foreground">{note}</p>}
+        </div>
+    );
+}
+
+function ScoreSummary({
+    run,
+    blocked,
+    changed,
+}: {
+    run: TrainRun;
+    blocked: string | null;
+    changed: boolean;
+}) {
+    const data = run.chosen;
+    return (
+        <Card className="gap-0 divide-y py-0">
+            <div className="flex flex-col gap-1 p-panel">
+                <span className="text-muted-foreground">Scores in</span>
+                <output className="text-3xl tabular-nums" aria-live="polite">
+                    {blocked || !data ? "–" : scoreTime(run)}
+                </output>
+                <span className="text-muted-foreground tabular-nums">
+                    {data ? `on ${count(run.heldOut)} held-out rows` : "Not scored: no data"}
+                </span>
+            </div>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 p-panel">
+                <Item label="Method">Instructions only</Item>
+                <Item label="Instructions">{changed ? "Changed" : "Unchanged"}</Item>
+                <Item label="Held out">{count(run.heldOut)}</Item>
+                <Item label="Creates">{`v${run.number}`}</Item>
+            </dl>
+            <Problems run={run} blocked={blocked} />
+        </Card>
+    );
+}
+
+export function RunSummary({
+    run,
+    blocked,
+    changed,
+}: {
+    run: TrainRun;
+    blocked: string | null;
+    changed: boolean;
+}) {
+    if (!run.training) {
+        return <ScoreSummary run={run} blocked={blocked} changed={changed} />;
+    }
     const info = run.info;
     const fits = Boolean(info?.chosen);
     const machine = fits ? run.pickedMachine : null;
     const minutes = fits ? (info?.minutes ?? null) : null;
-    const problems = problemsOf(run, blocked);
     const unknown = info && !info.chosen && info.level === "unknown" ? info.basis : null;
     return (
         <Card className="gap-0 divide-y py-0">
@@ -86,24 +155,26 @@ export function RunSummary({
                     />
                 </div>
             )}
-            <div
-                className={cn(
-                    "flex-col gap-3 p-panel",
-                    problems.length > 0 || unknown ? "flex" : "hidden @4xl:flex",
-                )}
-            >
-                {problems.length > 0 && (
-                    <ul role="alert" className="flex flex-col gap-1.5 text-destructive">
-                        {problems.map((text) => (
-                            <li key={text}>{text}</li>
-                        ))}
-                    </ul>
-                )}
-                {unknown && <p className="text-sm text-muted-foreground">{unknown}</p>}
-                {actions}
-            </div>
+            <Problems run={run} blocked={blocked} note={unknown} />
         </Card>
     );
+}
+
+export function ProblemLine({
+    run,
+    blocked,
+    className,
+}: {
+    run: TrainRun;
+    blocked: string | null;
+    className?: string;
+}) {
+    const problem = problemsOf(run, blocked)[0];
+    return problem ? (
+        <p role="alert" className={cn("text-destructive", className)}>
+            {problem}
+        </p>
+    ) : null;
 }
 
 export function StatusLine({
@@ -116,6 +187,20 @@ export function StatusLine({
     className?: string;
 }) {
     const problem = problemsOf(run, blocked)[0];
+    if (!run.training) {
+        return (
+            <p
+                aria-live="polite"
+                className={cn(
+                    "tabular-nums",
+                    problem ? "text-destructive" : "text-muted-foreground",
+                    className,
+                )}
+            >
+                {problem ?? `Scores in ${scoreTime(run)} on ${count(run.heldOut)} held-out rows`}
+            </p>
+        );
+    }
     const minutes = run.info?.chosen ? run.info.minutes : null;
     const text =
         problem ??

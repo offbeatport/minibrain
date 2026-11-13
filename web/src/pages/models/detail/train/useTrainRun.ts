@@ -10,13 +10,12 @@ import { useToast } from "obp-ui";
 import { useState } from "react";
 import { type ModelDetail, type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { type DatasetVersionInfo, useDatasetVersions } from "~/api/dataQueries";
-import { useFeedbackSummary } from "~/api/feedbackQueries";
 import { keys } from "~/api/queries";
 import { errorMessage } from "~/components/Section";
-import { jobHref } from "~/lib/modelLinks";
-import { isDeployed, nextVersion } from "../header";
-import { liveOf } from "../makeLive";
-import { AUTO, type DataRef, versusLive } from "./parts";
+import { jobSeconds } from "~/lib/jobs";
+import { type TrainMethod, jobHref, modelVersionHref } from "~/lib/modelLinks";
+import { nextVersion } from "../header";
+import { AUTO } from "./parts";
 import {
     type Level,
     type MachinePlan,
@@ -49,18 +48,6 @@ function trainRows(version: DatasetVersionInfo | undefined): number {
     return (version.counts.train ?? 0) + (version.feedback_rows ?? 0);
 }
 
-function liveData(row: ModelRow, versions: VersionInfo[]): DataRef | null {
-    const live = isDeployed(row) ? liveOf(versions) : undefined;
-    if (!live || live.kind !== "lora" || !live.dataset_version_id) {
-        return null;
-    }
-    return {
-        id: live.dataset_version_id,
-        number: live.dataset_version_number,
-        rows: live.dataset_version_rows ?? 0,
-    };
-}
-
 function fastestOf(plan: PlanInfo | undefined): MachinePlan | null {
     return (plan?.machines ?? [])
         .filter((item) => item.chosen)
@@ -73,12 +60,35 @@ function fastestOf(plan: PlanInfo | undefined): MachinePlan | null {
 
 export type TrainStart = Start & { data: number | null };
 
+function scoreSeconds(versions: VersionInfo[], heldOut: number): number | null {
+    const timed = versions
+        .filter(
+            (version) =>
+                version.kind === "prompt" &&
+                version.job?.kind === "eval" &&
+                version.job.finished_at &&
+                version.job.status !== "failed",
+        )
+        .sort((a, b) => b.number - a.number)[0];
+    if (!timed?.job) {
+        return null;
+    }
+    const seconds = jobSeconds(timed.job);
+    if (seconds < 0) {
+        return null;
+    }
+    const rows = timed.held_out?.examples ?? 0;
+    return rows > 0 && heldOut > 0 ? (seconds * heldOut) / rows : seconds;
+}
+
 export function useTrainRun({
     row,
     detail,
     versions,
     start,
     blocked,
+    method,
+    instructions,
     onDone,
 }: {
     row: ModelRow;
@@ -86,13 +96,15 @@ export function useTrainRun({
     versions: VersionInfo[];
     start: TrainStart;
     blocked: string | null;
+    method: TrainMethod;
+    instructions: string | null;
     onDone: () => void;
 }) {
+    const training = method === "sft";
     const router = useRouter();
     const toast = useToast();
     const client = useQueryClient();
     const dataVersions = useDatasetVersions(detail.dataset ?? "", Boolean(detail.dataset));
-    const feedback = useFeedbackSummary(row.key);
     const saved = (dataVersions.data ?? []).filter((item) => item.saved !== false);
     const [picked, setPicked] = useState<number | null>(start.data);
     const [basis, setBasis] = useState<Quality>(start.basis);
@@ -111,7 +123,7 @@ export function useTrainRun({
         queryFn: () => fetchPlan(row.key, query),
         placeholderData: keepPreviousData,
         retry: false,
-        enabled: Boolean(chosen) && !blocked,
+        enabled: Boolean(chosen) && !blocked && training,
     });
     const presets = useQueries({
         queries: QUALITIES.map((item) => {
@@ -125,7 +137,7 @@ export function useTrainRun({
                 queryKey: planKey(row.key, presetQuery),
                 queryFn: () => fetchPlan(row.key, presetQuery),
                 retry: false,
-                enabled: Boolean(chosen) && !blocked,
+                enabled: Boolean(chosen) && !blocked && training,
             };
         }),
     });
@@ -146,34 +158,53 @@ export function useTrainRun({
     const planError = plan.error
         ? (errorMessage(plan.error) ?? "The planner refused these settings.")
         : null;
-    const issues = issuesOf(recipe, info, planError);
+    const issues = training ? issuesOf(recipe, info, planError) : [];
     const level: Level = custom ? "custom" : basis;
     const changed = changedFrom(recipe, basis);
     const number = nextVersion(row);
     const heldOut = info?.held_out_rows ?? chosen?.counts.eval ?? 0;
     const pickedMachine = info?.machines.find((item) => item.picked) ?? null;
     const option = info?.chosen ?? pickedMachine?.smallest ?? null;
-    const ready =
-        !blocked &&
-        Boolean(chosen) &&
-        issues.length === 0 &&
-        Boolean(info?.chosen) &&
-        !plan.isFetching;
-    const live = liveData(row, versions);
-    const diff = chosen
-        ? versusLive({ id: chosen.id, number: chosen.number, rows: chosen.rows }, live)
-        : null;
+    const ready = training
+        ? !blocked &&
+          Boolean(chosen) &&
+          issues.length === 0 &&
+          Boolean(info?.chosen) &&
+          !plan.isFetching
+        : !blocked;
 
     const create = useMutation({
-        mutationFn: (force: boolean) =>
-            unwrap(
+        mutationFn: (force: boolean) => {
+            const saved = instructions === null ? {} : { instructions };
+            const body = training
+                ? { kind: "lora" as const, ...query, breaking: force, ...saved }
+                : {
+                      kind: "prompt" as const,
+                      dataset_version_id: datasetVersion ?? undefined,
+                      breaking: force,
+                      ...saved,
+                  };
+            return unwrap(
                 api.POST("/api/models/{name}/versions", {
                     params: { path: { name: row.key } },
-                    body: { kind: "lora", ...query, breaking: force },
+                    body,
                 }),
-            ),
+            );
+        },
         onSuccess: async (version) => {
             await client.invalidateQueries();
+            if (version.kind === "prompt") {
+                toast({
+                    title:
+                        version.status === "evaluating"
+                            ? `Scoring v${version.number} of ${row.name}`
+                            : `Saved v${version.number} of ${row.name}`,
+                    description: instructions === null ? undefined : "With the new instructions.",
+                    tone: "success",
+                });
+                router.history.push(modelVersionHref(row.key, version.number));
+                return;
+            }
             const job = version.job;
             toast({
                 title: `Training v${version.number} of ${row.name}`,
@@ -216,9 +247,6 @@ export function useTrainRun({
         setPicked,
         available,
         heldOut,
-        accepted: chosen?.feedback_rows ?? 0,
-        pending: feedback.data?.pending ?? 0,
-        diff,
         level,
         basis,
         custom,
@@ -238,6 +266,8 @@ export function useTrainRun({
         fastest: fastestOf(info),
         number,
         ready,
+        training,
+        scoreSeconds: scoreSeconds(versions, heldOut),
         submit,
         create,
         failure: create.error && !breaking ? errorMessage(create.error) : null,
