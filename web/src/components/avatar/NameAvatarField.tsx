@@ -65,6 +65,7 @@ export function NameAvatarField({
     taken,
     error,
     labelled = true,
+    rows,
     children,
 }: {
     id: string;
@@ -73,6 +74,7 @@ export function NameAvatarField({
     taken: NameTaken;
     error?: string;
     labelled?: boolean;
+    rows?: { avatar: (node: ReactNode) => ReactNode; name: (node: ReactNode) => ReactNode };
     children?: ReactNode;
 }) {
     const [locks, setLocks] = useState<Locks>({ name: null, avatar: null });
@@ -136,31 +138,34 @@ export function NameAvatarField({
             setLocks((held) => ({ ...held, name: null }));
         }
     };
+    const avatarButton = (size: "md" | "xl") => (
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    aria-label="Change avatar"
+                    aria-haspopup="dialog"
+                    onClick={() => setPicking(true)}
+                    className="shrink-0 rounded-md outline-none hover:ring-1 hover:ring-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
+                >
+                    <AvatarTile
+                        key={`avatar-${dealt}`}
+                        choice={value.avatar}
+                        name={display}
+                        size={size}
+                        className="avatar-fade"
+                    />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent>Change avatar</TooltipContent>
+        </Tooltip>
+    );
     const label = shuffleLabel(locks);
-    return (
+    const field = (
         <div data-testid="name-row" className="flex flex-col gap-label">
             {labelled && <Label htmlFor={id}>Name</Label>}
             <div className="flex items-center gap-2">
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            type="button"
-                            aria-label="Change avatar"
-                            aria-haspopup="dialog"
-                            onClick={() => setPicking(true)}
-                            className="shrink-0 rounded-md outline-none hover:ring-1 hover:ring-input focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background"
-                        >
-                            <AvatarTile
-                                key={`avatar-${dealt}`}
-                                choice={value.avatar}
-                                name={display}
-                                size="md"
-                                className="avatar-fade"
-                            />
-                        </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Change avatar</TooltipContent>
-                </Tooltip>
+                {!rows && avatarButton("md")}
                 <div className="relative min-w-0 flex-1">
                     <Input
                         key={`name-${dealt}`}
@@ -209,13 +214,37 @@ export function NameAvatarField({
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}
             {children}
-            <PickerDialog
-                open={picking}
-                onOpenChange={setPicking}
-                name={display}
-                value={value.avatar}
-                onUse={applyAvatar}
-            />
         </div>
+    );
+    const picker = (
+        <PickerDialog
+            open={picking}
+            onOpenChange={setPicking}
+            name={display}
+            value={value.avatar}
+            onUse={applyAvatar}
+        />
+    );
+    if (rows) {
+        return (
+            <>
+                {rows.name(field)}
+                {rows.avatar(
+                    <div className="flex items-end gap-3">
+                        {avatarButton("xl")}
+                        <Button type="button" variant="outline" onClick={() => setPicking(true)}>
+                            Change
+                        </Button>
+                    </div>,
+                )}
+                {picker}
+            </>
+        );
+    }
+    return (
+        <>
+            {field}
+            {picker}
+        </>
     );
 }

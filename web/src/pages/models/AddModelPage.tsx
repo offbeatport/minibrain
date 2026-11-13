@@ -395,20 +395,28 @@ export function AddModelPage() {
                         <FieldError text={shownFor("dataset")} />
                     </FormControl>
                 </FormRow>
-                <FormRow id="create-name" label="Name" align="start">
-                    <FormControl width="text">
-                        <NameAvatarField
-                            id="create-name"
-                            labelled={false}
-                            value={identity}
-                            onChange={setIdentity}
-                            taken={nameTaken}
-                            error={nameTouched || attempted ? problems.name : undefined}
-                        >
-                            <ApiNameHint name={name} />
-                        </NameAvatarField>
-                    </FormControl>
-                </FormRow>
+                <NameAvatarField
+                    id="create-name"
+                    labelled={false}
+                    value={identity}
+                    onChange={setIdentity}
+                    taken={nameTaken}
+                    error={nameTouched || attempted ? problems.name : undefined}
+                    rows={{
+                        name: (node) => (
+                            <FormRow id="create-name" label="Name" align="start">
+                                <FormControl width="text">{node}</FormControl>
+                            </FormRow>
+                        ),
+                        avatar: (node) => (
+                            <FormRow label="Avatar" align="start">
+                                {node}
+                            </FormRow>
+                        ),
+                    }}
+                >
+                    <ApiNameHint name={name} />
+                </NameAvatarField>
             </FormGroup>
         </FormCard>
     );
