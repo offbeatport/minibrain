@@ -17,7 +17,8 @@ function PresetSelect({ run }: { run: TrainRun }) {
         <PickSelect
             id="train-quality"
             compact
-            menuClassName="min-w-72"
+            large
+            menuClassName="min-w-80"
             value={run.level}
             onChange={(next) => run.choose(next as typeof run.level)}
             options={[
@@ -26,14 +27,14 @@ function PresetSelect({ run }: { run: TrainRun }) {
                     return {
                         value: item.id,
                         label: item.label,
-                        icon: <Icon />,
+                        icon: <Icon className="size-5" />,
                         description: `${presetText(item.id)} · ${timeText(run.minutes[item.id])}`,
                     };
                 }),
                 {
                     value: "custom",
                     label: "Custom",
-                    icon: <SlidersHorizontal />,
+                    icon: <SlidersHorizontal className="size-5" />,
                     description: "Set each parameter yourself",
                     separated: true,
                 },
@@ -74,7 +75,7 @@ export function TrainingCard({ run }: { run: TrainRun }) {
                         <label htmlFor="train-quality">Training</label>
                     </h2>
                     <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-                        <div className="w-full sm:w-40">
+                        <div className="w-full sm:w-52">
                             <PresetSelect run={run} />
                         </div>
                         <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
