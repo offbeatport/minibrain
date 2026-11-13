@@ -1,5 +1,6 @@
 import {
     Field,
+    InfoTip,
     NumberField,
     Select,
     SelectContent,
@@ -9,7 +10,6 @@ import {
 } from "obp-ui";
 import type { ReactNode } from "react";
 import { count } from "~/lib/format";
-import { Row } from "./parts";
 import {
     ACCUM_CHOICES,
     type Auto,
@@ -33,9 +33,21 @@ function Warn({ children }: { children: ReactNode }) {
 
 function Group({ id, label, children }: { id: string; label: string; children: ReactNode }) {
     return (
-        <Row id={id} label={<span className="font-normal text-muted-foreground">{label}</span>}>
-            <div className="grid gap-x-field gap-y-6 pt-1 sm:grid-cols-2">{children}</div>
-        </Row>
+        <section aria-labelledby={id} className="flex flex-col gap-3">
+            <h4 id={id} className="text-sm text-muted-foreground">
+                {label}
+            </h4>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-4">{children}</div>
+        </section>
+    );
+}
+
+function Tipped({ label, tip }: { label: string; tip: ReactNode }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            {label}
+            <InfoTip label={label}>{tip}</InfoTip>
+        </span>
     );
 }
 
@@ -48,15 +60,18 @@ function ChoiceSelect<T extends string | number | boolean>({
     value,
     choices,
     onChange,
+    disabled,
 }: {
     id: string;
     value: Auto<T>;
     choices: { value: Auto<T>; label: string }[];
     onChange: (value: Auto<T>) => void;
+    disabled: boolean;
 }) {
     const key = (item: Auto<T>) => String(item);
     return (
         <Select
+            disabled={disabled}
             value={key(value)}
             onValueChange={(next) => {
                 const found = choices.find((item) => key(item.value) === next);
@@ -91,7 +106,9 @@ export function Advanced({
     heldOut,
     issues,
     next,
+    disabled,
 }: {
+    disabled: boolean;
     recipe: Recipe;
     onChange: Change;
     plan: PlanInfo | undefined;
@@ -110,15 +127,20 @@ export function Advanced({
     const evalEvery = recipe.evalEvery === "auto" ? null : recipe.evalEvery;
     const checks = evalEvery ? Math.floor(Math.max(steps - 1, 0) / evalEvery) + 1 : null;
     return (
-        <div className="divide-y">
+        <div className="flex flex-col gap-6">
             <Group id="train-group-adapter" label="Adapter">
                 <Field
                     id="train-rank"
-                    label="Rank"
-                    hint={`Capacity of the adapter: higher learns more and needs more memory. Serving loads up to ${MAX_RANK}.`}
+                    label={
+                        <Tipped
+                            label="Rank"
+                            tip={`Capacity of the adapter: higher learns more and needs more memory. Serving loads up to ${MAX_RANK}.`}
+                        />
+                    }
                     error={errorFor(issues, "rank")}
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-rank"
                         value={recipe.rank}
                         onValueChange={(value) => onChange({ rank: value ?? recipe.rank })}
@@ -131,14 +153,19 @@ export function Advanced({
                 </Field>
                 <Field
                     id="train-alpha"
-                    label="Alpha"
-                    hint={
-                        recipe.alpha === "auto"
-                            ? `Scales the adapter's updates; follows 2 × rank (${recipe.rank * 2}).`
-                            : `Scales the adapter's updates; 2 × rank (${recipe.rank * 2}) is usual.`
+                    label={
+                        <Tipped
+                            label="Alpha"
+                            tip={
+                                recipe.alpha === "auto"
+                                    ? `Scales the adapter's updates; follows 2 × rank (${recipe.rank * 2}).`
+                                    : `Scales the adapter's updates; 2 × rank (${recipe.rank * 2}) is usual.`
+                            }
+                        />
                     }
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-alpha"
                         value={alpha}
                         onValueChange={(value) =>
@@ -157,16 +184,21 @@ export function Advanced({
             <Group id="train-group-optimisation" label="Optimisation">
                 <Field
                     id="train-rate"
-                    label="Learning rate"
-                    hint={
-                        recipe.learningRate >= 1e-3 ? (
-                            <Warn>Often diverges with LoRA; 2e-4 is the usual start.</Warn>
-                        ) : (
-                            "Step size of each update. Lower is steadier and slower to learn."
-                        )
+                    label={
+                        <Tipped
+                            label="Learning rate"
+                            tip={
+                                recipe.learningRate >= 1e-3 ? (
+                                    <Warn>Often diverges with LoRA; 2e-4 is the usual start.</Warn>
+                                ) : (
+                                    "Step size of each update. Lower is steadier and slower to learn."
+                                )
+                            }
+                        />
                     }
                 >
                     <ChoiceSelect<number>
+                        disabled={disabled}
                         id="train-rate"
                         value={recipe.learningRate}
                         choices={LEARNING_RATES.map((value) => ({ value, label: rate(value) }))}
@@ -177,16 +209,23 @@ export function Advanced({
                 </Field>
                 <Field
                     id="train-epochs"
-                    label="Epochs"
-                    hint={
-                        recipe.epochs >= 5 ? (
-                            <Warn>Past 4 passes the model starts to memorise its rows.</Warn>
-                        ) : (
-                            "Passes over the rows. More fits your data closer."
-                        )
+                    label={
+                        <Tipped
+                            label="Epochs"
+                            tip={
+                                recipe.epochs >= 5 ? (
+                                    <Warn>
+                                        Past 4 passes the model starts to memorise its rows.
+                                    </Warn>
+                                ) : (
+                                    "Passes over the rows. More fits your data closer."
+                                )
+                            }
+                        />
                     }
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-epochs"
                         value={recipe.epochs}
                         onValueChange={(value) => onChange({ epochs: value ?? recipe.epochs })}
@@ -198,18 +237,23 @@ export function Advanced({
                 </Field>
                 <Field
                     id="train-rows"
-                    label="Max rows"
-                    hint={
-                        rows >= available ? (
-                            `Uses all ${count(available)} training rows.`
-                        ) : rows < 200 ? (
-                            <Warn>{`Only ${count(rows)} of ${count(available)} rows: fine for a smoke test, weak for a release.`}</Warn>
-                        ) : (
-                            `Uses ${count(rows)} of ${count(available)} rows.`
-                        )
+                    label={
+                        <Tipped
+                            label="Max rows"
+                            tip={
+                                rows >= available ? (
+                                    `Uses all ${count(available)} training rows.`
+                                ) : rows < 200 ? (
+                                    <Warn>{`Only ${count(rows)} of ${count(available)} rows: fine for a smoke test, weak for a release.`}</Warn>
+                                ) : (
+                                    `Uses ${count(rows)} of ${count(available)} rows.`
+                                )
+                            }
+                        />
                     }
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-rows"
                         value={rows}
                         onValueChange={(value) =>
@@ -225,13 +269,17 @@ export function Advanced({
                         unit="rows"
                     />
                 </Field>
-                <div className="hidden sm:block" />
                 <Field
                     id="train-micro"
-                    label="Batch"
-                    hint={`Rows per forward pass. Automatic picks ${chosen ? chosen.micro_batch : "the largest that fits"}${chosen ? ` on ${machine}` : ""}.`}
+                    label={
+                        <Tipped
+                            label="Batch"
+                            tip={`Rows per forward pass. Automatic picks ${chosen ? chosen.micro_batch : "the largest that fits"}${chosen ? ` on ${machine}` : ""}.`}
+                        />
+                    }
                 >
                     <ChoiceSelect<number>
+                        disabled={disabled}
                         id="train-micro"
                         value={recipe.microBatch}
                         choices={[
@@ -246,14 +294,19 @@ export function Advanced({
                 </Field>
                 <Field
                     id="train-accum"
-                    label="Gradient accumulation"
-                    hint={
-                        chosen && plan?.grad_accum
-                            ? `Batches per update: ${chosen.micro_batch} × ${plan.grad_accum} = ${chosen.micro_batch * plan.grad_accum} rows per step, ${count(steps)} steps.`
-                            : "Batches per update."
+                    label={
+                        <Tipped
+                            label="Accumulation"
+                            tip={
+                                chosen && plan?.grad_accum
+                                    ? `Gradient accumulation: batches per update, ${chosen.micro_batch} × ${plan.grad_accum} = ${chosen.micro_batch * plan.grad_accum} rows per step, ${count(steps)} steps.`
+                                    : "Gradient accumulation: batches per update."
+                            }
+                        />
                     }
                 >
                     <ChoiceSelect<number>
+                        disabled={disabled}
                         id="train-accum"
                         value={recipe.gradAccum}
                         choices={[
@@ -270,17 +323,22 @@ export function Advanced({
             <Group id="train-group-sequence" label="Sequence">
                 <Field
                     id="train-seq"
-                    label="Length"
-                    hint={
-                        recipe.seqLen !== "auto" && recipe.seqLen < longest ? (
-                            <Warn>{`Longest example: about ${count(longest)} tokens; longer rows get cut.`}</Warn>
-                        ) : (
-                            `Longest example: about ${count(longest)} tokens. ${recipe.seqLen === "auto" ? "Automatic fits it." : "Longer rows get cut."}`
-                        )
+                    label={
+                        <Tipped
+                            label="Length"
+                            tip={
+                                recipe.seqLen !== "auto" && recipe.seqLen < longest ? (
+                                    <Warn>{`Longest example: about ${count(longest)} tokens; longer rows get cut.`}</Warn>
+                                ) : (
+                                    `Longest example: about ${count(longest)} tokens. ${recipe.seqLen === "auto" ? "Automatic fits it." : "Longer rows get cut."}`
+                                )
+                            }
+                        />
                     }
                     error={errorFor(issues, "seqLen")}
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-seq"
                         value={seq}
                         onValueChange={(value) => onChange({ seqLen: value ?? "auto" })}
@@ -292,19 +350,19 @@ export function Advanced({
                         unit="tokens"
                     />
                 </Field>
-                <p className="text-sm text-muted-foreground sm:pt-7">
-                    {plan?.context
-                        ? `The base reads up to ${count(plan.context)} tokens. Longer sequences need more activation memory.`
-                        : "Longer sequences need more activation memory."}
-                </p>
             </Group>
             <Group id="train-group-memory" label="Memory">
                 <Field
                     id="train-strategy"
-                    label="Method"
-                    hint="QLoRA holds the base in 4 bits: about a third of the memory, a little slower."
+                    label={
+                        <Tipped
+                            label="Method"
+                            tip="QLoRA holds the base in 4 bits: about a third of the memory, a little slower."
+                        />
+                    }
                 >
                     <ChoiceSelect<Strategy>
+                        disabled={disabled}
                         id="train-strategy"
                         value={recipe.strategy}
                         choices={[
@@ -322,10 +380,15 @@ export function Advanced({
                 </Field>
                 <Field
                     id="train-checkpointing"
-                    label="Gradient checkpointing"
-                    hint="Recomputes activations instead of storing them: less memory, about 25% slower."
+                    label={
+                        <Tipped
+                            label="Gradient checkpointing"
+                            tip="Recomputes activations instead of storing them: less memory, about 25% slower."
+                        />
+                    }
                 >
                     <ChoiceSelect<boolean>
+                        disabled={disabled}
                         id="train-checkpointing"
                         value={recipe.checkpointing}
                         choices={[
@@ -345,14 +408,19 @@ export function Advanced({
             <Group id="train-group-evaluation" label="Evaluation">
                 <Field
                     id="train-eval"
-                    label="Score held-out rows every"
-                    hint={
-                        checks === null
-                            ? `Automatic scores ${count(heldOut)} held-out rows a few times during the run and at the end.`
-                            : `${count(checks)} ${checks === 1 ? "check" : "checks"} on ${count(heldOut)} rows, the last at the end. Each costs a little time.`
+                    label={
+                        <Tipped
+                            label="Score held-out rows every"
+                            tip={
+                                checks === null
+                                    ? `Automatic scores ${count(heldOut)} held-out rows a few times during the run and at the end.`
+                                    : `${count(checks)} ${checks === 1 ? "check" : "checks"} on ${count(heldOut)} rows, the last at the end. Each costs a little time.`
+                            }
+                        />
                     }
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-eval"
                         value={evalEvery}
                         onValueChange={(value) => onChange({ evalEvery: value ?? "auto" })}
@@ -369,10 +437,15 @@ export function Advanced({
             <Group id="train-group-seed" label="Reproducibility">
                 <Field
                     id="train-seed"
-                    label="Seed"
-                    hint={`Same seed, data and settings train the same weights for v${next}.`}
+                    label={
+                        <Tipped
+                            label="Seed"
+                            tip={`Same seed, data and settings train the same weights for v${next}.`}
+                        />
+                    }
                 >
                     <NumberField
+                        disabled={disabled}
                         id="train-seed"
                         value={recipe.seed}
                         onValueChange={(value) => onChange({ seed: value ?? recipe.seed })}

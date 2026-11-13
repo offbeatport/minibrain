@@ -5,6 +5,7 @@ import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
 import {
     HEADROOM,
+    type Level,
     type MachinePlan,
     type OptionInfo,
     QUALITIES,
@@ -12,6 +13,7 @@ import {
     deviceHours,
     duration,
     gigabytes,
+    presetText,
 } from "./recipe";
 
 export function Row({
@@ -78,48 +80,64 @@ const CARD =
 
 const QUIET_RADIO = "focus-visible:ring-0 focus-visible:ring-offset-0";
 
+function timeText(time: number | null | undefined): string {
+    return time === undefined
+        ? "Estimating…"
+        : time === null
+          ? "Does not fit"
+          : `≈ ${duration(time)}`;
+}
+
 export function QualityPicker({
     value,
     minutes,
+    custom,
     onPick,
 }: {
-    value: Quality | null;
+    value: Level;
     minutes: Record<Quality, number | null | undefined>;
-    onPick: (quality: Quality) => void;
+    custom: { minutes: number | null | undefined; text: string };
+    onPick: (level: Level) => void;
 }) {
+    const cards: { id: Level; label: string; time: string; text: string }[] = [
+        ...QUALITIES.map((item) => ({
+            id: item.id as Level,
+            label: item.label,
+            time: timeText(minutes[item.id]),
+            text: presetText(item.id),
+        })),
+        {
+            id: "custom",
+            label: "Custom",
+            time: value === "custom" ? timeText(custom.minutes) : "",
+            text: custom.text,
+        },
+    ];
     return (
         <RadioGroup
             aria-labelledby="train-quality"
-            value={value ?? ""}
-            onValueChange={(next) => onPick(next as Quality)}
-            className="grid gap-2 sm:grid-cols-3"
+            value={value}
+            onValueChange={(next) => onPick(next as Level)}
+            className="grid grid-cols-2 gap-2"
         >
-            {QUALITIES.map((item) => {
-                const time = minutes[item.id];
-                const text =
-                    time === undefined
-                        ? "Estimating…"
-                        : time === null
-                          ? "Does not fit"
-                          : `≈ ${duration(time)}`;
-                return (
-                    <Label
-                        key={item.id}
-                        className={cn(
-                            CARD,
-                            value === item.id && "border-primary bg-accent hover:bg-accent",
-                        )}
-                    >
-                        <span className="flex items-center gap-2">
-                            <RadioGroupItem value={item.id} className={QUIET_RADIO} />
-                            <span className="font-medium">{item.label}</span>
-                            <span className="ml-auto text-sm tabular-nums sm:hidden">{text}</span>
-                        </span>
-                        <span className="hidden pl-6 text-sm tabular-nums sm:block">{text}</span>
-                        <span className="pl-6 text-sm text-muted-foreground">{item.blurb}</span>
-                    </Label>
-                );
-            })}
+            {cards.map((item) => (
+                <Label
+                    key={item.id}
+                    className={cn(
+                        CARD,
+                        value === item.id && "border-primary bg-accent hover:bg-accent",
+                    )}
+                >
+                    <span className="flex items-center gap-2">
+                        <RadioGroupItem value={item.id} className={QUIET_RADIO} />
+                        <span className="font-medium">{item.label}</span>
+                    </span>
+                    <span className="min-h-5 pl-6 text-sm tabular-nums">{item.time}</span>
+                    <span className="pl-6 text-sm text-muted-foreground tabular-nums">
+                        {item.text}
+                    </span>
+                </Label>
+            ))}
         </RadioGroup>
     );
 }

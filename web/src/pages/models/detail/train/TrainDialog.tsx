@@ -8,9 +8,6 @@ import {
 import { useRouter } from "@tanstack/react-router";
 import {
     Button,
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
     ConfirmDialog,
     Dialog,
     DialogClose,
@@ -50,6 +47,7 @@ import {
     versusLive,
 } from "./parts";
 import {
+    type Level,
     MIN_HELD_OUT,
     type PlanInfo,
     type PlanQuery,
@@ -62,8 +60,6 @@ import {
     labelOf,
     planQuery,
     presetRecipe,
-    qualityOf,
-    strategyName,
 } from "./recipe";
 
 function fetchPlan(slug: string, query: PlanQuery) {
@@ -126,7 +122,7 @@ function Body({
     const [recipe, setRecipe] = useState<Recipe>(presetRecipe("balanced"));
     const [compute, setCompute] = useState<string>(AUTO);
     const [opened, setOpened] = useState<"data" | "compute" | null>(null);
-    const [advanced, setAdvanced] = useState(false);
+    const [custom, setCustom] = useState(false);
     const [breaking, setBreaking] = useState<string | null>(null);
     const chosen =
         saved.find((item) => item.id === picked) ?? saved[0] ?? detail.dataset_version ?? undefined;
@@ -175,7 +171,8 @@ function Body({
         ? (errorMessage(plan.error) ?? "The planner refused these settings.")
         : null;
     const issues = issuesOf(recipe, info, planError);
-    const quality = qualityOf(recipe);
+    const level: Level = custom ? "custom" : basis;
+    const changed = changedFrom(recipe, basis);
     const number = nextVersion(row);
     const heldOut = info?.held_out_rows ?? chosen?.counts.eval ?? 0;
     const option = info?.chosen ?? info?.machines.find((item) => item.picked)?.smallest ?? null;
@@ -218,7 +215,12 @@ function Body({
     });
 
     const change = (patch: Partial<Recipe>) => setRecipe((current) => ({ ...current, ...patch }));
-    const choose = (next: Quality) => {
+    const choose = (next: Level) => {
+        if (next === "custom") {
+            setCustom(true);
+            return;
+        }
+        setCustom(false);
         setBasis(next);
         setRecipe(presetRecipe(next));
     };
@@ -238,7 +240,7 @@ function Body({
             start();
         }
     };
-    const qualityName = quality ? labelOf(quality) : "Custom";
+    const qualityName = custom ? "Custom" : labelOf(basis);
     const summary =
         ready && info?.chosen
             ? [
@@ -273,158 +275,178 @@ function Body({
             <DialogHeader className="border-b px-5 pt-6 pb-5 sm:px-7 sm:pt-7">
                 <DialogTitle>{`Train v${number} · ${row.name}`}</DialogTitle>
             </DialogHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-7">
-                <div className="divide-y">
-                    <Row id="train-method" label="Method">
-                        <p className="flex min-h-8 flex-wrap items-center gap-x-3">
-                            <span>Supervised fine-tuning (SFT)</span>
-                        </p>
-                    </Row>
-                    <Row id="train-quality" label="Training quality">
-                        <QualityPicker value={quality} minutes={minutes} onPick={choose} />
-                        {!quality && (
-                            <Meta className="flex flex-wrap items-center gap-x-2">
-                                <span className="text-foreground">Custom</span>
-                                <span>{`${changedFrom(recipe, basis)} of the Advanced settings differ from ${labelOf(basis)}.`}</span>
-                                <button
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
+                <div className="min-h-fit px-5 sm:px-7 md:min-h-0 md:overflow-y-auto md:overscroll-contain">
+                    <div className="divide-y">
+                        <Row id="train-data" label="Data">
+                            {chosen ? (
+                                <>
+                                    <Headline
+                                        action={
+                                            saved.length > 1 ? (
+                                                <ToggleButton
+                                                    open={opened === "data"}
+                                                    onToggle={() => toggle("data")}
+                                                    controls="train-data-picker"
+                                                    label="training data"
+                                                />
+                                            ) : undefined
+                                        }
+                                    >
+                                        {`${detail.dataset_name ?? detail.dataset ?? "Data"} v${chosen.number ?? "–"} · ${count(chosen.counts.train ?? 0)} rows`}
+                                        {accepted > 0 && (
+                                            <span className="text-muted-foreground">{` + ${count(accepted)} accepted feedback`}</span>
+                                        )}
+                                    </Headline>
+                                    <Meta className="flex flex-wrap gap-x-2">
+                                        <span>
+                                            {[`${count(heldOut)} held out`, diff]
+                                                .filter(Boolean)
+                                                .join(" · ")}
+                                        </span>
+                                        {pending > 0 && (
+                                            <Link
+                                                href={`/feedback?model=${encodeURIComponent(row.key)}`}
+                                                onClick={onClose}
+                                                className="text-primary hover:underline"
+                                            >
+                                                {`${count(pending)} feedback rows to review`}
+                                            </Link>
+                                        )}
+                                    </Meta>
+                                    {heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={heldOut} />}
+                                    {opened === "data" && (
+                                        <DataPicker
+                                            versions={saved}
+                                            picked={chosen.id}
+                                            live={live}
+                                            onPick={setPicked}
+                                            footer={
+                                                <>
+                                                    {`Saved versions of ${detail.dataset_name ?? detail.dataset}. `}
+                                                    <Link
+                                                        href={`/data?item=${encodeURIComponent(`dataset:${detail.dataset}`)}`}
+                                                        onClick={onClose}
+                                                        className="text-primary hover:underline"
+                                                    >
+                                                        Open the dataset
+                                                    </Link>
+                                                </>
+                                            }
+                                        />
+                                    )}
+                                </>
+                            ) : (
+                                <Headline>
+                                    <span className="text-destructive">
+                                        Add training data first: training needs examples.
+                                    </span>
+                                </Headline>
+                            )}
+                        </Row>
+                        <Row id="train-method" label="Method">
+                            <p className="flex min-h-8 flex-wrap items-center gap-x-3">
+                                <span>Supervised fine-tuning (SFT)</span>
+                            </p>
+                        </Row>
+                        <Row id="train-quality" label="Quality">
+                            <QualityPicker
+                                value={level}
+                                minutes={minutes}
+                                custom={{
+                                    minutes: info?.chosen ? info.minutes : info ? null : undefined,
+                                    text:
+                                        custom && changed > 0
+                                            ? `${changed} changed`
+                                            : "your values",
+                                }}
+                                onPick={choose}
+                            />
+                        </Row>
+                        <Row id="train-compute" label="Compute">
+                            <Headline
+                                action={
+                                    <ToggleButton
+                                        open={opened === "compute"}
+                                        onToggle={() => toggle("compute")}
+                                        controls="train-compute-picker"
+                                        label="compute"
+                                    />
+                                }
+                            >
+                                {computeTitle || "Automatic"}
+                                {info?.chosen && (
+                                    <span className="text-muted-foreground">{` · ${fitText(info.chosen)}`}</span>
+                                )}
+                            </Headline>
+                            {option && <MemoryBar option={option} memoryLabel={memoryLabel} />}
+                            {info?.chosen && info.minutes !== null && info.minutes !== undefined ? (
+                                <>
+                                    <TimeLine
+                                        minutes={info.minutes}
+                                        kind={info.machines.find((item) => item.picked)?.kind}
+                                        ahead={info.queue.ahead}
+                                    />
+                                    <Meta>{`${info.chosen.checkpointing ? "Gradient checkpointing" : "No checkpointing"}, batch ${info.chosen.micro_batch} × ${info.grad_accum ?? info.chosen.grad_accum}: the memory planner's choice.`}</Meta>
+                                </>
+                            ) : info && !info.chosen && info.level === "unknown" ? (
+                                <Meta>{info.basis}</Meta>
+                            ) : (
+                                (planError || info?.level === "insufficient") && (
+                                    <p className="text-destructive">{planError ?? info?.basis}</p>
+                                )
+                            )}
+                            {opened === "compute" && info && (
+                                <ComputePicker
+                                    machines={info.machines}
+                                    choice={compute}
+                                    onChoice={setCompute}
+                                />
+                            )}
+                        </Row>
+                    </div>
+                </div>
+                <aside
+                    aria-labelledby="train-parameters"
+                    className="flex min-h-0 flex-col border-t bg-muted md:border-t-0 md:border-l"
+                >
+                    <div className="flex min-h-14 items-center justify-between gap-3 border-b px-5 py-3">
+                        <h3 id="train-parameters" className="font-medium">
+                            Parameters
+                        </h3>
+                        {custom ? (
+                            changed > 0 && (
+                                <Button
                                     type="button"
-                                    className="rounded-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                                    onClick={() => choose(basis)}
+                                    variant="ghost"
+                                    onClick={() => setRecipe(presetRecipe(basis))}
                                 >
                                     {`Reset to ${labelOf(basis)}`}
-                                </button>
-                            </Meta>
-                        )}
-                    </Row>
-                    <Row id="train-data" label="Training data">
-                        {chosen ? (
-                            <>
-                                <Headline
-                                    action={
-                                        saved.length > 1 ? (
-                                            <ToggleButton
-                                                open={opened === "data"}
-                                                onToggle={() => toggle("data")}
-                                                controls="train-data-picker"
-                                                label="training data"
-                                            />
-                                        ) : undefined
-                                    }
-                                >
-                                    {`${detail.dataset_name ?? detail.dataset ?? "Data"} v${chosen.number ?? "–"} · ${count(chosen.counts.train ?? 0)} rows`}
-                                    {accepted > 0 && (
-                                        <span className="text-muted-foreground">{` + ${count(accepted)} accepted feedback`}</span>
-                                    )}
-                                </Headline>
-                                <Meta className="flex flex-wrap gap-x-2">
-                                    <span>
-                                        {[`${count(heldOut)} held out`, diff]
-                                            .filter(Boolean)
-                                            .join(" · ")}
-                                    </span>
-                                    {pending > 0 && (
-                                        <Link
-                                            href={`/feedback?model=${encodeURIComponent(row.key)}`}
-                                            onClick={onClose}
-                                            className="text-primary hover:underline"
-                                        >
-                                            {`${count(pending)} feedback rows to review`}
-                                        </Link>
-                                    )}
-                                </Meta>
-                                {heldOut < MIN_HELD_OUT && <HeldOutWarning heldOut={heldOut} />}
-                                {opened === "data" && (
-                                    <DataPicker
-                                        versions={saved}
-                                        picked={chosen.id}
-                                        live={live}
-                                        onPick={setPicked}
-                                        footer={
-                                            <>
-                                                {`Saved versions of ${detail.dataset_name ?? detail.dataset}. `}
-                                                <Link
-                                                    href={`/data?item=${encodeURIComponent(`dataset:${detail.dataset}`)}`}
-                                                    onClick={onClose}
-                                                    className="text-primary hover:underline"
-                                                >
-                                                    Open the dataset
-                                                </Link>
-                                            </>
-                                        }
-                                    />
-                                )}
-                            </>
-                        ) : (
-                            <Headline>
-                                <span className="text-destructive">
-                                    Add training data first: training needs examples.
-                                </span>
-                            </Headline>
-                        )}
-                    </Row>
-                    <Row id="train-compute" label="Compute">
-                        <Headline
-                            action={
-                                <ToggleButton
-                                    open={opened === "compute"}
-                                    onToggle={() => toggle("compute")}
-                                    controls="train-compute-picker"
-                                    label="compute"
-                                />
-                            }
-                        >
-                            {computeTitle || "Automatic"}
-                            {info?.chosen && (
-                                <span className="text-muted-foreground">{` · ${fitText(info.chosen)}`}</span>
-                            )}
-                        </Headline>
-                        {option && <MemoryBar option={option} memoryLabel={memoryLabel} />}
-                        {info?.chosen && info.minutes !== null && info.minutes !== undefined ? (
-                            <>
-                                <TimeLine
-                                    minutes={info.minutes}
-                                    kind={info.machines.find((item) => item.picked)?.kind}
-                                    ahead={info.queue.ahead}
-                                />
-                                <Meta>{`${info.chosen.checkpointing ? "Gradient checkpointing" : "No checkpointing"}, batch ${info.chosen.micro_batch} × ${info.grad_accum ?? info.chosen.grad_accum}: the memory planner's choice.`}</Meta>
-                            </>
-                        ) : info && !info.chosen && info.level === "unknown" ? (
-                            <Meta>{info.basis}</Meta>
-                        ) : (
-                            (planError || info?.level === "insufficient") && (
-                                <p className="text-destructive">{planError ?? info?.basis}</p>
+                                </Button>
                             )
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => choose("custom")}
+                            >
+                                Customise
+                            </Button>
                         )}
-                        {opened === "compute" && info && (
-                            <ComputePicker
-                                machines={info.machines}
-                                choice={compute}
-                                onChoice={setCompute}
-                            />
-                        )}
-                    </Row>
-                    <Collapsible open={advanced} onOpenChange={setAdvanced}>
-                        <div className="flex min-h-8 flex-wrap items-center justify-between gap-x-3 gap-y-1 py-4">
-                            <CollapsibleTrigger>Advanced</CollapsibleTrigger>
-                            <span className="text-sm text-muted-foreground">
-                                {quality
-                                    ? `${labelOf(quality)} settings${info?.chosen ? ` · ${strategyName(info.chosen.strategy)}` : ""}`
-                                    : `${changedFrom(recipe, basis)} changed from ${labelOf(basis)}`}
-                            </span>
-                        </div>
-                        <CollapsibleContent className="border-t">
-                            <Advanced
-                                recipe={recipe}
-                                onChange={change}
-                                plan={info}
-                                available={available}
-                                heldOut={heldOut}
-                                issues={issues}
-                                next={number}
-                            />
-                        </CollapsibleContent>
-                    </Collapsible>
-                </div>
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">
+                        <Advanced
+                            disabled={!custom}
+                            recipe={recipe}
+                            onChange={change}
+                            plan={info}
+                            available={available}
+                            heldOut={heldOut}
+                            issues={issues}
+                            next={number}
+                        />
+                    </div>
+                </aside>
             </div>
             <div className="flex flex-col gap-3 border-t px-5 py-4 sm:flex-row sm:items-center sm:px-7">
                 <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -501,7 +523,7 @@ export function TrainDialog({
 }) {
     return (
         <Dialog open={open && Boolean(detail)} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[44rem]">
+            <DialogContent className="flex h-[min(46rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[70rem]">
                 {open && detail && (
                     <Body row={row} detail={detail} versions={versions} onClose={onClose} />
                 )}

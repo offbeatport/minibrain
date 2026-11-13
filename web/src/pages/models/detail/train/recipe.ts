@@ -25,11 +25,12 @@ export type Recipe = {
 };
 
 export type Quality = "fast" | "balanced" | "quality";
+export type Level = Quality | "custom";
 
-export const QUALITIES: { id: Quality; label: string; blurb: string }[] = [
-    { id: "fast", label: "Fast", blurb: "Check whether training helps." },
-    { id: "balanced", label: "Balanced", blurb: "The usual run." },
-    { id: "quality", label: "Higher quality", blurb: "More capacity and passes." },
+export const QUALITIES: { id: Quality; label: string }[] = [
+    { id: "fast", label: "Fast" },
+    { id: "balanced", label: "Balanced" },
+    { id: "quality", label: "Best" },
 ];
 
 export const MAX_RANK = 64;
@@ -39,7 +40,8 @@ export const LEARNING_RATES = [2e-5, 5e-5, 1e-4, 2e-4, 3e-4, 5e-4, 1e-3];
 export const MICRO_CHOICES = [1, 2, 4, 8];
 export const ACCUM_CHOICES = [1, 2, 4, 8, 16, 32];
 
-const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs" | "maxRows"> = {
+const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs"> = {
+    maxRows: "all",
     alpha: "auto",
     microBatch: "auto",
     gradAccum: "auto",
@@ -51,9 +53,9 @@ const SHARED: Omit<Recipe, "rank" | "learningRate" | "epochs" | "maxRows"> = {
 };
 
 const PRESETS: Record<Quality, Recipe> = {
-    fast: { ...SHARED, rank: 8, learningRate: 2e-4, epochs: 1, maxRows: 1000 },
-    balanced: { ...SHARED, rank: 16, learningRate: 2e-4, epochs: 1, maxRows: 3000 },
-    quality: { ...SHARED, rank: 32, learningRate: 1e-4, epochs: 3, maxRows: "all" },
+    fast: { ...SHARED, rank: 8, learningRate: 2e-4, epochs: 1 },
+    balanced: { ...SHARED, rank: 16, learningRate: 2e-4, epochs: 2 },
+    quality: { ...SHARED, rank: 32, learningRate: 1e-4, epochs: 3 },
 };
 
 export function presetRecipe(quality: Quality): Recipe {
@@ -72,6 +74,11 @@ export function changedFrom(recipe: Recipe, quality: Quality): number {
     const preset = PRESETS[quality];
     return (Object.keys(recipe) as (keyof Recipe)[]).filter((key) => preset[key] !== recipe[key])
         .length;
+}
+
+export function presetText(quality: Quality): string {
+    const preset = PRESETS[quality];
+    return `rank ${preset.rank} · ${preset.epochs} ${preset.epochs === 1 ? "epoch" : "epochs"}`;
 }
 
 export function labelOf(quality: Quality): string {
