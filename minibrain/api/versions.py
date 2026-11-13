@@ -259,6 +259,8 @@ def delete_version(
 ) -> Response:
     model = get_model(session, name)
     version = get_version(model, number)
+    if number == 0:
+        raise ConflictError(f"{name}@0 is the baseline every version is scored against; delete the model instead")
     jobs = version_jobs(session, version)
     refusal = a_job_running(f"{name}@{number}", uncancelled(jobs))
     cancel = canceller(session, queue, cancel_jobs)

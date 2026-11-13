@@ -126,16 +126,25 @@ def test_each_version_is_reported_with_its_own_status_and_requests(harness: Harn
     assert (versions[1]["live"], versions[1]["status"], versions[1]["usage"]) == (False, "training", None)
 
 
+def test_v0_cannot_be_deleted(harness: Harness) -> None:
+    create_on_data(harness)
+    finish(harness, "eval", accuracy=0.8)
+    refused = harness.client.delete(f"/api/models/{SLUG}/versions/0")
+    assert refused.status_code == 409 and "baseline" in refused.json()["detail"]
+    assert [item["number"] for item in custom_row(harness, SLUG)["versions"]] == [0]
+
+
 def test_a_deployed_version_must_be_undeployed_before_it_is_deleted(harness: Harness) -> None:
     create_on_data(harness)
     finish(harness, "eval", accuracy=0.8)
-    deploy(harness)
-    refused = harness.client.delete(f"/api/models/{SLUG}/versions/0")
+    assert add_version(harness, "prompt")["number"] == 1
+    finish(harness, "eval", accuracy=0.9)
+    deploy(harness, 1)
+    refused = harness.client.delete(f"/api/models/{SLUG}/versions/1")
     assert refused.status_code == 409 and "undeploy it first" in refused.json()["detail"]
     harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False})
-    assert harness.client.delete(f"/api/models/{SLUG}/versions/0").status_code == 204
-    assert custom_row(harness, SLUG)["versions"] == []
-    assert add_version(harness, "prompt")["number"] == 1
+    assert harness.client.delete(f"/api/models/{SLUG}/versions/1").status_code == 204
+    assert [item["number"] for item in custom_row(harness, SLUG)["versions"]] == [0]
 
 
 def test_rows_count_api_keys(harness: Harness) -> None:

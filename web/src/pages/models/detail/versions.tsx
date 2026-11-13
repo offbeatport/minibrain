@@ -250,6 +250,7 @@ function RowMenu({
         .sort((a, b) => b.number - a.number);
     const comparable = version.status === "ready" && version.score !== null && others.length > 0;
     const isLive = isDeployed(row) && row.current_version === version.number;
+    const baseline = version.number === 0;
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -314,11 +315,15 @@ function RowMenu({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             variant="destructive"
-                            disabled={isLive}
+                            disabled={isLive || baseline}
                             onSelect={onDelete}
                         >
                             <Trash2 />
-                            {isLive ? "Delete (deployed)" : "Delete"}
+                            {baseline
+                                ? "Delete (v0 is the baseline)"
+                                : isLive
+                                  ? "Delete (deployed)"
+                                  : "Delete"}
                         </DropdownMenuItem>
                     </>
                 )}
@@ -464,7 +469,9 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
         .map((version) => version.number)
         .sort((a, b) => a - b);
     const liveNumber = isDeployed(row) ? row.current_version : null;
-    const deletable = chosen.filter((version) => version.number !== liveNumber);
+    const deletable = chosen.filter(
+        (version) => version.number !== liveNumber && version.number !== 0,
+    );
     const every = ordered.length > 0 && ordered.every((version) => picked.includes(version.number));
     const metric = metricName(versions.find((version) => version.main_metric)?.main_metric);
     const pick = (number: number, on: boolean) =>
@@ -535,7 +542,7 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                             <Tip
                                 tip={
                                     deletable.length === 0
-                                        ? "The deployed version cannot be deleted."
+                                        ? "v0 and the deployed version cannot be deleted."
                                         : null
                                 }
                             >
