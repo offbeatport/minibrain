@@ -63,9 +63,9 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 
 - Two contracts: free text and a JSON schema. A label set is a JSON schema with one enum field (`label`) and is served
   as the bare label.
-- Add model asks only for a base and a name. Every model starts as a Chat assistant (`general`, the API's default
+- Add model asks for a base, a dataset and a name. Every model starts as a Chat assistant (`general`, the API's default
   preset; `preset` stays in the API for scripts and tests) and narrows later, in two ways:
-  - When data is attached: if its latest dataset version's expected answers look like a label set (the check's rule:
+  - From the dataset: if its latest dataset version's expected answers look like a label set (the check's rule:
     at most 256 short single-line values, each repeated on average), the model page proposes them ("Answers look like
     labels: billing, bug, refund (+2). Restrict answers to these?"). Accept switches the model to Classify with those
     labels, its graders and its view, and scores a prompt-only version with them when the data splits; Dismiss keeps
@@ -134,8 +134,8 @@ The staff Chat app comes next and is separate from the Playground: a ChatGPT-lik
 organisation, with per-person history, retrieval over company documents, sharing and admin retention. The Playground
 stays the tool for trying models with the API's settings and turning bad answers into test examples.
 
-Add model asks only for a base and a name; every model starts as a Chat assistant and narrows later (labels proposed
-when attached data looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
+Add model asks for a base, a dataset and a name; every model starts as a Chat assistant and narrows later (labels
+proposed when the dataset looks like a label set, or set in How it's judged; see Task types). Built (2026-11-06).
 
 ### Order
 
@@ -170,7 +170,7 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
 - General, shown as Chat assistant: a free-text contract over turns; chat JSONL (`messages`, system messages
   dropped) or a question and answer table (`question`/`answer`, `prompt`/`completion`, `input`/`output` and the
   like) as data; every assistant turn trains and the last one is scored; version 0 is the base with the model's
-  system prompt (written on the model page) plus a few examples once there is data; graders text similarity, plus the
+  system prompt (written on the model page) plus a few examples from the dataset; graders text similarity, plus the
   judge with a default rubric (correct, follows the instructions, concise) once a judge model is set; no checks; the
   default rule. `expected: data` takes expected answers from the data; the hook for distillation is `expected:
   teacher`, which will fill them from a teacher model. Try with sample data on the empty Models page creates a Chat
@@ -204,14 +204,20 @@ API keys decide who may call which models.
 New capabilities add a job kind (export, distill, rebase) or a pool type (Kubernetes, your cloud, managed compute),
 not a new concept.
 
-A custom model is bound to one dataset, picked when it is created (optional: v0 can be the base plus instructions)
-or, if it has none, on its first training run. Retraining uses that dataset's newer versions. A model never switches
-dataset; Duplicate covers that, and the copy takes another dataset (2026-11-13).
+A custom model needs a dataset when it is created and keeps it for life; the dataset's versions change underneath,
+and retraining uses the newer ones. A model never switches dataset; Duplicate covers that, and the copy takes another
+dataset (2026-11-13). v0 is created at once as the untrained baseline (the base with the model's instructions), scored
+on the dataset's held-out rows and deployable at once.
+
+A custom or base model's Settings tab (Builders, last tab) replaces the header's ⋯ menu: General (name, API name,
+avatar, description, tags), Evaluation (graders, judge, promotion rule) and a Danger zone (Switch base, Duplicate,
+Delete). Changing the graders or the judge asks to re-score every version and runs it as a `score` job, so versions
+stay comparable; changing the promotion rule saves without re-scoring (2026-11-13).
 
 | Term | Meaning |
 |---|---|
 | minibrain | Slug, sources, base model (pinned revision), `current` version pointer, system prompt, index, API keys |
-| Version | Prompt-only (model + instructions + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its contract and number, graders and eval result. Immutable. Version 0 is always prompt-only and is created with the model |
+| Version | Prompt-only (model + instructions + few-shot examples) or trained (dataset version + recipe + base model revision + adapter), plus its contract and number, graders and eval result. Immutable. Version 0 is always prompt-only, the untrained baseline, and is created with the model |
 | Dataset version | A dataset's rows copied to content-hashed Parquet when the dataset is created, its query is saved or it is updated; numbered per dataset (v1, v2, …); splits are derived from it |
 | Pool | One serving engine, one base model, N adapters loaded. The teacher runs as its own pool |
 | Job | Finite work run by a worker: data build, training, eval, judge, transfers, exports, deploy and undeploy rollouts |
@@ -226,7 +232,7 @@ dataset; Duplicate covers that, and the copy takes another dataset (2026-11-13).
 
 ## Flow
 
-base + name → version 0 as a Chat assistant: prompt-only on the base at once, scored by the graders when there is data
+base + dataset + name → version 0 as a Chat assistant: prompt-only on the base at once, scored on the held-out rows
 → narrow the answers (labels proposed from the data, or set in How it's judged) → stop here if it passes the promotion
 rule and the cost is acceptable.
 
@@ -660,8 +666,10 @@ from. They have different endpoints and keys, so they are configured apart.
   tokens per second, peak memory, time left) and a `train.eval` event with the held-out loss on up to 64 held-out rows
   at every tenth of the run; scoring, judging and transfers emit their own progress events.
 - Cancel kills the process group. On start, the worker marks orphaned `running` jobs `failed`.
-- One default recipe (rank, alpha, learning rate, epochs), assistant-only loss, a small general instruction mix to
+- One install-wide default recipe (rank, alpha, learning rate, epochs), assistant-only loss, a small general instruction mix to
   limit forgetting. How it fits in memory is planned per run (Training memory).
+- The Train dialog starts from the model's last run: rank, epochs and learning rate prefill from it, selecting the
+  preset they match, else Custom; a model's first run starts from Balanced. There is no per-model default recipe.
 - The teacher can be a base model too: LoRA on the large model when prompting gets close but stays inconsistent
   (QLoRA keeps it on one GPU).
 
@@ -858,8 +866,8 @@ once it matches; only deleting a base removes its files.
 - Version 0 is created with the model: prompt-only on the base, the preset's prompt (or the model's instructions)
   plus few-shot examples when data exists. It answers at once in the Playground, through `slug@0` and through
   `POST /api/models/<slug>/versions/<n>/test` (one conversation, scored by the graders when an expected answer is
-  sent), and is scored on the data when there is any (once the base is on this install). Going live is a separate
-  step; training makes v1 and up, compared against the live version.
+  sent), and is scored on the dataset's held-out rows at once (once the base is on this install). It is the
+  untrained baseline and can be deployed at once. Going live is a separate step; training makes v1 and up, compared against the live version.
 - Evaluation calls the gateway's own prompt and constraint code (`minibrain/tasks/prompting.py`), so scores are what
   apps get. The eval job only generates answers and times them; main grades them with the version's graders, and a
   judge grader queues a `judge` job for the answers the cache lacks (`judge_scores`, keyed by the SHA-256 of the
@@ -867,6 +875,9 @@ once it matches; only deleting a base removes its files.
   content hash). The judge also returns a one-sentence reason, kept with the score.
 - The judge model is a setting: Settings → General → Judge model for the install (`GET`/`PUT /api/settings/judge`,
   audited as `settings.judge`) and a per-model override (`PUT /api/models/<slug>/judge`), any base on this install.
+  The per-model judge, the graders and the promotion rule are set in the model's Settings tab; changing the judge or
+  the graders re-scores every version in one `score` job, and the Versions and Training tabs show "Scored by …" with
+  a link there.
   A preset with a default rubric (General) adds the judge to its graders once either is set, ahead of its other
   graders, so the judge score becomes the main metric. A judge turned on without a judge model uses the model's own
   base, and the model page says so.
@@ -1236,30 +1247,30 @@ keys, and `/v1` stays key-only.
   reserved by a deleted model or a route word (`new`, `base`, `custom`, `name`). Old
   `/models/base/<key>` and `/models/custom/<slug>` links redirect. A breadcrumb sits above a compact header: the logo or
   avatar, the name, a Custom or Base badge, Deployed or Not deployed, "v4 live 86.7%" and a subtitle (description ·
-  On base). Its actions are Playground and Connect (the snippet dialog: base URL, name, `name@N`, harness configs) and,
-  for Builders, a ⋯ menu: Deploy or Undeploy, Train vN, Rename, Change avatar, Duplicate, Switch base, then Delete; there is no
-  state-driven primary button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Training · Monitoring
-  · API keys for a custom model (Viewers lose Training), Overview · Monitoring · API keys for a base (one installed
-  format is one base, so there is no Variants tab); `data` and `keys` redirect to Training and API keys, and an unknown
+  On base). Its actions, for Builders, are Train · Deploy · Use ▾ on a custom model and Create custom model · Deploy ·
+  Use ▾ on a base (Use: Playground, Connect); Viewers get Use ▾. There is no ⋯ menu and no state-driven primary
+  button. Tabs are `TabNav` pages with their own URLs: Overview · Versions · Training · Monitoring · API keys ·
+  Settings for a custom model (Viewers lose Training and Settings), Overview · Monitoring · API keys · Settings for a
+  base (one installed format is one base, so there is no Variants tab); `data` and `keys` redirect to Training and API keys, and an unknown
   tab to Overview.
   - Overview: Usage, About and Details in sections titled outside their panels, Activity in a right column. Usage
     starts with a status line of one action computed on the server (`ModelPage.status`), broken first, then ship, then
     improve, then start: a failed teardown or bad health, errors at three times the usual rate, a failed newest
     version (Retry), a version that beats live (Make vN live), a running job ("Training v8 · 45% · 8 min left · View"),
-    feedback to review, no data (Add data), not deployed (Deploy), else "Live: v4 · 2 replicas". Under it the shared
+    feedback to review, not deployed (Deploy), else "Live: v4 · 2 replicas". Under it the shared
     line chart of requests by version (the four newest versions that were ever live take the validated series colours,
     in order; the rest fold into Other versions), with made-live markers, a Requests · p95 · Errors · Cost switch and a
     24h · 7d · 30d range shared with Monitoring, an empty frame when there is no traffic, and a footer line with p95,
     errors and replicas. About lists Task, Live, Base, Data, Deployed and API name (with copy), then Tags, Created,
     Updated and Description, the last two editable in place by a pencil on hover. Details, always shown: task setup
-    (labels, instructions, graders, promotion rule; their pencils open the Versions sections), data (splits, feedback
+    (labels, instructions, then graders and promotion rule read-only, changed in Settings), data (splits, feedback
     waiting, test examples), serving (safety, kept inputs, machines), lineage and integrity (the live adapter's and the
     base's SHA-256 with copy, the model card). Activity is the audit log filtered to the model, its versions, keys and
     jobs (`/api/models/<name>/activity`), as sentences with day separators and runs of three or more folded; All
     activity opens the audit log searched for it (Admins).
   - Versions: a table with a Status column (dot and text), the main score and a badge against live ("beats live +1.4"
     or "below rule", none on v0 · Baseline), Watch, Retry and Make vN live; ticking two compares them, ticking any
-    deletes them (the live one is kept). Then Instructions and How it's judged.
+    deletes them (the live one is kept), under a "Scored by" line. Then Instructions and How it's judged.
   - A version's page (`/models/<name>/versions/<n>`): a breadcrumb, Make vN live (its confirmation says the direction,
     "v5 scores +1.4 over live v4" or "v4 replaces live v5 (−1.4)") and a ⋯ menu (Try in Playground as `name@N`, Compare
     with…, Copy the name, Model card, Export…, Delete version); then Score (against live and v0 · Baseline), Where it
@@ -1285,8 +1296,8 @@ keys, and `/v1` stays key-only.
   - API keys: the model's keys (a name is required and unique among the keys that call the same model, shown in the
     list, Callers and the request log; the secret is shown once), the endpoint and harness configs, the feedback API,
     kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
-- Add model (`/models/new`) asks only for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
-  one search over four tabs), and a name; description and tags are optional, and the licence acceptance and the disk
+- Add model (`/models/new`) asks for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
+  one search over four tabs), a dataset (required; Create stays off until one is picked) and a name; description and tags are optional, and the licence acceptance and the disk
   and memory gauges stay. Every model starts as a Chat assistant. The name row (built 2026-11-12) is the
   avatar button, then the name, then a dice Shuffle (R): the name is prefilled and required, a generated adjective
   and noun ("Brisk Heron") never held by a base or custom model, with an inline error when a typed one is taken.
@@ -1294,8 +1305,8 @@ keys, and `/v1` stays key-only.
   assistant, 7B+ works best." The picker lists base models only; to start from one of your models, Duplicate it
   (below). The model page proposes labels found in its data (see Task types), and its How it's judged section shows each
   part as a plain default with an Edit action, collapsed until opened: the answers (free text, one of these labels or
-  a JSON schema) with the contract number (after going live, a breaking change asks to confirm), the graders with the
-  judge's rubric and model, and the rule. Its Instructions section edits the system prompt; saving makes a
+  a JSON schema) with the contract number (after going live, a breaking change asks to confirm) and the judge's rubric;
+  graders, judge model and rule are in Settings. Its Instructions section edits the system prompt; saving makes a
   prompt-only version that tries it at once.
   - Recommended: recently used bases, then 2–3 that run on this machine and 1–2 that need more compute, ranked by fit
     for a chat assistant (capability, size tier favouring 7B and up, the catalogue's tested default; superseded
@@ -1310,14 +1321,14 @@ keys, and `/v1` stays key-only.
     custom letters) and Colour (the kit's ten `--file-*` tones), with a large preview, "In the app" at 48, 32 and
     20 px, Recent and Surprise me. A model stores `{style, seed, tone, letters?}` (`models.avatar`, tone by name,
     never hex), so it redraws in the current theme. `POST /api/models` takes it; `PUT /api/models/{slug}/avatar`
-    (Builder, audited as `model.avatar`) changes it from the model page's ⋯ › Change avatar; Duplicate copies it.
+    (Builder, audited as `model.avatar`) changes it from the model's Settings › General; Duplicate copies it.
     A model without one shows its initials in a tone from its name's hash.
   - Under the picker: the download against free space on the model files disk (blocked when it does not fit), the
     variant and licence, and for a base that needs more compute, the pools it fits and how to join a GPU machine to a
     pool. It can always be downloaded now and run later.
-  - `?model=<catalogue id>&variant=` and `?base=<key>` preselect the base, `?dataset=` the training data, and
+  - `?model=<catalogue id>&variant=` and `?base=<key>` preselect the base, `?dataset=` the dataset, and
     `?source=import` opens Import.
-- Duplicate (built 2026-11-07), in a custom model's row menu on Models and its page header, asks for a name
+- Duplicate (built 2026-11-07), in a custom model's row menu on Models and its Settings tab, asks for a name
   ("<name> copy", the next free one in the shared namespace) and calls `POST /api/models/{slug}/duplicate` (Builder,
   audited as `model.duplicate` with the source slug and version; 409 on a taken name or a source being deleted). The
   copy gets the same base, preset, answers, instructions, graders, rule, judge, safety, training data, description,

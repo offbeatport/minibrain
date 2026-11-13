@@ -198,6 +198,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Release reserved names** · planned · admin
   Free a deleted model's API name from Settings, with a warning.
   Roadmap: v2
+- **Model settings** · planned · product, ml
+  Rename, re-avatar, set scoring, duplicate or delete in one tab.
+  Roadmap: Concepts
 - **Classify preset** · shipped · product, ml
   Sort text into one label from a set that grows.
   UI: Models › model › Training › How it's judged › Answers, Evaluations › version · API: GET /api/presets
@@ -312,6 +315,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Roadmap: Eval and promote
 - **Target score** · planned · product
   Say when the prompt-only version is good enough to skip training.
+  Roadmap: Eval and promote
+- **Re-score on grader change** · planned · ml
+  Re-score every version when the graders or judge change.
   Roadmap: Eval and promote
 - **Graders** · partial · ml
   Score with exact match, labels, JSON, similarity, a judge, SQL, Python.
