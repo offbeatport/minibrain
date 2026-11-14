@@ -7,7 +7,7 @@ import {
     DialogTitle,
     Link,
 } from "obp-ui";
-import { API_REFERENCE_PATH } from "~/lib/modelLinks";
+import { API_KEYS_PATH, API_REFERENCE_PATH } from "~/lib/modelLinks";
 import { samples } from "~/lib/playground";
 
 export function ViewCode({
@@ -27,9 +27,12 @@ export function ViewCode({
                     <DialogTitle>View code</DialogTitle>
                     <DialogDescription>
                         The request the Playground sends next, with these settings and this
-                        conversation, for <span className="font-mono">/v1</span> and an API key from
-                        Deployments. Fields the <span className="font-mono">openai</span> SDK does
-                        not know go in <span className="font-mono">extra_body</span>.
+                        conversation, for <span className="font-mono">/v1</span> and a key from{" "}
+                        <Link href={API_KEYS_PATH} className="text-primary hover:underline">
+                            API keys
+                        </Link>
+                        . Fields the <span className="font-mono">openai</span> SDK does not know go
+                        in <span className="font-mono">extra_body</span>.
                     </DialogDescription>
                 </DialogHeader>
                 <CodeTabs
