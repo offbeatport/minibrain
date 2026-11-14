@@ -1,6 +1,5 @@
 import {
     Archive,
-    Download,
     ExternalLink,
     GraduationCap,
     HardDrive,
@@ -101,13 +100,11 @@ function Requirements({
     trainFit,
     servesOnly,
     storage,
-    download,
 }: {
     fit: FitInfo | null;
     trainFit: TrainFitInfo | null;
     servesOnly: boolean;
     storage: number | null;
-    download: number | null;
 }) {
     const train = servesOnly ? (
         "Can't be trained"
@@ -127,11 +124,6 @@ function Requirements({
             <SummaryFact icon={Archive} label="Storage">
                 {storage ? <Amount icon={HardDrive} value={bytes(storage)} /> : "Unknown"}
             </SummaryFact>
-            {download !== null && (
-                <SummaryFact icon={Download} label="Download">
-                    <Amount icon={HardDrive} value={bytes(download)} />
-                </SummaryFact>
-            )}
         </SummaryFacts>
     );
 }
@@ -315,7 +307,6 @@ export function AddModelSummary({
                     trainFit={trainFit}
                     servesOnly={servesOnly}
                     storage={storage}
-                    download={need ? need.size : null}
                 />
             </SummarySection>
             <SummarySection title="Memory">
