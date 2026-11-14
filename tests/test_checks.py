@@ -63,6 +63,12 @@ def test_balance_uses_the_configured_limits() -> None:
     assert loose.status == "ok"
 
 
+def test_balance_names_the_majority_label_as_written() -> None:
+    rows = [(f"spam {index}", "Spam") for index in range(95)] + [(f"ham {index}", "Ham") for index in range(5)]
+    detail = by_check(run_checks(rows, None, CheckLimits()))["balance"].detail
+    assert detail.startswith("'Spam' is 95% of rows")
+
+
 def test_leakage_finds_test_rows_that_differ_only_in_case_and_punctuation() -> None:
     rows = labelled(300)
     splits = split(clean(examples_of(rows)))

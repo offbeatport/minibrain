@@ -54,6 +54,10 @@ def normalized(text: str) -> str:
     return " ".join(re.sub(r"[^\w\s]", " ", text.lower()).split())
 
 
+def sentence(text: str) -> str:
+    return text[:1].upper() + text[1:]
+
+
 def plural(count: int, noun: str) -> str:
     return f"{count:,} {noun}{'' if count == 1 else 's'}"
 
@@ -150,7 +154,7 @@ def balance(rows: list[tuple[str, str]], limits: CheckLimits, _splits: object, l
         "balance",
         "warning",
         "Unbalanced labels",
-        "; ".join(problems).capitalize() + ". A model learns rare labels poorly.",
+        sentence("; ".join(problems)) + ". A model learns rare labels poorly.",
         count=len(rare) + (1 if share > limits.majority_share else 0),
         examples=tuple(f"{label}: {size}" for label, size in rare[:EXAMPLES]),
     )
@@ -197,7 +201,7 @@ def length(rows: list[tuple[str, str]], _limits: CheckLimits, _splits: object, r
         "length",
         "warning",
         "Empty or long inputs",
-        "; ".join(parts).capitalize() + ".",
+        sentence("; ".join(parts)) + ".",
         count=empty + len(long),
         examples=tuple(clip(text) for text in long[:EXAMPLES]),
     )
