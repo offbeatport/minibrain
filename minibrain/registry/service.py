@@ -94,7 +94,13 @@ def address_taken(session: Session, address: str) -> bool:
     return address in taken_names(session)[1]
 
 
+def require_letter(name: str) -> None:
+    if not re.search(r"[A-Za-z0-9]", name):
+        raise ModelNameError("a model name needs at least one letter or number")
+
+
 def check_rename(session: Session, current: str, name: str) -> None:
+    require_letter(name)
     wanted = name.strip().lower()
     if wanted == current.strip().lower():
         return
@@ -169,8 +175,7 @@ def free_model_name(session: Session, noun: str, numbered: bool = True) -> str:
 def create_model(session: Session, name: str, preset: str, base_model: str, api_name: str | None = None) -> Model:
     from minibrain.policy import load
 
-    if not re.search(r"[A-Za-z0-9]", name):
-        raise ModelNameError("a model name needs at least one letter or number")
+    require_letter(name)
     require_free_name(session, name)
     slug = address_for(session, slugify(name), api_name)
     bodies = bool(load(session)["request_bodies"])

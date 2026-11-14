@@ -354,3 +354,11 @@ def test_a_model_name_needs_a_letter_or_number_and_must_be_free(harness: Harness
         },
     )
     assert same_address.status_code == 201 and same_address.json()["slug"] == f"{SLUG}-2"
+
+
+def test_a_rename_needs_a_letter_or_number_too(harness: Harness) -> None:
+    create_model(harness)
+    for name in ("   ", "\N{SLIGHTLY SMILING FACE}"):
+        renamed = harness.client.patch(f"/api/models/{SLUG}", json={"name": name})
+        assert renamed.status_code == 422 and "letter or number" in renamed.json()["detail"]
+    assert harness.client.get(f"/api/models/{SLUG}").json()["name"] == "Support Triage"
