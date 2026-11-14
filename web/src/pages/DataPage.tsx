@@ -423,7 +423,9 @@ function DatasetPicker({ detail }: { detail: ModelDetail }) {
                 <Select
                     value={detail.dataset ?? ""}
                     onValueChange={(next) => next && choose.mutate(String(next))}
-                    disabled={options.length === 0 || choose.isPending}
+                    disabled={
+                        options.length === 0 || choose.isPending || Boolean(detail.dataset_lock)
+                    }
                 >
                     <SelectTrigger aria-label="Dataset" className="w-72">
                         <SelectValue
@@ -447,6 +449,9 @@ function DatasetPicker({ detail }: { detail: ModelDetail }) {
                     </Link>
                 )}
             </div>
+            {detail.dataset_lock && (
+                <p className="text-sm text-muted-foreground">{detail.dataset_lock}</p>
+            )}
             <ErrorLine error={choose.error} />
         </Section>
     );

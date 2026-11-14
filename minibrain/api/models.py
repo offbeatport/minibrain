@@ -37,7 +37,7 @@ from minibrain.api.schemas import (
     RescoreResult,
 )
 from minibrain.api.versions import audit_version, start_version
-from minibrain.api.views import detail
+from minibrain.api.views import dataset_lock, detail
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import Role, allows
@@ -360,10 +360,19 @@ def create_demo(session: SessionDep, settings: SettingsDep, store: StoreDep) -> 
     return DemoModelDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
 
 
-@router.put("/{name}/dataset", dependencies=[Depends(builder)], summary="Choose the dataset a custom model trains on")
+@router.put(
+    "/{name}/dataset",
+    dependencies=[Depends(builder)],
+    summary="Choose the dataset a custom model trains on",
+    description="Refused with 409 while a training or scoring job of the model is queued or running.",
+)
 def choose_dataset(name: str, body: DatasetChoice, session: SessionDep, settings: SettingsDep) -> ModelDetail:
     model = get_model(session, name)
-    model.dataset = get_dataset(session, body.dataset) if body.dataset else None
+    chosen = get_dataset(session, body.dataset) if body.dataset else None
+    lock = dataset_lock(model)
+    if lock is not None and chosen is not model.dataset:
+        raise ConflictError(lock)
+    model.dataset = chosen
     model.updated_at = now()
     session.commit()
     return detail(settings, model)

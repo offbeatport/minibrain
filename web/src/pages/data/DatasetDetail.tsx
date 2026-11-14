@@ -11,7 +11,14 @@ import {
     SelectValue,
 } from "obp-ui";
 import { useState } from "react";
-import { type DatasetSummary, type SourceSummary, api, succeed, unwrap } from "~/api/client";
+import {
+    type DatasetSummary,
+    type ModelRow,
+    type SourceSummary,
+    api,
+    succeed,
+    unwrap,
+} from "~/api/client";
 import {
     keys,
     useAllModels,
@@ -202,6 +209,16 @@ function TestExampleNote({ count: total }: { count: number }) {
     );
 }
 
+const DATA_JOBS = new Set(["train", "eval"]);
+
+function busyOnData(row: ModelRow): string | null {
+    const { activity } = row;
+    const active = activity.state === "queued" || activity.state === "running";
+    return active && DATA_JOBS.has(activity.kind ?? "")
+        ? `${activity.label}: its dataset changes once that finishes`
+        : null;
+}
+
 function UsedBy({ dataset }: { dataset: DatasetSummary }) {
     const refresh = useDataRefresh();
     const models = useAllModels();
@@ -249,11 +266,19 @@ function UsedBy({ dataset }: { dataset: DatasetSummary }) {
                             <SelectValue placeholder="Use it for another model" />
                         </SelectTrigger>
                         <SelectContent>
-                            {candidates.map((row) => (
-                                <SelectItem key={row.key} value={row.key}>
-                                    {row.name}
-                                </SelectItem>
-                            ))}
+                            {candidates.map((row) => {
+                                const busy = busyOnData(row);
+                                return (
+                                    <SelectItem
+                                        key={row.key}
+                                        value={row.key}
+                                        disabled={Boolean(busy)}
+                                        description={busy ?? undefined}
+                                    >
+                                        {row.name}
+                                    </SelectItem>
+                                );
+                            })}
                         </SelectContent>
                     </Select>
                 )}

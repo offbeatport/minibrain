@@ -762,6 +762,7 @@
           "Data"
         ],
         "summary": "Choose the dataset a custom model trains on",
+        "description": "Refused with 409 while a training or scoring job of the model is queued or running.",
         "operationId": "choose_dataset_api_models__name__dataset_put",
         "parameters": [
           {
@@ -15897,6 +15898,18 @@
               }
             ]
           },
+          "dataset_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Lock",
+            "description": "Why the dataset cannot change now: a training or scoring job is queued or running."
+          },
           "changed": {
             "anyOf": [
               {
@@ -21747,6 +21760,18 @@
                 "type": "null"
               }
             ]
+          },
+          "dataset_lock": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Lock",
+            "description": "Why the dataset cannot change now: a training or scoring job is queued or running."
           },
           "changed": {
             "anyOf": [

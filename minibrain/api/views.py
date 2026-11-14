@@ -59,6 +59,8 @@ from minibrain.registry.models import (
     DatasetVersion,
     Job,
     JobAttempt,
+    JobKind,
+    JobStatus,
     Model,
     Teardown,
     TeardownKind,
@@ -443,6 +445,21 @@ def label_proposal(model: Model, current: DatasetVersion | None) -> LabelProposa
     return LabelProposal(dataset_version_id=current.id, dataset_version_number=current.number, labels=current.labels)
 
 
+DATA_JOBS = {JobKind.TRAIN: "Training", JobKind.EVAL: "Scoring"}
+
+
+def dataset_lock(model: Model) -> str | None:
+    busy = [job for job in model.jobs if job.status in ACTIVE_JOB_STATUSES and job.kind in DATA_JOBS]
+    if not busy:
+        return None
+    job = max(busy, key=lambda found: found.id)
+    number = next((version.number for version in model.versions if version.id == job.version_id), None)
+    verb = DATA_JOBS[JobKind(job.kind)]
+    what = f"{verb} v{number}" if number is not None else verb
+    state = "is queued" if job.status == JobStatus.QUEUED else "is running"
+    return f"{what} {state} on this dataset; change it once that finishes, or cancel the job."
+
+
 def detail(settings: Settings, model: Model) -> ModelDetail:
     current = latest_dataset_version(model)
     session = object_session(model)
@@ -467,6 +484,7 @@ def detail(settings: Settings, model: Model) -> ModelDetail:
         dataset=model.dataset.slug if model.dataset else None,
         dataset_name=model.dataset.name if model.dataset else None,
         dataset_version=dataset_version_info(current) if current is not None else None,
+        dataset_lock=dataset_lock(model),
         changed=model_changes(settings, model),
         models=model_names(model),
         request_bodies=bodies_info(model),

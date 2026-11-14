@@ -852,6 +852,9 @@ class ModelDetail(ModelSummary):
     dataset: str | None = None
     dataset_name: str | None = None
     dataset_version: DatasetVersionInfo | None
+    dataset_lock: str | None = Field(
+        default=None, description="Why the dataset cannot change now: a training or scoring job is queued or running."
+    )
     changed: ChangeInfo | None = None
     serve_only: ServeOnlyInfo | None = None
     models: list[str]

@@ -292,7 +292,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Choose the dataset a custom model trains on */
+        /**
+         * Choose the dataset a custom model trains on
+         * @description Refused with 409 while a training or scoring job of the model is queued or running.
+         */
         put: operations["choose_dataset_api_models__name__dataset_put"];
         post?: never;
         delete?: never;
@@ -4716,6 +4719,11 @@ export interface components {
             /** Dataset Name */
             dataset_name?: string | null;
             dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
+            /**
+             * Dataset Lock
+             * @description Why the dataset cannot change now: a training or scoring job is queued or running.
+             */
+            dataset_lock?: string | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
             serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
             /** Models */
@@ -6615,6 +6623,11 @@ export interface components {
             /** Dataset Name */
             dataset_name?: string | null;
             dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
+            /**
+             * Dataset Lock
+             * @description Why the dataset cannot change now: a training or scoring job is queued or running.
+             */
+            dataset_lock?: string | null;
             changed?: components["schemas"]["ChangeInfo"] | null;
             serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
             /** Models */
