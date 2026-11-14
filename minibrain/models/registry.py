@@ -27,6 +27,7 @@ from minibrain.policy import load as load_policy
 from minibrain.registry.files import store_for
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
+    AuditEvent,
     BaseModel,
     BaseModelStatus,
     CatalogModel,
@@ -263,7 +264,15 @@ def start_download(
     model.updated_at = now()
     session.flush()
     params = download_params(settings, model, variant, entry.gated)
-    enqueue(session, JobKind.DOWNLOAD, params, idempotency_key=f"download:{model.id}", base_model_id=model.id)
+    job = enqueue(session, JobKind.DOWNLOAD, params, idempotency_key=f"download:{model.id}", base_model_id=model.id)
+    facts = {
+        "name": model.name,
+        "repo": variant.repo,
+        "revision": variant.revision,
+        "variant": variant.id,
+        "job": job.id,
+    }
+    session.add(AuditEvent(actor=acknowledged_by, action="model.download", target=model.id, detail=facts))
     return model
 
 

@@ -220,6 +220,7 @@ def import_model(body: ImportRequest, request: Request, session: SessionDep, set
         body.connection_id,
         body.api_name,
     )
+    audit(session, "model.import", model, source=body.location.strip(), kind=kind)
     session.commit()
     return row_of(session, settings, request, model)
 

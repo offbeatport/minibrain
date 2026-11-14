@@ -198,6 +198,16 @@ def duplicated(owner: Owner, event: AuditEvent) -> Said:
     return Said(f"duplicated {source} as {name}", ActivityLink(kind="model", label=name, key=owner.key))
 
 
+def downloaded(owner: Owner, event: AuditEvent) -> Said:
+    name = detail_text(event, "name") or owner.name
+    return Said(f"started downloading {name}", ActivityLink(kind="model", label=name, key=owner.key))
+
+
+def imported(owner: Owner, event: AuditEvent) -> Said:
+    name = detail_text(event, "name") or owner.name
+    return Said(f"started importing {name}", ActivityLink(kind="model", label=name, key=owner.key))
+
+
 def deployed(owner: Owner, event: AuditEvent) -> Said:
     return Said(f"deployed {owner.key}", ActivityLink(kind="monitoring", label=owner.key, key=owner.key), "success")
 
@@ -226,6 +236,8 @@ def updated(owner: Owner, event: AuditEvent) -> Said:
 SENTENCES: dict[str, Callable[[Owner, AuditEvent], Said]] = {
     "model.create": created,
     "model.duplicate": duplicated,
+    "model.download": downloaded,
+    "model.import": imported,
     "model.deploy": deployed,
     "model.undeploy": undeployed,
     "model.undeploy_finished": fixed("finished undeploying"),

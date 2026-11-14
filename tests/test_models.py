@@ -210,6 +210,28 @@ def test_delete_base_model_frees_its_files_once_nothing_uses_it(harness: Harness
         ]
 
 
+def test_starting_a_download_or_an_import_is_audited_and_names_who_added_it(
+    harness: Harness, hub: Path, tmp_path: Path
+) -> None:
+    add_tiny(harness)
+    download_tiny(harness)
+    folder = tmp_path / "base"
+    folder.mkdir()
+    for name, data in FILES.items():
+        (folder / name).write_bytes(data)
+    body = {"name": "Base One", "source_type": "folder", "location": str(folder)}
+    assert harness.client.post("/api/models/import", json=body).status_code == 202
+    with harness.sessions() as session:
+        found = {event.action: event for event in session.query(AuditEvent)}
+    assert (found["model.download"].target, found["model.download"].detail["repo"]) == ("tiny", REPO)
+    assert (found["model.import"].target, found["model.import"].detail["source"]) == ("base-one", str(folder))
+    for key, text in (("tiny", "started downloading"), ("base-one", "started importing")):
+        page = harness.client.get(f"/api/models/{key}/overview").json()
+        assert page["created_by"] == "admin@example.com"
+        events = harness.client.get(f"/api/models/{key}/activity").json()["events"]
+        assert [event["text"].startswith(text) for event in events] == [True]
+
+
 def test_download_is_refused_when_the_model_disk_is_too_full(
     harness: Harness, hub: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
