@@ -215,3 +215,23 @@ def test_only_builders_switch_and_each_switch_is_audited(harness: Harness) -> No
     assert switch(harness, FULL, harness.person(Role.BUILDER)).status_code == 200
     [event] = events(harness, "model.base_change")
     assert event.actor == "builder@example.com" and event.detail["from"] == GGUF
+
+
+def announce(harness: Harness, base: str, pool: str) -> None:
+    body = {"id": f"e-{base}-{pool}", "host": f"{pool}-1", "url": f"http://{pool}-{base}:9000", "base_model": base}
+    body |= {"engine": "sglang", "state": "ready", "pool": pool}
+    response = harness.client.post("/internal/gateway/engines", json=body, headers=harness.gateway_headers)
+    assert response.status_code == 204
+
+
+def test_monitoring_lists_the_replicas_of_the_live_base_in_its_pool(harness: Harness) -> None:
+    trained_and_live(harness)
+    add_base(harness)
+    assert switch(harness, BASE).status_code == 200
+    finish(harness, "eval", accuracy=0.95)
+    deploy(harness, max(versions(harness)))
+    for base in (FULL, BASE):
+        for pool in ("local", "rack"):
+            announce(harness, base, pool)
+    replicas = harness.client.get(f"/api/models/{SLUG}/traffic").json()["replicas"]
+    assert [(replica["host"], replica["pool"]) for replica in replicas] == [("local-1", "local")]

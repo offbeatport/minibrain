@@ -13,10 +13,12 @@ from minibrain.api.access import viewer
 from minibrain.api.deps import SessionDep
 from minibrain.api.overview import aligned, bucket_of, failed, integer, partitions, ranked, shared_columns
 from minibrain.api.request_logs import CLIENT_ERROR, aware
+from minibrain.models.placement import pools_of
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import ApiKey, AuditEvent, Model, RequestLog, now
 from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import no_model
+from minibrain.tasks.service import serving_base
 
 router = APIRouter(prefix="/api")
 
@@ -125,8 +127,13 @@ class Subject:
     @property
     def serving_base(self) -> str:
         if self.custom is not None:
-            return self.custom.deployed_base or self.custom.base_model
+            return serving_base(self.custom)
         return self.base.id if self.base is not None else self.target
+
+    @property
+    def pools(self) -> set[str]:
+        found = self.custom or self.base
+        return pools_of(found) if found is not None else set()
 
     @property
     def deployed(self) -> bool:
@@ -299,13 +306,13 @@ def callers_of(session: Session, where: Sequence[ColumnElement[bool]]) -> list[T
     return found
 
 
-def replicas_of(session: Session, base: str) -> list[TrafficReplica]:
+def replicas_of(session: Session, base: str, pools: set[str]) -> list[TrafficReplica]:
     return [
         TrafficReplica(
             host=replica.node_id.split("/", 1)[-1], pool=replica.pool, engine=replica.engine, state=replica.state
         )
         for replica in live_engines(session)
-        if replica.base_model == base
+        if replica.base_model == base and replica.pool in pools
     ]
 
 
@@ -348,7 +355,7 @@ def traffic_report(session: Session, name: str, span: TrafficRange) -> ModelTraf
         markers=markers_of(session, subject, start, until),
         errors=errors_of(session, where),
         callers=callers_of(session, where),
-        replicas=replicas_of(session, subject.serving_base) if subject.deployed else [],
+        replicas=replicas_of(session, subject.serving_base, subject.pools) if subject.deployed else [],
     )
 
 
