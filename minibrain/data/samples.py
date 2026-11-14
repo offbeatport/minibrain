@@ -28,7 +28,7 @@ class Sample:
 SAMPLES = (
     Sample(
         file="demo_travel_intents.jsonl",
-        name="Travel intents",
+        name="Demo travel intents",
         format="JSON Lines",
         rows=750,
         labels=5,
@@ -37,7 +37,7 @@ SAMPLES = (
     ),
     Sample(
         file="demo_banking77.csv",
-        name="Banking77",
+        name="Demo Banking77",
         format="CSV",
         rows=13_083,
         labels=77,
@@ -46,7 +46,7 @@ SAMPLES = (
     ),
     Sample(
         file="demo_clinc150.parquet",
-        name="CLINC150",
+        name="Demo CLINC150",
         format="Parquet",
         rows=23_850,
         labels=151,

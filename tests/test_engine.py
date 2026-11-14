@@ -290,7 +290,11 @@ def test_try_with_sample_data_is_a_chat_assistant_offered_the_travel_intents(har
     created = harness.client.post("/api/models/sample")
     assert created.status_code == 201, created.text
     found = created.json()
-    assert (found["name"], found["preset"], found["dataset_name"]) == ("Travel intents", "general", "Travel intents")
+    assert (found["name"], found["preset"], found["dataset_name"]) == (
+        "Demo travel intents",
+        "general",
+        "Demo travel intents",
+    )
     assert found["contract"] == {"kind": "text", "json_schema": None, "labels": None}
     assert found["promotion"] == {"thresholds": [], "beats_live": True}
     assert found["label_proposal"]["labels"] == [
@@ -301,4 +305,4 @@ def test_try_with_sample_data_is_a_chat_assistant_offered_the_travel_intents(har
         "lost_luggage",
     ]
     assert found["label_proposal"]["dataset_version_id"] == found["dataset_version"]["id"]
-    assert harness.client.post("/api/models/sample").json()["name"] == "Travel intents 2"
+    assert harness.client.post("/api/models/sample").json()["name"] == "Demo travel intents 2"

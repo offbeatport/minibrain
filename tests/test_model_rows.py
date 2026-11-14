@@ -99,7 +99,7 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     assert first.status_code == 201, first.text
     body = first.json()
     assert (body["name"], body["preset"], body["source"]["file"]) == (
-        "Travel intents",
+        "Demo travel intents",
         "general",
         "demo_travel_intents.jsonl",
     )
@@ -107,7 +107,7 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     assert body["dataset_version"]["rows"] == 750
     assert len(body["label_proposal"]["labels"]) == 5
     again = harness.client.post("/api/models/sample").json()
-    assert (again["name"], again["dataset"]) == ("Travel intents 2", body["dataset"])
+    assert (again["name"], again["dataset"]) == ("Demo travel intents 2", body["dataset"])
 
 
 def test_each_version_is_reported_with_its_own_status_and_requests(harness: Harness) -> None:

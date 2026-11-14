@@ -607,7 +607,7 @@ def test_sample_starts_its_base_download_once(harness: Harness, hub: Path, monke
     assert (first.json()["base_name"], first.json()["download_bytes"] > GIB) == ("Qwen3 0.6B", True)
     assert rows(harness)["qwen3-0.6b"]["availability"]["state"] == "downloading"
     second = harness.client.post("/api/models/sample").json()
-    assert (second["name"], second["download_bytes"]) == ("Travel intents 2", None)
+    assert (second["name"], second["download_bytes"]) == ("Demo travel intents 2", None)
 
 
 def test_sample_needing_a_download_offline_creates_nothing(
