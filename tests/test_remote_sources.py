@@ -12,7 +12,7 @@ from minibrain.connections import s3 as connection_s3
 from minibrain.connections.spec import ConnectionConfig
 from minibrain.connections.store import Resolved
 from minibrain.data import extensions, remote
-from minibrain.data.sources import SourceError, statement_tables
+from minibrain.data.sources import READERS, SourceError, statement_tables
 from minibrain.registry.models import Job
 from tests.conftest import Harness
 from tests.fake_s3 import ACCESS_KEY, SECRET_KEY, FakeS3, fake_s3
@@ -109,7 +109,9 @@ def test_duckdb_reads_use_scoped_secrets_and_read_only_attaches() -> None:
         secret="it's-secret",
     )
     recorder = Recorder()
-    reader = remote.S3Reader(connection=s3, files=("s3://data/a.parquet",), reader="read_parquet", scope="s3://data/")
+    reader = remote.S3Reader(
+        connection=s3, files=("s3://data/a.parquet",), reader=READERS[".parquet"], scope="s3://data/"
+    )
     relation = reader.open(recorder, "remote_0")  # type: ignore[arg-type]
     assert relation == "SELECT * FROM read_parquet(['s3://data/a.parquet'], union_by_name = true)"
     secret = recorder.statements[0]

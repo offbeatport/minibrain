@@ -14,12 +14,12 @@ from minibrain.data.extensions import ExtensionMissingError, load, offline_confi
 from minibrain.encryption.duck import register
 
 READERS = {
-    ".csv": "read_csv_auto",
-    ".tsv": "read_csv_auto",
-    ".json": "read_json_auto",
-    ".jsonl": "read_json_auto",
-    ".ndjson": "read_json_auto",
-    ".parquet": "read_parquet",
+    ".csv": "read_csv_auto({})",
+    ".tsv": "read_csv_auto({}, delim = '\\t')",
+    ".json": "read_json_auto({})",
+    ".jsonl": "read_json_auto({})",
+    ".ndjson": "read_json_auto({})",
+    ".parquet": "read_parquet({})",
 }
 SOURCE_TABLE = "source"
 QUERY_TIMEOUT_SECONDS = 30
@@ -124,12 +124,12 @@ def table_name_base(name: str) -> str:
 
 def stage(source: str | Path, staging_path: Path) -> None:
     name = Path(str(source)).name
-    reader = READERS[Path(name).suffix.lower()]
+    relation = READERS[Path(name).suffix.lower()].format(quote_literal(str(source)))
     staging_path.unlink(missing_ok=True)
     try:
         with duckdb.connect(str(staging_path)) as connection:
             register(connection)
-            connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS SELECT * FROM {reader}({quote_literal(str(source))})")
+            connection.execute(f"CREATE TABLE {SOURCE_TABLE} AS SELECT * FROM {relation}")
     except duckdb.Error as error:
         staging_path.unlink(missing_ok=True)
         raise SourceError(f"could not read {name}: {error}") from error
@@ -137,6 +137,10 @@ def stage(source: str | Path, staging_path: Path) -> None:
 
 def file_list(files: Sequence[str]) -> str:
     return "[" + ", ".join(quote_literal(file) for file in files) + "]"
+
+
+def read_files(reader: str, files: Sequence[str]) -> str:
+    return "SELECT * FROM " + reader.format(f"{file_list(files)}, union_by_name = true")
 
 
 def table_relation(connection: duckdb.DuckDBPyConnection, table: Table, attached: str) -> str:
@@ -147,7 +151,7 @@ def table_relation(connection: duckdb.DuckDBPyConnection, table: Table, attached
         return f"SELECT * FROM {attached}.{SOURCE_TABLE}"
     if not table.files:
         raise SourceError(f"{table.name} has no files to read")
-    return f"SELECT * FROM {table.reader}({file_list(table.files)}, union_by_name = true)"
+    return read_files(table.reader, table.files)
 
 
 def connect(

@@ -23,9 +23,9 @@ from minibrain.data.sources import (
     READERS,
     SourceError,
     Table,
-    file_list,
     quote_identifier,
     quote_literal,
+    read_files,
     sandbox,
 )
 
@@ -124,7 +124,7 @@ class S3Reader:
 
     def open(self, connection: duckdb.DuckDBPyConnection, alias: str) -> str:
         connection.execute(s3_secret(alias, self.connection, self.scope))
-        return f"SELECT * FROM {self.reader}({file_list(self.files)}, union_by_name = true)"
+        return read_files(self.reader, self.files)
 
 
 def split_table(table: str, default_schema: str) -> tuple[str, str]:

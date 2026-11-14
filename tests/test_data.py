@@ -5,9 +5,11 @@ import pytest
 
 from minibrain.data import splits
 from minibrain.data.sources import (
+    READERS,
     SourceError,
     Table,
     assess,
+    describe,
     example_rows,
     label_counts,
     run_query,
@@ -100,6 +102,21 @@ def test_chat_rows_split_off_the_last_answer(tmp_path: Path) -> None:
     assert label_counts(tables, "SELECT messages FROM source", 10) == [("billing", 1), ("bug", 1)]
     with pytest.raises(SourceError, match="messages column"):
         example_rows(tables, "SELECT 1 AS other")
+
+
+TABBED = "text\tlabel\nhello, world, again\tgreet\nbye, see you, soon\tbye\nfoo, bar, baz\tother\n"
+
+
+def test_tsv_splits_on_tabs_even_when_the_text_has_commas(tmp_path: Path) -> None:
+    upload = tmp_path / "chat.tsv"
+    upload.write_text(TABBED)
+    staged = tmp_path / "staging.duckdb"
+    stage(upload, staged)
+    folder = Table(name="folder", files=(str(upload),), reader=READERS[".tsv"])
+    for table in (Table(name="source", staging=str(staged)), folder):
+        columns, rows = describe(table)
+        assert [column.name for column in columns] == ["text", "label"]
+        assert rows == 3
 
 
 def test_table_names_are_readable_identifiers() -> None:
