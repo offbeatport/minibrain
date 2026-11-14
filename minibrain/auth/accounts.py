@@ -167,7 +167,8 @@ def checked_session(session: Session, token: str) -> tuple[LoginSession | None, 
         if idle and limits.idle is not None:
             return None, f"idle:{int(limits.idle.total_seconds() // 60)}"
         return None, f"expired:{int(limits.absolute.total_seconds() // 3600)}"
-    if moment - row.last_seen_at > TOUCH_EVERY:
+    touch_every = min(TOUCH_EVERY, limits.idle / 4) if limits.idle is not None else TOUCH_EVERY
+    if moment - row.last_seen_at > touch_every:
         row.last_seen_at = moment
     return row, None
 

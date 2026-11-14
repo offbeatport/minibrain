@@ -295,6 +295,17 @@ def test_sessions_end_after_the_idle_and_absolute_lifetimes(install: Install) ->
         assert session.scalars(select(LoginSession)).all() == []
 
 
+def test_a_one_minute_idle_timeout_keeps_busy_people_signed_in(install: Install) -> None:
+    admin = set_up(install)
+    assert admin.put("/api/policies/session_idle_minutes", json={"value": 1}, headers=csrf(admin)).status_code == 200
+    for _ in range(3):
+        with install.sessions() as session:
+            seen = session.scalars(select(LoginSession.last_seen_at)).one()
+            session.execute(update(LoginSession).values(last_seen_at=seen - timedelta(seconds=40)))
+            session.commit()
+        assert admin.get("/api/models").status_code == 200
+
+
 def test_admins_invite_people_with_a_one_time_link(install: Install) -> None:
     admin = set_up(install)
     link = invite(admin, "bea@example.com", "builder")
