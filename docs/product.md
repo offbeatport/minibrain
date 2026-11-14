@@ -373,8 +373,8 @@ Principles: any size, own hardware, air-gapped, gated on scores
   Let one key call every model, including ones added later.
   UI: API keys · API: POST /api/keys, PUT /api/keys/{key_id}/models
 - **Harness configs** · shipped · engineer
-  Copy ready config for curl, Python, LangChain, LiteLLM and more.
-  UI: Models › model › Use › API Connect
+  Copy ready configs, create a key and see the first request.
+  UI: Models › model › Use › API Connect · API: POST /api/keys, GET /api/requests, POST /v1/chat/completions
 - **Playground** · shipped · product, engineer
   Chat with any model, streamed, with every API setting and its code.
   UI: Playground · API: GET /api/playground/models, POST /api/playground/chat/completions

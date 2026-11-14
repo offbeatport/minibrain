@@ -9,7 +9,7 @@ export type Harness = {
     code: string;
 };
 
-const SAMPLE = "I was charged twice";
+export const SAMPLE = "I was charged twice";
 
 export function harnesses(baseUrl: string, model: string, key: string): Harness[] {
     return [
