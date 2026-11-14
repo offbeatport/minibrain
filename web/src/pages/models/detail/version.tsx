@@ -73,6 +73,8 @@ import {
     modelCardHref,
     modelCompareHref,
     modelPageHref,
+    versionCrumb,
+    versionNumberOf,
     versionPlaygroundHref,
 } from "~/lib/modelLinks";
 import { bytes, relativeTime } from "~/lib/time";
@@ -866,7 +868,7 @@ function Curves({ job }: { job: JobDetail }) {
     );
 }
 
-export function VersionView({ row, number }: { row: ModelRow; number: number }) {
+export function VersionView({ row, number }: { row: ModelRow; number: number | null }) {
     const models = useAllModels();
     const versions = useVersions(row.key);
     const jobs = useJobs(row.key);
@@ -875,7 +877,7 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
     const run = version ? runJob(version, jobs.data ?? []) : undefined;
     const runDetail = useJob(run?.id ?? null);
     const job = runDetail.data;
-    const crumbs = modelCrumbs(row, [{ label: `v${number}` }]);
+    const crumbs = modelCrumbs(row, [{ label: versionCrumb(number) }]);
     if (!version) {
         return (
             <Page wide>
@@ -893,7 +895,7 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
                         }}
                         secondary={{ label: `Go to ${row.name}`, href: modelPageHref(row.key) }}
                     >
-                        {Number.isInteger(number) && number >= 0
+                        {number !== null
                             ? `${row.name} has no v${number}. It may have been deleted.`
                             : `${row.name} has no version with that number.`}
                     </NotFoundState>
@@ -953,7 +955,7 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
     );
 }
 
-export function useVersionNumber(): number {
+export function useVersionNumber(): number | null {
     const { number } = useParams({ strict: false }) as { number?: string };
-    return Number((number ?? "").replace(/^v/, ""));
+    return versionNumberOf(number);
 }

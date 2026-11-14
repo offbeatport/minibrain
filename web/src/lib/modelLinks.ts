@@ -84,6 +84,15 @@ export function modelVersionHref(name: string, number: number): string {
     return `/models/${encodeURIComponent(name)}/versions/${number}`;
 }
 
+export function versionNumberOf(value: string | null | undefined): number | null {
+    const text = (value ?? "").trim().replace(/^v/, "");
+    return /^\d+$/.test(text) ? Number(text) : null;
+}
+
+export function versionCrumb(number: number | null): string {
+    return number === null ? "Version" : `v${number}`;
+}
+
 export function modelCompareHref(name: string, a: number, b: number): string {
     return `/models/${encodeURIComponent(name)}/compare?a=${a}&b=${b}`;
 }

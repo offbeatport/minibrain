@@ -17,14 +17,20 @@ import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
-import { PageCrumbs } from "~/components/PageCrumbs";
+import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { VersionState } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { modelAibomHref, modelCardDownloadHref, modelPageHref } from "~/lib/modelLinks";
+import {
+    modelAibomHref,
+    modelCardDownloadHref,
+    modelPageHref,
+    versionCrumb,
+    versionNumberOf,
+} from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import {
     ApprovalsSection,
@@ -287,49 +293,84 @@ function CardView({
     );
 }
 
+function cardCrumbs(slug: string, number: number | null): Crumb[] {
+    return [
+        { label: "Models", href: modelsHref() },
+        { label: slug, href: modelPageHref(slug) },
+        {
+            label: versionCrumb(number),
+            href: number === null ? undefined : modelPageHref(slug, "versions"),
+        },
+        { label: "Model card" },
+    ];
+}
+
+function CardMissing({
+    slug,
+    number,
+    detail,
+}: { slug: string; number: number | null; detail?: string }) {
+    return (
+        <NotFoundState
+            title="Model card not found"
+            primary={{ label: "Go to Versions", href: modelPageHref(slug, "versions") }}
+            secondary={{ label: "Go to Models", href: modelsHref() }}
+            detail={detail}
+        >
+            {number === null
+                ? `${slug} has no version with that number.`
+                : `There is no card for ${slug} v${number}. The model or the version may have been deleted.`}
+        </NotFoundState>
+    );
+}
+
+function CardPage({ target }: { target: Target }) {
+    const card = useModelCard(target);
+    if (card.data) {
+        return (
+            <CardView
+                target={target}
+                card={card.data.card}
+                sha256={card.data.sha256}
+                form={card.data.canonical_form}
+            />
+        );
+    }
+    return (
+        <>
+            <PageCrumbs items={cardCrumbs(target.slug, target.number)} />
+            {card.error ? (
+                <QueryError
+                    error={card.error}
+                    retry={card.refetch}
+                    notFound={
+                        <CardMissing
+                            slug={target.slug}
+                            number={target.number}
+                            detail={errorMessage(card.error)}
+                        />
+                    }
+                />
+            ) : (
+                <p className="text-muted-foreground">Loading…</p>
+            )}
+        </>
+    );
+}
+
 export function ModelCardPage() {
     const params = useParams({ strict: false }) as { name?: string; number?: string };
-    const target = { slug: params.name ?? "", number: Number(params.number) };
-    const card = useModelCard(target);
+    const slug = params.name ?? "";
+    const number = versionNumberOf(params.number);
     return (
         <Page wide>
-            {card.isLoading && <p className="text-muted-foreground">Loading…</p>}
-            {card.error && !card.data && (
+            {number === null ? (
                 <>
-                    <PageCrumbs
-                        items={[
-                            { label: "Models", href: modelsHref() },
-                            { label: target.slug, href: modelPageHref(target.slug) },
-                            { label: `v${params.number ?? ""}` },
-                            { label: "Model card" },
-                        ]}
-                    />
-                    <QueryError
-                        error={card.error}
-                        retry={card.refetch}
-                        notFound={
-                            <NotFoundState
-                                title="Model card not found"
-                                primary={{
-                                    label: "Go to Versions",
-                                    href: modelPageHref(target.slug, "versions"),
-                                }}
-                                secondary={{ label: "Go to Models", href: modelsHref() }}
-                                detail={errorMessage(card.error)}
-                            >
-                                {`There is no card for ${target.slug} v${params.number ?? ""}. The model or the version may have been deleted.`}
-                            </NotFoundState>
-                        }
-                    />
+                    <PageCrumbs items={cardCrumbs(slug, null)} />
+                    <CardMissing slug={slug} number={null} />
                 </>
-            )}
-            {card.data && (
-                <CardView
-                    target={target}
-                    card={card.data.card}
-                    sha256={card.data.sha256}
-                    form={card.data.canonical_form}
-                />
+            ) : (
+                <CardPage target={{ slug, number }} />
             )}
         </Page>
     );

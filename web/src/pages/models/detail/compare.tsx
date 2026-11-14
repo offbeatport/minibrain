@@ -20,7 +20,7 @@ import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
-import { modelCompareHref, versionPlaygroundHref } from "~/lib/modelLinks";
+import { modelCompareHref, versionNumberOf, versionPlaygroundHref } from "~/lib/modelLinks";
 import { datasetVersionDiffHref } from "../../data/versionData";
 import { baseNameOf, isDeployed, modelCrumbs } from "./header";
 import {
@@ -263,15 +263,23 @@ function DataDiff({ a, b }: { a: VersionInfo; b: VersionInfo }) {
     );
 }
 
+function defaultPair(list: VersionInfo[]): [number | null, number | null] {
+    const newest = [...list].sort((x, y) => y.number - x.number);
+    const latest = newest[0];
+    const other = newest.find((item) => item.current && item !== latest) ?? newest[1];
+    return [other?.number ?? null, latest?.number ?? null];
+}
+
 export function CompareView({ row }: { row: ModelRow }) {
     const router = useRouter();
     const can = useCan();
     const versions = useVersions(row.key);
     const models = useAllModels();
     const [promoting, setPromoting] = useState<number | null>(null);
-    const first = Number(useSearchParam("a"));
-    const second = Number(useSearchParam("b"));
     const list = versions.data ?? [];
+    const fallback = defaultPair(list);
+    const first = versionNumberOf(useSearchParam("a")) ?? fallback[0];
+    const second = versionNumberOf(useSearchParam("b")) ?? fallback[1];
     const a = list.find((item) => item.number === first);
     const b = list.find((item) => item.number === second);
     const crumbs = modelCrumbs(row, [
