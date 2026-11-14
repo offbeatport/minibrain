@@ -8,7 +8,7 @@ import {
     initialsMarkup,
     styleById,
 } from "./avatarStyles";
-import { TONE_KEYS, type ToneName, cyrb53, slugOf, toneOf } from "./tones";
+import { TONE_KEYS, type ToneName, slugOf, toneOf } from "./tones";
 
 const DEFAULT_PX = 48;
 
@@ -23,7 +23,7 @@ let renderer: Renderer | undefined;
 let loading: Promise<Renderer> | undefined;
 const waiting = new Set<() => void>();
 
-export function loadDicebear(): Promise<Renderer> {
+function loadDicebear(): Promise<Renderer> {
     loading ??= import("./dicebear").then((module) => {
         renderer = module;
         for (const listener of waiting) {
@@ -49,16 +49,8 @@ export function useDicebear(needed: boolean): Renderer | undefined {
     return ready;
 }
 
-function toneAt(hash: number): ToneName {
-    return TONE_KEYS[hash % TONE_KEYS.length];
-}
-
 export function baseSeed(name: string): string {
     return slugOf(name) || "model";
-}
-
-export function choiceFor(style: AvatarStyleId, name: string, seed = baseSeed(name)): AvatarChoice {
-    return { style, seed, tone: toneAt(cyrb53(seed)) };
 }
 
 export function fallbackChoice(name: string): AvatarChoice {

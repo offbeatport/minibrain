@@ -61,66 +61,6 @@ function globalPage(path: string, component: RouteComponent): AnyRoute {
     return createRoute({ getParentRoute: () => rootRoute, path, component });
 }
 
-function prototypePages(): AnyRoute[] {
-    if (!import.meta.env.DEV) {
-        return [];
-    }
-    const logos = lazyRouteComponent(() => import("./pages/proto/LogosPage"), "LogosPage");
-    const modelIcons = lazyRouteComponent(
-        () => import("./pages/proto/ModelIconsPage"),
-        "ModelIconsPage",
-    );
-    return [
-        globalPage("/proto/logos", logos),
-        globalPage("/proto/model-icons", modelIcons),
-        globalPage("/proto/models-flow", flow("FlowRedirect")),
-        globalPage("/proto/models-flow/$", flow("FlowRedirect")),
-        flowRoutes(),
-    ];
-}
-
-type FlowPages = typeof import("./pages/proto/flowRoutes");
-
-function flow(name: keyof FlowPages): RouteComponent {
-    return lazyRouteComponent(() => import("./pages/proto/flowRoutes"), name);
-}
-
-function flowRoutes(): AnyRoute {
-    const layout = createRoute({
-        getParentRoute: () => rootRoute,
-        path: "/proto/flow",
-        component: flow("FlowShell"),
-    });
-    const page = (path: string, name: keyof FlowPages) =>
-        createRoute({ getParentRoute: () => layout, path, component: flow(name) });
-    return layout.addChildren([
-        page("/", "FlowHomePage"),
-        page("models", "ModelsFlowPage"),
-        page("models/new", "FlowAddModelPage"),
-        page("models/$model", "FlowModelPage"),
-        page("models/$model/compare", "ModelsFlowComparePage"),
-        page("models/$model/versions/$version", "ModelsFlowVersionPage"),
-        page("models/$model/versions/$version/$tab", "ModelsFlowVersionPage"),
-        page("models/$model/$tab", "FlowModelPage"),
-        page("training", "FlowTrainingPage"),
-        page("training/$id", "FlowJobPage"),
-        page("data", "FlowDataPage"),
-        page("data/$dataset", "FlowDatasetPage"),
-        page("discover", "FlowDiscoverPage"),
-        page("discover/$id", "FlowCatalogPage"),
-        page("playground", "FlowPlaygroundPage"),
-        page("monitor", "FlowMonitorPage"),
-        page("monitor/jobs", "FlowOldJobsRedirect"),
-        page("jobs", "FlowJobsPage"),
-        page("evaluations", "FlowEvaluationsPage"),
-        page("jobs/$id", "FlowJobPage"),
-        page("feedback", "FlowFeedbackPage"),
-        page("activity", "FlowActivityPage"),
-        page("infrastructure", "FlowInfrastructurePage"),
-        page("settings", "FlowSettingsPage"),
-    ]);
-}
-
 function guarded(role: Role, Component: RouteComponent): RouteComponent {
     return function Guarded() {
         return (
@@ -186,7 +126,6 @@ const routeTree = rootRoute.addChildren([
     globalPage("/settings/storage", guarded("admin", StorageSettingsPage)),
     globalPage("/settings/connections", guarded("admin", ConnectionsSettingsPage)),
     globalPage("/settings/install", guarded("admin", InstallSettingsPage)),
-    ...prototypePages(),
 ]);
 
 export const router = createRouter({

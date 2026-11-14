@@ -38,7 +38,7 @@ export function slugOf(name: string): string {
         .replace(/^-|-$/g, "");
 }
 
-export function cyrb53(text: string, seed = 0): number {
+function cyrb53(text: string, seed = 0): number {
     let h1 = 0xdeadbeef ^ seed;
     let h2 = 0x41c6ce57 ^ seed;
     for (let index = 0; index < text.length; index++) {

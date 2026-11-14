@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from "react";
-import { appPresetStyle } from "~/lib/theme";
 import { type Palette, hexOf, luminance } from "./avatarStyles";
 import { TONE_KEYS, type ToneName, toneToken } from "./tones";
 
@@ -50,57 +49,6 @@ function paletteFrom(read: (token: string) => string): Palette {
 function readPalette(): Palette {
     const computed = getComputedStyle(document.documentElement);
     return paletteFrom((name) => computed.getPropertyValue(name).trim());
-}
-
-function readableRules(sheet: CSSStyleSheet): CSSRuleList | undefined {
-    try {
-        return sheet.cssRules;
-    } catch {
-        return undefined;
-    }
-}
-
-function declaredTokens(selector: string): Map<string, string> {
-    const found = new Map<string, string>();
-    const visit = (rules: CSSRuleList) => {
-        for (const rule of Array.from(rules)) {
-            if (
-                rule instanceof CSSStyleRule &&
-                rule.selectorText.split(",").some((part) => part.trim() === selector)
-            ) {
-                for (const property of Array.from(rule.style)) {
-                    if (property.startsWith("--")) {
-                        found.set(property, rule.style.getPropertyValue(property).trim());
-                    }
-                }
-            }
-            if ("cssRules" in rule) {
-                visit((rule as CSSGroupingRule).cssRules);
-            }
-        }
-    };
-    for (const sheet of Array.from(document.styleSheets)) {
-        const rules = readableRules(sheet);
-        if (rules) {
-            visit(rules);
-        }
-    }
-    return found;
-}
-
-export type ThemeMode = "light" | "dark";
-
-export function modePalette(mode: ThemeMode, fallback: Palette): Palette {
-    const preset = appPresetStyle(mode);
-    const light = declaredTokens(":root");
-    const declared = mode === "dark" ? new Map([...light, ...declaredTokens(".dark")]) : light;
-    const computed = getComputedStyle(document.documentElement);
-    return {
-        ...paletteFrom(
-            (name) => preset[name] ?? declared.get(name) ?? computed.getPropertyValue(name).trim(),
-        ),
-        font: fallback.font,
-    };
 }
 
 let palette: Palette | undefined;
