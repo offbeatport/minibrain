@@ -40,7 +40,7 @@ import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
 import { DiskGauge, MAIN_POOL, MemoryGauge, PoolStatus } from "./ResourceGauges";
 import { type BaseOption, trainableVariant } from "./baseOptions";
-import { formatName, formatUse, scheme, trainable } from "./formats";
+import { formatUse, scheme, trainable } from "./formats";
 import { type PoolFits, usePoolFits } from "./runsHere";
 
 function variantLabel(variant: CatalogVariantInfo): string {
@@ -148,32 +148,30 @@ export function ServeOnlyNotice({
     onPickAnother: () => void;
 }) {
     const full = entry ? trainableVariant(entry) : undefined;
-    const next = full ? (
+    const switching = full ? (
         entry && installed(entry, full) ? (
-            `${scheme(full)} is already on this install.`
+            `Switch to ${scheme(full)} when you want to train; it's already on this install.`
         ) : (
             <>
-                {`Switching downloads ${scheme(full)}, `}
-                <span className="whitespace-nowrap tabular-nums">{bytes(full.size_bytes)}</span>.
+                {`Switch to ${scheme(full)} when you want to train (a `}
+                <span className="whitespace-nowrap tabular-nums">{bytes(full.size_bytes)}</span>
+                {" download)."}
             </>
         )
     ) : (
-        "The catalogue has no full-precision format of this model."
+        "This model has no full-precision format to train."
     );
-    const still = full
-        ? `You can still give it instructions, score it and serve it under its own name; train it later by switching to ${entry?.name ?? "the model"} ${scheme(full)}.`
-        : "You can still give it instructions, score it and serve it under its own name.";
     return (
         <div className="flex flex-col gap-2.5">
-            <StatusText tone="warning">{`${scheme(variant)} can't be fine-tuned`}</StatusText>
+            <StatusText tone="warning">{`${scheme(variant)} can't be trained`}</StatusText>
             <p className="text-muted-foreground">
-                Quantized formats serve only; training needs full precision. {next}
+                {"Quantized formats can only serve. You can still score and deploy it. "}
+                {switching}
             </p>
-            <p className="text-muted-foreground">{still}</p>
             <div>
                 {full ? (
                     <Button type="button" variant="outline" onClick={() => onVariant(full.id)}>
-                        {`Use ${formatName(full)}`}
+                        {`Use ${scheme(full)}`}
                     </Button>
                 ) : (
                     <Button type="button" variant="outline" onClick={onPickAnother}>
