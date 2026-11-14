@@ -101,6 +101,7 @@ ignore = ["S311"]
 "minibrain/data/delta.py" = ["S608"]
 "hatch_build.py" = ["S603"]
 "scripts/release_notes.py" = ["S603"]
+"scripts/check_licences.py" = ["S310", "S603"]
 
 [tool.pyright]
 include = ["minibrain", "demo_data", "scripts", "tests", "hatch_build.py"]

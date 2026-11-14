@@ -1,7 +1,9 @@
 # Third-party notices
 
-Python and web dependencies are listed with their licences in the SBOMs ([security](docs/security.md#software-sbom)).
-This file covers what those do not: the DuckDB extensions the Docker image carries.
+Python and web dependencies are listed in the SBOMs ([security](docs/security.md#software-sbom)); CI checks their
+licences against the project's policy, and `uv run python scripts/check_licences.py --list` prints each one with its
+licence ([security](docs/security.md#dependency-licences)). This file covers what those do not: the DuckDB extensions
+the Docker image carries.
 
 ## DuckDB extensions
 

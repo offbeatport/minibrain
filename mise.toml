@@ -38,6 +38,10 @@ run = [
 ]
 env = { SYFT_CHECK_FOR_APP_UPDATE = "false" }
 
+[tasks.licences]
+description = "Check the Python and web dependency licences against the Apache-2.0 policy; looks them up on PyPI"
+run = "uv run python scripts/check_licences.py"
+
 [tasks.api-types]
 description = "Regenerate the TypeScript API client from FastAPI"
 run = "pnpm --dir web gen:api"

@@ -485,6 +485,24 @@ writes the same two into `sbom/`.
 - CI downloads syft by release version and checks the archive's SHA-256 (`SYFT_VERSION` and `SYFT_SHA256` in
   `.github/workflows/ci.yml`).
 
+### Dependency licences
+
+minibrain is Apache-2.0. The `Dependency licences` CI job runs `scripts/check_licences.py`, which fails on any
+dependency the product ships whose licence is outside this policy:
+
+- Checked: the wheel's Python dependencies with every extra, for every platform in `uv.lock` (licences from PyPI's
+  metadata for the locked version), and the web UI's production dependencies (`pnpm licenses list --prod`). Dev
+  tools are not shipped and are not checked.
+- Allowed: permissive licences (MIT, BSD, Apache-2.0, ISC, PSF, Zlib, BSL-1.0, Unlicense, CC0, 0BSD and the like),
+  OFL-1.1 for fonts, CC-BY-4.0 for data, and weak copyleft used as an unmodified library (MPL-2.0, LGPL). An `OR`
+  expression passes when one side does; an `AND` expression needs every part.
+- Refused: GPL, AGPL, SSPL, non-commercial or proprietary licences, and packages with no licence metadata, unless the
+  script names them with a reason. Today: NVIDIA's CUDA libraries, which torch pulls in on Linux (NVIDIA's licence
+  lets an application redistribute them), and PyKCS11 (GPL-2.0-or-later), in the optional `hsm` extra only: never a
+  requirement of the wheel and not in the image; the operator installs it.
+
+The check needs the network (PyPI) and runs in CI only; nothing in minibrain looks licences up at run time.
+
 ### Docker image
 
 Each release carries one SBOM per image, `minibrain-image-{cpu,cuda}-{amd64,arm64}.cdx.json`: the release workflow
