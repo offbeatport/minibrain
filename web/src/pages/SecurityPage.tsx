@@ -8,6 +8,8 @@ import {
     type LucideIcon,
     Radar,
     ScrollText,
+    ShieldCheck,
+    Timer,
 } from "lucide-react";
 import {
     Button,
@@ -24,7 +26,7 @@ import {
     SettingsRow,
     Switch,
 } from "obp-ui";
-import { type FormEvent, type ReactNode, useState } from "react";
+import { type FormEvent, Fragment, type ReactNode, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
@@ -33,6 +35,7 @@ import { SettingsLayout } from "~/components/SettingsLayout";
 import { SourceBadge } from "~/components/SourceBadge";
 import { StatusText } from "~/components/models/StatusText";
 import { AUDIT_PATH, auditHref } from "~/lib/audit";
+import { AuditIntegrity, AuditRetention, RETENTION } from "~/pages/settings/AuditSettings";
 import { EncryptionSettings } from "~/pages/settings/EncryptionSettings";
 import { SECURITY, type SettingsSection, policyAnchor } from "~/pages/settings/settingsIndex";
 
@@ -43,7 +46,14 @@ const AUDIT = ["audit"] as const;
 const POLICY_CHANGES = auditHref({ action: "policy.update" });
 const INSTALL_PATH = "/settings/install";
 
-type Group = { icon: LucideIcon; section: SettingsSection; description?: ReactNode };
+type Policies = Map<string, PolicyInfo>;
+
+type Group = {
+    icon: LucideIcon;
+    section: SettingsSection;
+    description?: ReactNode;
+    own?: (policies: Policies) => ReactNode;
+};
 
 const NESTED = new Set(["licences"]);
 
@@ -63,13 +73,22 @@ const GROUPS: Group[] = [
         section: SECURITY.auditExport,
         description: (
             <>
-                {"The "}
+                {"Sealed events go to your SIEM as RFC 5424 syslog. Browse them in the "}
                 <Link href={AUDIT_PATH} className="text-primary hover:underline">
                     audit log
                 </Link>
-                {" shows whether the SIEM is keeping up and whether the hash chain verifies."}
+                {"."}
             </>
         ),
+    },
+    { icon: ShieldCheck, section: SECURITY.auditIntegrity, own: () => <AuditIntegrity /> },
+    {
+        icon: Timer,
+        section: SECURITY.auditRetention,
+        own: (policies) => {
+            const policy = policies.get(RETENTION);
+            return policy ? <AuditRetention policy={policy} /> : null;
+        },
     },
     {
         icon: Radar,
@@ -509,42 +528,46 @@ export function SecurityPage() {
         queryKey: POLICIES,
         queryFn: () => unwrap(api.GET("/api/policies")),
     });
-    const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
+    const byName: Policies = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
         <SettingsLayout
             title="Security"
-            caption="Install-wide policies: network, sign-in, request logs, exports and encryption."
+            caption="Install-wide policies: network, sign-in, request logs, the audit log, exports and encryption."
         >
             <ErrorLine error={policies.error} onRetry={policies.refetch} />
             <PanelSections>
                 {policies.data &&
-                    GROUPS.map((group) => (
-                        <PanelSection
-                            key={group.section.anchor}
-                            icon={group.icon}
-                            anchor={group.section.anchor}
-                            title={group.section.title}
-                            description={group.description}
-                        >
-                            <SettingsGroup>
-                                {policyNames(group.section).map((name) => {
-                                    const policy = byName.get(name);
-                                    if (!policy) {
-                                        return null;
-                                    }
-                                    return name === "licence_mode" ? (
-                                        <LicencesRow
-                                            key={name}
-                                            mode={policy}
-                                            list={byName.get("licences")}
-                                        />
-                                    ) : (
-                                        <PolicyRow key={name} policy={policy} />
-                                    );
-                                })}
-                            </SettingsGroup>
-                        </PanelSection>
-                    ))}
+                    GROUPS.map((group) =>
+                        group.own ? (
+                            <Fragment key={group.section.anchor}>{group.own(byName)}</Fragment>
+                        ) : (
+                            <PanelSection
+                                key={group.section.anchor}
+                                icon={group.icon}
+                                anchor={group.section.anchor}
+                                title={group.section.title}
+                                description={group.description}
+                            >
+                                <SettingsGroup>
+                                    {policyNames(group.section).map((name) => {
+                                        const policy = byName.get(name);
+                                        if (!policy) {
+                                            return null;
+                                        }
+                                        return name === "licence_mode" ? (
+                                            <LicencesRow
+                                                key={name}
+                                                mode={policy}
+                                                list={byName.get("licences")}
+                                            />
+                                        ) : (
+                                            <PolicyRow key={name} policy={policy} />
+                                        );
+                                    })}
+                                </SettingsGroup>
+                            </PanelSection>
+                        ),
+                    )}
                 {policies.data && <EncryptionSettings />}
                 <p className="text-sm text-muted-foreground">
                     {"Every change on this page is recorded in the "}

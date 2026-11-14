@@ -47,7 +47,7 @@ import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { Facts } from "~/components/Facts";
-import { ErrorLine, PanelSections } from "~/components/Section";
+import { ErrorLine } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import {
     AUDIT_KEYS,
@@ -75,7 +75,7 @@ import {
 import { count } from "~/lib/format";
 import { splitList, useListSearch } from "~/lib/listSearch";
 import { exactTime, relativeTime } from "~/lib/time";
-import { Integrity, RETENTION, Retention } from "~/pages/settings/audit/AuditPolicies";
+import { AuditStatus, RETENTION } from "~/pages/settings/AuditSettings";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type Policies = Map<string, PolicyInfo>;
@@ -538,7 +538,6 @@ export function AuditLogPage() {
     const eventId =
         search.event && Number.isInteger(Number(search.event)) ? Number(search.event) : null;
     const loaded = page.data?.events.find((event) => event.id === eventId);
-    const retention = policies.get(RETENTION);
     return (
         <SettingsLayout
             title="Audit log"
@@ -546,6 +545,7 @@ export function AuditLogPage() {
             actions={<ExportMenu query={query} />}
         >
             <div className="flex flex-col gap-3">
+                <AuditStatus policy={policies.get(RETENTION)} />
                 <div className="flex flex-wrap items-center gap-2">
                     <SearchInput
                         aria-label="Search the audit log"
@@ -651,10 +651,6 @@ export function AuditLogPage() {
                     />
                 )}
             </div>
-            <PanelSections>
-                <Integrity />
-                {retention && <Retention policy={retention} />}
-            </PanelSections>
             <EventSheet
                 id={eventId}
                 loaded={loaded}

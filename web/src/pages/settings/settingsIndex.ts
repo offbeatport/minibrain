@@ -388,6 +388,24 @@ export const SECURITY = {
         siemPort: policy("siem_port", ["syslog", "6514", "514"]),
         siemCaBundle: policy("siem_ca_bundle", TLS_WORDS),
     }),
+    auditIntegrity: section("Audit integrity", {
+        hashChain: setting(
+            "Hash chain",
+            "Every event carries a SHA-256 hash of its fields and of the event before it.",
+            ["tamper", "verify", "sha-256", "immutable", "worm", "audit log"],
+        ),
+        siemStatus: setting("SIEM status", "Whether your SIEM is keeping up with sealed events.", [
+            "syslog",
+            "forwarding",
+            "splunk",
+        ]),
+    }),
+    auditRetention: section("Audit retention", {
+        keep: policy("audit_retention_days", ["retention", "delete", "purge", "compliance"], {
+            label: "Keep audit events",
+            description: "Events older than this are deleted for good, checked every hour.",
+        }),
+    }),
     otel: section("OpenTelemetry export", {
         otelProtocol: aka(
             ["otlp", "otel"],
@@ -532,24 +550,6 @@ export const AUDIT = {
                 "evidence",
             ]),
         ),
-    }),
-    integrity: section("Integrity", {
-        hashChain: setting(
-            "Hash chain",
-            "Every event carries a SHA-256 hash of its fields and of the event before it.",
-            ["tamper", "verify", "sha-256", "immutable", "worm"],
-        ),
-        siem: setting("SIEM export", "Whether your SIEM is keeping up with sealed events.", [
-            "syslog",
-            "forwarding",
-            "splunk",
-        ]),
-    }),
-    retention: section("Retention", {
-        keep: policy("audit_retention_days", ["retention", "delete", "purge", "compliance"], {
-            label: "Keep audit events",
-            description: "Events older than this are deleted for good, checked every hour.",
-        }),
     }),
 };
 

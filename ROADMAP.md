@@ -1414,10 +1414,12 @@ keys, and `/v1` stays key-only.
   action, target and a details summary. Search, action, actor and a date range (`?q=&action=&actor=&from=&to=`, local
   days) stay in the URL; paging is server-side by event id (`?before=<id>`, `?after=<id>`), so history size does not
   matter. A row opens the full event as fields with before and after values (`?event=<id>`). Export downloads CSV or
-  JSONL of the current filter from `/api/audit/export`, with each event's `seq`, `prev_hash` and `hash`. Retention
-  is the `audit_retention_days` policy: keep forever by default; the hourly purge deletes older sealed events up to a
-  chain anchor and records an `audit.prune` event with the `seq` and hash it cuts at. Integrity shows whether the hash
-  chain verifies, or its first break, and whether SIEM export (set under Security) is keeping up, with Verify again.
+  JSONL of the current filter from `/api/audit/export`, with each event's `seq`, `prev_hash` and `hash`. The page
+  only browses: one line under the header gives the chain state, how long events are kept and the SIEM state, with
+  Change in Settings. Settings › Security holds the rest. Audit retention is the `audit_retention_days` policy: keep
+  forever by default; the hourly purge deletes older sealed events up to a chain anchor and records an `audit.prune`
+  event with the `seq` and hash it cuts at. Audit integrity shows whether the hash chain verifies, or its first
+  break, and whether SIEM export (set in the section above it) is keeping up, with Verify again.
 - Settings → This install, read only: minibrain version and build commit, Python, DuckDB, PyTorch, Transformers, OS
   and architecture; home, database (location and size), artifact storage (folder, or bucket and endpoint; never
   credentials) and the web build; catalogue version and when catalogue and model files were last checked; pools,

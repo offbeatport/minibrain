@@ -514,10 +514,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Settings › Request content, Settings › Security › Request logs and API keys · API: PUT /api/models/{name}/request-bodies · Policy: request_bodies, request_bodies_locked
 - **Audit log** · shipped · admin
   Search, filter, inspect and export every audited change, linked to its target.
-  UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
+  UI: Settings › Audit log, Settings › Security › Audit retention · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
 - **Tamper-evident audit** · shipped · admin
   Prove no audit event was changed or removed.
-  UI: Settings › Audit log › Integrity · API: GET /api/audit/chain · CLI: minibrain audit verify
+  UI: Settings › Security › Audit integrity, Settings › Audit log · API: GET /api/audit/chain · CLI: minibrain audit verify
 - **SIEM export** · shipped · admin
   Stream audit events to your SIEM as RFC 5424 syslog.
   UI: Settings › Security › Audit log export · Policy: siem_protocol, siem_host, siem_port, siem_ca_bundle

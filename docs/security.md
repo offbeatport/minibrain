@@ -215,7 +215,7 @@ export and every SIEM message can be checked on its own, without the server.
 
 Verification walks the events in `seq` order and reports the first break: an event whose fields no longer match its
 hash, one that does not link to the event before it, a missing `seq`, events past the head that minibrain did not
-seal, or a newest event that does not match the head. It runs from Settings → Audit log (Integrity, "Verify again"),
+seal, or a newest event that does not match the head. It runs from Settings → Security (Audit integrity, "Verify again"),
 `GET /api/audit/chain`, and `minibrain audit verify` (exit code 1 on a break; `--file <export.jsonl>` checks an
 unfiltered JSONL export instead of the database; `--json` prints the report).
 
@@ -248,7 +248,7 @@ address and nowhere else; the network policy does not apply to it, as it does no
   at the next event. A connection that fails mid-batch sends the whole batch again, so the SIEM may see an event
   twice (same `seq` and `hash`, so it can drop the copy). UDP has none of these checks.
 - While the SIEM is unreachable minibrain retries every 15 seconds, events queue in the database, and Settings →
-  Audit log shows the error and how many events wait. Turning export on for the first time sends the whole retained
+  Security (Audit integrity) shows the error and how many events wait. Turning export on for the first time sends the whole retained
   log, oldest first.
 
 ## Encryption at rest

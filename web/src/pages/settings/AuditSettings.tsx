@@ -12,20 +12,22 @@ import {
     SettingsGroup,
     SettingsRow,
 } from "obp-ui";
-import { type ComponentProps, type ReactNode, useMemo } from "react";
+import { type ComponentProps, Fragment, useMemo } from "react";
 import { api, unwrap } from "~/api/client";
 import type { components } from "~/api/schema";
 import { PanelSection, errorMessage } from "~/components/Section";
+import { StatusText, type Tone } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
 import { relativeTime } from "~/lib/time";
-import { AUDIT } from "~/pages/settings/settingsIndex";
+import { SECURITY } from "~/pages/settings/settingsIndex";
 
 type PolicyInfo = components["schemas"]["PolicyInfo"];
 type ChainInfo = components["schemas"]["AuditChainInfo"];
 type SiemInfo = components["schemas"]["SiemInfo"];
 
 export const RETENTION = "audit_retention_days";
-const SECURITY_PATH = "/settings/security";
+const EXPORT_HREF = `/settings/security#${SECURITY.auditExport.anchor}`;
+const SETTINGS_HREF = `/settings/security#${SECURITY.auditIntegrity.anchor}`;
 const DAY_MS = 24 * 3600 * 1000;
 const RETENTION_CHOICES: [number, string][] = [
     [0, "Keep forever"],
@@ -36,7 +38,7 @@ const RETENTION_CHOICES: [number, string][] = [
     [90, "90 days"],
 ];
 
-function useChain() {
+export function useChain() {
     return useQuery({
         queryKey: ["audit", "chain"],
         queryFn: () => unwrap(api.GET("/api/audit/chain")),
@@ -91,14 +93,6 @@ function ChainBadge({ chain }: { chain: ChainInfo | undefined }) {
     );
 }
 
-function SettingsLink({ children }: { children: ReactNode }) {
-    return (
-        <Link href={SECURITY_PATH} className="text-primary hover:underline">
-            {children}
-        </Link>
-    );
-}
-
 type SiemState = {
     variant: ComponentProps<typeof Badge>["variant"];
     label: string;
@@ -141,8 +135,8 @@ function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
     const state = siem ? siemState(siem) : CHECKING;
     return (
         <SettingsRow
-            anchor={AUDIT.integrity.settings.siem.anchor}
-            label={AUDIT.integrity.settings.siem.label}
+            anchor={SECURITY.auditIntegrity.settings.siemStatus.anchor}
+            label={SECURITY.auditIntegrity.settings.siemStatus.label}
             description={
                 <>
                     {siem?.target && (
@@ -152,9 +146,11 @@ function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
                         </>
                     )}
                     {state.detail}{" "}
-                    <SettingsLink>
-                        {siem?.target ? "Change it in Security" : "Set it up in Security"}
-                    </SettingsLink>
+                    <Link href={EXPORT_HREF} className="text-primary hover:underline">
+                        {siem?.target
+                            ? "Change it under Audit log export"
+                            : "Set it up under Audit log export"}
+                    </Link>
                     {"."}
                 </>
             }
@@ -163,13 +159,13 @@ function SiemRow({ siem }: { siem: SiemInfo | undefined }) {
     );
 }
 
-export function Integrity() {
+export function AuditIntegrity() {
     const chain = useChain();
     return (
         <PanelSection
             icon={ShieldCheck}
-            anchor={AUDIT.integrity.anchor}
-            title={AUDIT.integrity.title}
+            anchor={SECURITY.auditIntegrity.anchor}
+            title={SECURITY.auditIntegrity.title}
             description="Every event carries a SHA-256 hash of its fields and of the event before it, so an edit or a deletion breaks the chain."
             actions={
                 <Button
@@ -183,8 +179,8 @@ export function Integrity() {
         >
             <SettingsGroup>
                 <SettingsRow
-                    anchor={AUDIT.integrity.settings.hashChain.anchor}
-                    label={AUDIT.integrity.settings.hashChain.label}
+                    anchor={SECURITY.auditIntegrity.settings.hashChain.anchor}
+                    label={SECURITY.auditIntegrity.settings.hashChain.label}
                     description={chain.data ? chainText(chain.data) : "Checking every event…"}
                     error={errorMessage(chain.error)}
                     control={<ChainBadge chain={chain.data} />}
@@ -201,7 +197,7 @@ function retentionChoices(days: number): [number, string][] {
         : [...RETENTION_CHOICES, [days, `${days.toLocaleString()} days`]];
 }
 
-function retentionText(days: number): string {
+export function retentionText(days: number): string {
     return retentionChoices(days).find(([value]) => value === days)?.[1] ?? `${days} days`;
 }
 
@@ -214,7 +210,7 @@ function usePrunable(days: number) {
     });
 }
 
-export function Retention({ policy }: { policy: PolicyInfo }) {
+export function AuditRetention({ policy }: { policy: PolicyInfo }) {
     const client = useQueryClient();
     const days = typeof policy.value === "number" ? policy.value : 0;
     const prunable = usePrunable(days);
@@ -258,16 +254,20 @@ export function Retention({ policy }: { policy: PolicyInfo }) {
         </Select>
     );
     return (
-        <PanelSection icon={Timer} anchor={AUDIT.retention.anchor} title={AUDIT.retention.title}>
+        <PanelSection
+            icon={Timer}
+            anchor={SECURITY.auditRetention.anchor}
+            title={SECURITY.auditRetention.title}
+        >
             <SettingsGroup>
                 <SettingsRow
                     id={policy.locked ? undefined : "audit-retention"}
-                    anchor={AUDIT.retention.settings.keep.anchor}
-                    label={AUDIT.retention.settings.keep.label}
+                    anchor={SECURITY.auditRetention.settings.keep.anchor}
+                    label={SECURITY.auditRetention.settings.keep.label}
                     description={
                         days === 0
                             ? "Every event is kept. Pick a period to delete older events for good."
-                            : `Events older than ${retentionText(days).toLowerCase()} are deleted for good, checked every hour. Each deletion is itself recorded here.`
+                            : `Events older than ${retentionText(days).toLowerCase()} are deleted for good, checked every hour. Each deletion is itself recorded in the audit log.`
                     }
                     error={errorMessage(change.error)}
                     disabled={policy.locked}
@@ -283,5 +283,50 @@ export function Retention({ policy }: { policy: PolicyInfo }) {
                 </SettingsRow>
             </SettingsGroup>
         </PanelSection>
+    );
+}
+
+function chainStatus(chain: ChainInfo | undefined, failed: boolean): [Tone, string] {
+    if (failed) {
+        return ["warning", "Chain not checked"];
+    }
+    if (!chain) {
+        return ["neutral", "Checking the chain"];
+    }
+    return chain.broken
+        ? ["destructive", `Chain broken at seq ${count(chain.broken.seq)}`]
+        : ["success", "Chain verified"];
+}
+
+function siemStatus(siem: SiemInfo | undefined): string | null {
+    if (!siem?.target) {
+        return null;
+    }
+    const state = siemState(siem);
+    return state.variant === "destructive" ? "SIEM failing" : `SIEM ${state.label.toLowerCase()}`;
+}
+
+export function AuditStatus({ policy }: { policy: PolicyInfo | undefined }) {
+    const chain = useChain();
+    const [tone, chainText] = chainStatus(chain.data, chain.isError);
+    const days = typeof policy?.value === "number" ? policy.value : null;
+    const parts = [
+        days === null ? null : days === 0 ? "Kept forever" : `Kept ${retentionText(days)}`,
+        siemStatus(chain.data?.siem),
+    ].filter((part): part is string => part !== null);
+    return (
+        <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground tabular-nums">
+            <StatusText tone={tone}>{chainText}</StatusText>
+            {parts.map((part) => (
+                <Fragment key={part}>
+                    <span aria-hidden>·</span>
+                    <span>{part}</span>
+                </Fragment>
+            ))}
+            <span aria-hidden>·</span>
+            <Link href={SETTINGS_HREF} className="text-primary hover:underline">
+                Change in Settings
+            </Link>
+        </p>
     );
 }
