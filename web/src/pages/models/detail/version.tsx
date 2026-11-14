@@ -59,6 +59,8 @@ import { CopyButton } from "~/components/CopyButton";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
+import { PageCrumbs } from "~/components/PageCrumbs";
+import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
 import { ProgressBar } from "~/components/models/StatusText";
@@ -76,7 +78,7 @@ import {
 import { bytes, relativeTime } from "~/lib/time";
 import { LossSection, RateSection } from "../../jobs/TrainingPanel";
 import { ConfirmAction, type Confirmation } from "../dialogs";
-import { CompactHeader, Crumbs, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
+import { InlineFacts, Tip, baseNameOf, isDeployed, modelCrumbs } from "./header";
 import {
     DeployVersionDialog,
     canGoLive,
@@ -877,7 +879,7 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
     if (!version) {
         return (
             <Page wide>
-                <Crumbs items={crumbs} />
+                <PageCrumbs items={crumbs} />
                 {versions.isLoading ? (
                     <p className="text-muted-foreground">Loading…</p>
                 ) : versions.error ? (
@@ -911,14 +913,20 @@ export function VersionView({ row, number }: { row: ModelRow; number: number }) 
     const base = baseNameOf(models.data, version.base_model || row.base_model);
     return (
         <Page wide>
-            <Crumbs items={crumbs} />
-            <CompactHeader
+            <PageHeader
                 title={versionLabel(version)}
-                facts={[
-                    <VersionStatus key="status" row={row} version={version} />,
-                    delta !== null ? <Delta key="delta" value={delta} suffix="vs live" /> : null,
-                ]}
-                subtitle={`${row.name} on ${base} · created ${relativeTime(version.created_at)}`}
+                crumbs={crumbs}
+                badge={
+                    <InlineFacts
+                        items={[
+                            <VersionStatus key="status" row={row} version={version} />,
+                            delta !== null ? (
+                                <Delta key="delta" value={delta} suffix="vs live" />
+                            ) : null,
+                        ]}
+                    />
+                }
+                caption={`${row.name} on ${base} · created ${relativeTime(version.created_at)}`}
                 actions={
                     <>
                         <LiveButton row={row} versions={list} version={version} />

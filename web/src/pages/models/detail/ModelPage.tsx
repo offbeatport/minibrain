@@ -5,6 +5,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { keys, useAllModels, useBaseModel, useModel, useVersions } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
+import { PageCrumbs } from "~/components/PageCrumbs";
 import { Page, PanelSections } from "~/components/Section";
 import { ModelNotFound } from "~/components/models/ModelNotFound";
 import { useCan } from "~/lib/access";
@@ -21,7 +22,7 @@ import { CompareView } from "./compare";
 import { ModelActions } from "./deploy";
 import { EvaluationTab } from "./evaluation/EvaluationTab";
 import { BaseFiles, CustomFiles, FilesSheet, adapterText, verifiedText } from "./files";
-import { Crumbs, ModelHeader, baseNameOf, modelCrumbs } from "./header";
+import { ModelHeader, baseNameOf } from "./header";
 import { KeysTab } from "./keys";
 import { liveOf } from "./makeLive";
 import { MonitoringTab } from "./monitoring";
@@ -72,7 +73,7 @@ function Missing({ lookup }: { lookup: Lookup }) {
     const { row, loading, error, retry, name } = lookup;
     return (
         <Page wide>
-            <Crumbs
+            <PageCrumbs
                 items={[
                     { label: "Models", href: modelsHref() },
                     { label: row?.name ?? name, href: row ? modelPageHref(row.key) : undefined },
@@ -268,28 +269,20 @@ function Loaded({ row }: { row: ModelRow }) {
     const modelDetail = custom ? detail.data : undefined;
     return (
         <Page wide>
-            <Crumbs items={modelCrumbs(row)} />
-            <div className="flex flex-col gap-3">
-                <ModelHeader
-                    row={row}
-                    base={base.data}
-                    actions={
-                        <ModelActions
-                            row={row}
-                            detail={modelDetail}
-                            base={base.data}
-                            versions={list}
-                        />
-                    }
-                />
-                <TabNav
-                    label={`${row.name} pages`}
-                    tabs={tabs.map((item) => ({
-                        href: modelPageHref(row.key, item),
-                        label: TAB_LABELS[item],
-                    }))}
-                />
-            </div>
+            <ModelHeader
+                row={row}
+                base={base.data}
+                actions={
+                    <ModelActions row={row} detail={modelDetail} base={base.data} versions={list} />
+                }
+            />
+            <TabNav
+                label={`${row.name} pages`}
+                tabs={tabs.map((item) => ({
+                    href: modelPageHref(row.key, item),
+                    label: TAB_LABELS[item],
+                }))}
+            />
             <Notices row={row} />
             <div>
                 {(tab === "overview" || tab === "files") && (

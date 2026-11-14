@@ -8,8 +8,8 @@ import {
 import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
-import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
+import { type Crumb, PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { Tone } from "~/components/models/StatusText";
@@ -39,8 +39,6 @@ export function Inline({ items }: { items: Fact[] }) {
     );
 }
 
-export { Breadcrumbs as Crumbs } from "~/components/Breadcrumbs";
-
 export function modelCrumbs(row: ModelRow, more: Crumb[] = []): Crumb[] {
     return [
         { label: "Models", href: modelsHref() },
@@ -63,37 +61,11 @@ export function Tip({ tip, children }: { tip: ReactNode; children: ReactNode }) 
     );
 }
 
-export function CompactHeader({
-    icon,
-    title,
-    facts,
-    subtitle,
-    actions,
-}: {
-    icon?: ReactNode;
-    title: ReactNode;
-    facts?: Fact[];
-    subtitle?: ReactNode;
-    actions?: ReactNode;
-}) {
+export function InlineFacts({ items }: { items: Fact[] }) {
     return (
-        <header className="flex flex-wrap items-center gap-4 py-4">
-            {icon}
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-                <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1">
-                    <h1 className="text-2xl leading-tight font-normal">{title}</h1>
-                    {facts && (
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
-                            <Inline items={facts} />
-                        </div>
-                    )}
-                </div>
-                {subtitle && (
-                    <div className="flex flex-col gap-0.5 text-muted-foreground">{subtitle}</div>
-                )}
-            </div>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-        </header>
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
+            <Inline items={items} />
+        </span>
     );
 }
 
@@ -228,20 +200,23 @@ export function ModelHeader({
 }) {
     const description = subtitleOf(row, base);
     return (
-        <CompactHeader
+        <PageHeader
             icon={<ModelAvatar row={row} size="lg" />}
             title={row.name}
-            facts={[<DeploymentStatus key="deployment" row={row} />]}
-            subtitle={
-                <>
-                    <span className="flex items-center gap-1">
-                        <span className="font-mono text-sm text-foreground">{row.key}</span>
-                        <span className="-my-1">
-                            <CopyButton value={row.key} label="Copy API name" />
-                        </span>
-                    </span>
-                    {description && <span>{description}</span>}
-                </>
+            crumbs={modelCrumbs(row)}
+            badge={<DeploymentStatus row={row} />}
+            caption={
+                <InlineFacts
+                    items={[
+                        <span key="key" className="flex items-center gap-1">
+                            <span className="font-mono text-sm text-foreground">{row.key}</span>
+                            <span className="-my-1.5">
+                                <CopyButton value={row.key} label="Copy API name" />
+                            </span>
+                        </span>,
+                        description ? <span key="description">{description}</span> : null,
+                    ]}
+                />
             }
             actions={actions}
         />

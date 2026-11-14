@@ -13,6 +13,8 @@ import {
 import { useState } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useVersions } from "~/api/queries";
+import { PageCrumbs } from "~/components/PageCrumbs";
+import { PageHeader } from "~/components/PageHeader";
 import { ErrorLine, Page, Section } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { count, percent } from "~/lib/format";
@@ -20,7 +22,7 @@ import { useSearchParam } from "~/lib/listSearch";
 import { metricName } from "~/lib/metrics";
 import { modelCompareHref, versionPlaygroundHref } from "~/lib/modelLinks";
 import { datasetVersionDiffHref } from "../../data/versionData";
-import { CompactHeader, Crumbs, baseNameOf, isDeployed, modelCrumbs } from "./header";
+import { baseNameOf, isDeployed, modelCrumbs } from "./header";
 import {
     DeployVersionDialog,
     canGoLive,
@@ -278,7 +280,7 @@ export function CompareView({ row }: { row: ModelRow }) {
     if (!a || !b) {
         return (
             <Page wide>
-                <Crumbs items={crumbs} />
+                <PageCrumbs items={crumbs} />
                 <ErrorLine error={versions.error} onRetry={versions.refetch} />
                 {versions.data && (
                     <p className="text-muted-foreground">Pick two versions of this model.</p>
@@ -293,10 +295,10 @@ export function CompareView({ row }: { row: ModelRow }) {
     const liveable = can.build && canGoLive(row, goal) && !liveBlock(row, goal);
     return (
         <Page wide>
-            <Crumbs items={crumbs} />
-            <CompactHeader
+            <PageHeader
                 title={`v${a.number} and v${b.number}`}
-                subtitle={
+                crumbs={crumbs}
+                caption={
                     delta === null
                         ? row.name
                         : `${row.name} · v${b.number} is ${points(delta)} points on ${metricName(b.main_metric).toLowerCase()} against v${a.number}.`
@@ -328,6 +330,7 @@ export function CompareView({ row }: { row: ModelRow }) {
                         )}
                         {liveable && (
                             <Button
+                                variant="outline"
                                 onClick={() => setPromoting(goal.number)}
                             >{`Deploy v${goal.number}`}</Button>
                         )}

@@ -7,6 +7,7 @@ import { useAllModels, useModel, useVersions } from "~/api/queries";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
+import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PickSelect } from "~/components/PickSelect";
 import { Page } from "~/components/Section";
@@ -18,7 +19,7 @@ import { modelsHref } from "~/lib/modelsSearch";
 import { beingDeleted } from "~/lib/teardown";
 import { relativeTime } from "~/lib/time";
 import { ModelDataNotice } from "../../../data/versionData";
-import { Crumbs, baseNameOf, isDeployed, modelCrumbs, nextVersion, trainBlock } from "../header";
+import { baseNameOf, isDeployed, modelCrumbs, nextVersion, trainBlock } from "../header";
 import { AUTO, HeldOutWarning, fitText } from "./parts";
 import { MIN_HELD_OUT, duration, startFrom } from "./recipe";
 import { RunSummary, problemsOf, statusOf } from "./summary";
@@ -225,6 +226,10 @@ function blockFor(method: TrainMethod, row: ModelRow, detail: ModelDetail): stri
     return beingDeleted(row) ? "It is being deleted." : null;
 }
 
+function trainCrumbs(row: ModelRow) {
+    return modelCrumbs(row, [{ label: `Train v${nextVersion(row)}` }]);
+}
+
 function TrainForm({
     row,
     detail,
@@ -319,6 +324,7 @@ function TrainForm({
         <>
             <PageHeader
                 title={title}
+                crumbs={trainCrumbs(row)}
                 caption={captionOf(method, row, detail, versions, run, base)}
             />
             <CreateLayout
@@ -386,7 +392,7 @@ function Loaded({
                 />
             ) : (
                 <>
-                    <PageHeader title={title} />
+                    <PageHeader title={title} crumbs={trainCrumbs(row)} />
                     {detail.error || versions.error ? (
                         <QueryError
                             heading="h2"
@@ -410,7 +416,7 @@ export function TrainPage() {
     if (!row || row.kind !== "custom") {
         return (
             <Page>
-                <Crumbs
+                <PageCrumbs
                     items={[
                         { label: "Models", href: modelsHref() },
                         { label: name, href: row ? modelPageHref(row.key) : undefined },
@@ -444,7 +450,6 @@ export function TrainPage() {
             : `New version v${nextVersion(row)} of ${row.name}`;
     return (
         <Page>
-            <Crumbs items={modelCrumbs(row, [{ label: `Train v${nextVersion(row)}` }])} />
             <Loaded
                 key={row.key}
                 row={row}
