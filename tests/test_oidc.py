@@ -229,3 +229,19 @@ def test_sso_with_admin_as_the_default_role_needs_no_setup_link(
     for sso in sso_install(settings, monkeypatch, {"oidc": OIDC, "default_role": "admin"}):
         with sso.app.state.sessions() as session:
             assert prepare(session, load_auth(), {}) == FirstRun()
+
+
+@pytest.mark.parametrize("verified", [False, "false"])
+def test_an_unverified_email_does_not_match_auth_admins(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch, verified: object
+) -> None:
+    for sso in sso_install(settings, monkeypatch, {"oidc": OIDC, "admins": ["boss@example.com"]}):
+        sso.provider.claims = {"sub": "mallory-1", "email": "boss@example.com", "email_verified": verified}
+        browser = sso.browser()
+        sign_in(sso, browser)
+        person = browser.get("/api/auth/session").json()["person"]
+        assert person["email"] is None and person["role"] is None
+        sso.provider.claims = {"sub": "boss-1", "email": "Boss@Example.com", "email_verified": True}
+        boss = sso.browser()
+        sign_in(sso, boss)
+        assert boss.get("/api/auth/session").json()["person"]["role"] == "admin"
