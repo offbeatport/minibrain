@@ -38,6 +38,7 @@ STATUS_LABELS = {
     413: "Too large",
     422: "Invalid request",
     429: "Too many requests",
+    499: "Closed by the caller",
     500: "Server error",
     502: "Bad gateway",
     503: "Unavailable",

@@ -50,6 +50,7 @@ from minibrain.telemetry.call import current_call
 router = APIRouter(prefix="/v1")
 
 TEXT_MAX = 50_000
+CLIENT_CLOSED = 499
 COMMENT_MAX = 2_000
 API_KEY = HTTPBearer(
     auto_error=False,
@@ -280,7 +281,7 @@ def log_call(
     outcome: Outcome,
 ) -> None:
     completion, error = outcome.completion, outcome.error
-    status = status_of(error) if completion is not None or error is not None else 500
+    status = status_of(error) if completion is not None or error is not None else CLIENT_CLOSED
     answered = completion is not None and status == 200
     kept = answered and route is not None and route.request_bodies
     code = error.code if isinstance(error, OpenAIError) else None

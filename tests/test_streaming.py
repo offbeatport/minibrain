@@ -1,12 +1,19 @@
 import json
 import sys
-from collections.abc import Iterator
+import time
+from collections.abc import Generator, Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import cast
 
 from fastapi.testclient import TestClient
 
 from minibrain.base_models import QWEN3_0_6B, base_model
+from minibrain.gateway.chat import sse
+from minibrain.gateway.config import Grant
+from minibrain.gateway.logs import LogBuffer, LogEntry
+from minibrain.gateway.routes import CHAT, Outcome, log_call
+from minibrain.gateway.schema import ChatCompletionRequest
 from minibrain.ml.completion import Completion, Piece
 from minibrain.registry.models import RequestLog
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, Event, drained, streamed
@@ -103,6 +110,22 @@ def test_a_failure_in_the_middle_of_a_stream_ends_it_with_an_error(harness: Harn
     harness.flush_logs()
     with harness.sessions() as session:
         assert session.query(RequestLog).order_by(RequestLog.id).all()[-1].status == 503
+
+
+def test_a_stream_the_caller_closes_is_logged_as_closed_not_as_a_server_error() -> None:
+    outcomes: list[tuple[Completion | None, BaseException | None]] = []
+    events = iter([Piece(content="b"), Completion("bc", 1, 2, True, 0.1)])
+    opened = sse("chatcmpl-1", "m", Piece(content="a"), events, False, lambda *found: outcomes.append(found))
+    stream = cast(Generator[str], opened)
+    next(stream)
+    stream.close()
+    assert outcomes == [(None, None)]
+    entries: list[LogEntry] = []
+    logs = LogBuffer(entries.extend)
+    body = ChatCompletionRequest.model_validate({"model": "m", "messages": ASK, "stream": True})
+    log_call(logs, CHAT, body, Grant(1, ()), None, "chatcmpl-1", time.monotonic(), Outcome(*outcomes[0]))
+    logs.flush()
+    assert [entry.status for entry in entries] == [499]
 
 
 def test_formats_and_contracts_are_checked_before_they_stream(harness: Harness, tmp_path: Path) -> None:
