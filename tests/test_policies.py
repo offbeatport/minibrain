@@ -146,3 +146,23 @@ def test_licence_choices_carry_their_commercial_use(harness: Harness) -> None:
     assert uses["apache-2.0"] == "commercial"
     assert uses["llama3.2"] == "restricted"
     assert all(choice.get("use") is None for choice in policies["licence_mode"]["choices"])
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("audit_retention_days", "abc"),
+        ("audit_retention_days", None),
+        ("audit_retention_days", []),
+        ("audit_retention_days", 1.5),
+        ("audit_retention_days", True),
+        ("siem_port", {}),
+        ("data_folders", None),
+        ("allowed_hosts", 5),
+        ("allowed_hosts", [{}]),
+    ],
+)
+def test_values_of_the_wrong_type_are_refused(harness: Harness, name: str, value: object) -> None:
+    assert set_policy(harness, name, value) == 403
+    assert set_policy(harness, "audit_retention_days", "30") == 200
+    assert policies(harness)["audit_retention_days"]["value"] == 30

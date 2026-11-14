@@ -426,6 +426,24 @@ def plain_url(field: Field, value: Any) -> str:
     return text
 
 
+def whole_number(field: Field, value: Any) -> int:
+    whole = isinstance(value, int | str) or (isinstance(value, float) and value.is_integer())
+    if isinstance(value, bool) or not whole:
+        raise PolicyError(f"{field.label} is a whole number")
+    try:
+        return int(value)
+    except ValueError as error:
+        raise PolicyError(f"{field.label} is a whole number") from error
+
+
+def list_items(field: Field, value: Any) -> list[Any]:
+    if isinstance(value, str):
+        return value.split(",")
+    if isinstance(value, list) and all(isinstance(item, str | int) and not isinstance(item, bool) for item in value):
+        return value
+    raise PolicyError(f"{field.label} is a list of names")
+
+
 def coerce(field: Field, value: Any) -> Any:
     if field.kind == "bool":
         if isinstance(value, str):
@@ -437,7 +455,7 @@ def coerce(field: Field, value: Any) -> Any:
         text = str(value or "").strip()
         return {"names": [name for name, _ in header_pairs(text)], "plain": text}
     if field.kind == "int":
-        number = int(value)
+        number = whole_number(field, value)
         if number < field.minimum:
             raise PolicyError(
                 f"{field.label} cannot be less than {field.minimum}"
@@ -457,7 +475,7 @@ def coerce(field: Field, value: Any) -> Any:
     if field.kind == "text":
         return str(value).strip()
     if field.kind == "list":
-        items = value.split(",") if isinstance(value, str) else list(value)
+        items = list_items(field, value)
         cleaned = [str(item).strip() for item in items if str(item).strip()]
         unknown = [item for item in cleaned if field.choices and item not in field.choices]
         if unknown:
