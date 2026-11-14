@@ -32,6 +32,16 @@ function ActionButton({ action, primary }: { action: ErrorAction; primary: boole
     );
 }
 
+function ErrorFooter({ code }: { code: string }) {
+    const pathname = useRouterState({ select: (state) => state.location.pathname });
+    return (
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 border-t px-panel py-3 font-mono text-sm text-muted-foreground @md:px-[calc(var(--panel-padding)*1.5)]">
+            <span className="text-foreground">{code}</span>
+            <span className="min-w-0 truncate">{pathname}</span>
+        </div>
+    );
+}
+
 export function ErrorState({
     icon: Icon,
     title,
@@ -39,6 +49,7 @@ export function ErrorState({
     detail,
     primary,
     secondary,
+    code,
     heading: Heading = "h1",
     className,
 }: {
@@ -48,6 +59,7 @@ export function ErrorState({
     detail?: ReactNode;
     primary?: ErrorAction;
     secondary?: ErrorAction;
+    code?: string;
     heading?: "h1" | "h2";
     className?: string;
 }) {
@@ -56,30 +68,34 @@ export function ErrorState({
         <section
             aria-labelledby={titleId}
             className={cn(
-                "@container w-full max-w-2xl rounded-xl border bg-card p-panel",
+                "@container w-full max-w-2xl overflow-hidden rounded-xl border bg-card",
+                Heading === "h1" && "mt-4",
                 className,
             )}
         >
-            <div className="flex flex-col gap-3 @md:flex-row @md:items-start @md:gap-4">
-                <div className="grid size-9 shrink-0 place-items-center rounded-lg border bg-background">
-                    <Icon aria-hidden="true" className="size-5 text-muted-foreground" />
+            <div className="flex flex-col gap-6 p-panel @md:p-[calc(var(--panel-padding)*1.5)]">
+                <div className="grid size-11 place-items-center rounded-lg border bg-background">
+                    <Icon aria-hidden="true" className="size-5.5 text-muted-foreground" />
                 </div>
-                <div className="flex min-w-0 flex-1 flex-col gap-1 @md:pt-1.5">
-                    <Heading id={titleId} className="text-lg font-semibold">
+                <div className="flex min-w-0 flex-col gap-2">
+                    <Heading id={titleId} className="text-xl font-semibold">
                         {title}
                     </Heading>
-                    {children && <p className="text-base text-muted-foreground">{children}</p>}
+                    {children && (
+                        <p className="max-w-prose text-base text-muted-foreground">{children}</p>
+                    )}
                     {detail && (
                         <div className="text-sm break-words text-muted-foreground">{detail}</div>
                     )}
-                    {(primary || secondary) && (
-                        <div className="flex flex-wrap items-center gap-2 pt-3">
-                            {primary && <ActionButton action={primary} primary />}
-                            {secondary && <ActionButton action={secondary} primary={false} />}
-                        </div>
-                    )}
                 </div>
+                {(primary || secondary) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                        {primary && <ActionButton action={primary} primary />}
+                        {secondary && <ActionButton action={secondary} primary={false} />}
+                    </div>
+                )}
             </div>
+            {code && <ErrorFooter code={code} />}
         </section>
     );
 }
@@ -106,6 +122,7 @@ export function NotFoundState({
             detail={detail}
             primary={primary}
             secondary={secondary}
+            code="404 Not found"
             heading={heading}
         >
             {children}
@@ -115,7 +132,12 @@ export function NotFoundState({
 
 export function ForbiddenState({ needs }: { needs: ReactNode }) {
     return (
-        <ErrorState icon={ShieldX} title="You don't have access" primary={GO_HOME}>
+        <ErrorState
+            icon={ShieldX}
+            title="You don't have access"
+            primary={GO_HOME}
+            code="403 Forbidden"
+        >
             {needs}
         </ErrorState>
     );
@@ -154,6 +176,7 @@ export function QueryError({
             title="Couldn't load this page"
             primary={again ?? GO_HOME}
             secondary={again ? GO_HOME : undefined}
+            code={isUnreachable(error) ? "No connection" : `Error ${status ?? ""}`.trim()}
             heading={heading}
         >
             {message}
