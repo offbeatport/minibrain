@@ -12,7 +12,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add › Upload file, Data › Add › Sample data · API: POST /api/sources, POST /api/samples/{file}
 - **Sample data** · shipped · product
   Try the whole flow on bundled sample data in minutes.
-  UI: Home › Get started, Models › Try with sample data, Data › Add › Sample data · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
+  UI: Home › Get started, Models › Try with demo data, Data › Add › Sample data · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
   UI: Data › Add › Folder on the server · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders

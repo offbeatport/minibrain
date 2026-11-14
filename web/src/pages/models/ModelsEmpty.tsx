@@ -44,8 +44,7 @@ export function ModelsEmpty() {
             <div className="flex flex-col items-center gap-1">
                 <h2 className="text-lg font-semibold">No models yet</h2>
                 <p className="text-base text-muted-foreground">
-                    Add a base model to get started, or try a chat assistant on sample travel
-                    support messages and narrow it to their labels.
+                    Create a model from a base and your data, or try one with demo data.
                 </p>
             </div>
             <Button
@@ -54,7 +53,7 @@ export function ModelsEmpty() {
                 disabled={sample.isPending}
                 onClick={() => sample.mutate()}
             >
-                {sample.isPending ? "Adding sample data…" : "Try with sample data"}
+                {sample.isPending ? "Adding demo data…" : "Try with demo data"}
             </Button>
         </div>
     );
