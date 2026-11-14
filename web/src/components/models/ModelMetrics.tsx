@@ -104,11 +104,13 @@ export function Requests({
 }) {
     if (!usage) {
         if (!live) {
-            return <span className="text-muted-foreground">Never used</span>;
+            return <span className="whitespace-nowrap text-muted-foreground">Never used</span>;
         }
         return (
-            <span className="flex items-center gap-3">
-                <span className="text-muted-foreground">Never used</span>
+            <span className="flex h-7 flex-wrap gap-x-3 overflow-hidden">
+                <span className="leading-7 whitespace-nowrap text-muted-foreground">
+                    Never used
+                </span>
                 <DailyBars values={IDLE_WEEK} days={recentDays(IDLE_WEEK.length)} />
             </span>
         );

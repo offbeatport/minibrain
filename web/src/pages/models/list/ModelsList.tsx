@@ -1,6 +1,14 @@
 import { useRouter } from "@tanstack/react-router";
 import { Button, SearchInput, cn, useToast } from "obp-ui";
-import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
+import {
+    type KeyboardEvent,
+    type ReactNode,
+    type RefObject,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { useAllModels } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
@@ -34,7 +42,7 @@ import {
     NO_FILTERS,
     activeCount,
     filterSearch,
-    gridTemplate,
+    fitTable,
     passes,
     readFilters,
     readSort,
@@ -225,7 +233,10 @@ export function ModelsList() {
     const healthRun = useRef<Handlers["health"] | null>(null);
     const filters = readFilters(search);
     const sort = readSort(search);
-    const shownColumns = COLUMNS.map((column) => column.id).filter((id) => columns.includes(id));
+    const table = useRef<HTMLDivElement>(null);
+    const chosenColumns = COLUMNS.map((column) => column.id).filter((id) => columns.includes(id));
+    const tableLayout = fitTable(chosenColumns, useWidthInRem(table));
+    const shownColumns = tableLayout.columns;
     const text = (search.q ?? "").trim().toLowerCase();
     const setFilters = (next: Filters) => update(filterSearch(next));
     const pool = useMemo(() => models.filter((model) => matchesText(model, text)), [models, text]);
@@ -529,7 +540,7 @@ export function ModelsList() {
                 activeCount(filters) === 0 &&
                 sort === DEFAULT_SORT &&
                 !nested &&
-                sameColumns(shownColumns, DEFAULT_COLUMNS)
+                sameColumns(chosenColumns, DEFAULT_COLUMNS)
             }
             nested={nested}
             onNested={(value) => {
@@ -538,7 +549,7 @@ export function ModelsList() {
                     clear();
                 }
             }}
-            columns={shownColumns}
+            columns={chosenColumns}
             onColumns={setColumns}
         />
     );
@@ -583,8 +594,9 @@ export function ModelsList() {
         <div className="flex flex-col gap-3">
             {toolbar}
             <div
+                ref={table}
                 className="grid gap-x-3 overflow-x-auto rounded-lg border bg-card lg:overflow-x-clip"
-                style={{ gridTemplateColumns: gridTemplate(shownColumns) }}
+                style={{ gridTemplateColumns: tableLayout.template }}
             >
                 <div
                     className={cn(
@@ -642,6 +654,21 @@ export function ModelsList() {
             {health.dialogs}
         </div>
     );
+}
+
+function useWidthInRem(element: RefObject<HTMLDivElement | null>): number | null {
+    const [width, setWidth] = useState<number | null>(null);
+    useLayoutEffect(() => {
+        const node = element.current;
+        if (!node) {
+            return;
+        }
+        const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+        const observer = new ResizeObserver(() => setWidth(node.clientWidth / rem));
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [element]);
+    return width;
 }
 
 function clearedSearch(): ModelsSearch {

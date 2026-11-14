@@ -45,19 +45,59 @@ export const SORTS: { value: SortKey; label: string; detail?: string }[] = [
     { value: "recent", label: "Recently updated", detail: "Newest first" },
 ];
 
-export const COLUMNS: { id: Column; label: string; track: string }[] = [
-    { id: "data", label: "Data", track: "minmax(9rem,auto)" },
-    { id: "quality", label: "Quality", track: "minmax(10.5rem,auto)" },
-    { id: "requests", label: "Requests, 7 days", track: "minmax(9rem,auto)" },
-    { id: "cost", label: "Cost / 1k req.", track: "minmax(6rem,auto)" },
-    { id: "p95", label: "p95", track: "minmax(4rem,auto)" },
+export const COLUMNS: { id: Column; label: string; min: number; roomy?: number }[] = [
+    { id: "data", label: "Data", min: 6 },
+    { id: "quality", label: "Quality", min: 9.5 },
+    { id: "requests", label: "Requests, 7 days", min: 7, roomy: 9.75 },
+    { id: "cost", label: "Cost / 1k req.", min: 6 },
+    { id: "p95", label: "p95", min: 4 },
 ];
 
 export const DEFAULT_COLUMNS: Column[] = ["data", "quality", "requests", "cost"];
 
-export function gridTemplate(shown: Column[]): string {
-    const tracks = COLUMNS.filter((column) => shown.includes(column.id)).map((c) => c.track);
-    return ["minmax(14rem,1fr)", ...tracks, "minmax(10rem,14rem)", "auto"].join(" ");
+const MODEL_MIN = 10;
+const STATUS_MIN = 8.5;
+const STATUS_MAX = 14;
+const MENU = 3;
+const GAP = 0.75;
+const PADDING = 2;
+const DROP_FIRST: Column[] = ["p95", "cost", "data", "requests", "quality"];
+
+export type TableLayout = { columns: Column[]; template: string };
+
+function tracks(shown: Column[], roomy: boolean): number[] {
+    return COLUMNS.filter((column) => shown.includes(column.id)).map((column) =>
+        roomy ? (column.roomy ?? column.min) : column.min,
+    );
+}
+
+function neededRem(shown: Column[], roomy: boolean): number {
+    const columns = tracks(shown, roomy).reduce((sum, width) => sum + width, 0);
+    return PADDING + MODEL_MIN + columns + STATUS_MIN + MENU + GAP * (shown.length + 2);
+}
+
+function layout(shown: Column[], roomy: boolean): TableLayout {
+    const template = [
+        `minmax(${MODEL_MIN}rem,1fr)`,
+        ...tracks(shown, roomy).map((width) => `minmax(${width}rem,auto)`),
+        `minmax(${STATUS_MIN}rem,${STATUS_MAX}rem)`,
+        "auto",
+    ].join(" ");
+    return { columns: shown, template };
+}
+
+export function fitTable(shown: Column[], widthRem: number | null): TableLayout {
+    if (widthRem === null || neededRem(shown, true) <= widthRem) {
+        return layout(shown, true);
+    }
+    let fitted = shown;
+    for (const id of DROP_FIRST) {
+        if (neededRem(fitted, false) <= widthRem) {
+            break;
+        }
+        fitted = fitted.filter((item) => item !== id);
+    }
+    return layout(fitted, false);
 }
 
 function listOf<T extends string>(value: string | undefined, known: readonly T[]): T[] {

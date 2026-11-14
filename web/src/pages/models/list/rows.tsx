@@ -512,7 +512,6 @@ function ActionsCell({ pad, menu }: { pad: string; menu: ReactNode }) {
                 pad,
             )}
         >
-            <span aria-hidden="true" className="size-8 shrink-0" />
             {menu}
         </div>
     );
