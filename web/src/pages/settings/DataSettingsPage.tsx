@@ -159,7 +159,10 @@ export function DataSettingsPage() {
     const settings = useDataSettings();
     const data = settings.data;
     return (
-        <SettingsLayout title="Data">
+        <SettingsLayout
+            title="Data"
+            caption="How large dataset versions may be, how long they are kept and the checks they pass."
+        >
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <PanelSections>
                 <PanelSection

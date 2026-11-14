@@ -540,7 +540,11 @@ export function AuditLogPage() {
     const loaded = page.data?.events.find((event) => event.id === eventId);
     const retention = policies.get(RETENTION);
     return (
-        <SettingsLayout title="Audit log" actions={<ExportMenu query={query} />}>
+        <SettingsLayout
+            title="Audit log"
+            caption="Who changed what on this install, and when."
+            actions={<ExportMenu query={query} />}
+        >
             <div className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2">
                     <SearchInput

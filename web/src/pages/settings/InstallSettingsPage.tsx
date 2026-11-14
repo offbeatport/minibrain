@@ -495,6 +495,7 @@ export function InstallSettingsPage() {
     return (
         <SettingsLayout
             title="This install"
+            caption="Software versions, locations, compute and network as this install sees them."
             actions={
                 <>
                     <InfoTip label="What the diagnostics file holds">

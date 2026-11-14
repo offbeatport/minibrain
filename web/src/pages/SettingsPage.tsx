@@ -309,7 +309,10 @@ export function SettingsPage() {
     const { data, error } = useInstallSettings();
     const can = useCan();
     return (
-        <SettingsLayout title="General">
+        <SettingsLayout
+            title="General"
+            caption="Appearance, the model catalogue, compute prices and the defaults new models start from."
+        >
             <ErrorLine error={error} />
             <PanelSections>
                 <Appearance />

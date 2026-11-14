@@ -595,16 +595,20 @@ export function ConnectionsSettingsPage() {
     const list = connections.data ?? [];
     const formOpen = editing !== null;
     return (
-        <SettingsLayout title="Connections">
-            <p className="-mt-2 text-muted-foreground">
-                {
-                    "Buckets and databases that data sources and model imports read from. Where minibrain keeps its own files is under "
-                }
-                <Link href="/settings/storage" className="text-primary hover:underline">
-                    Storage
-                </Link>
-                .
-            </p>
+        <SettingsLayout
+            title="Connections"
+            caption={
+                <>
+                    {
+                        "Buckets and databases that data sources and model imports read from. minibrain's own files are under "
+                    }
+                    <Link href="/settings/storage" className="text-primary hover:underline">
+                        Storage
+                    </Link>
+                    .
+                </>
+            }
+        >
             <ErrorLine error={connections.error} onRetry={connections.refetch} />
             <PanelSections>
                 <PanelSection

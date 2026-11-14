@@ -511,7 +511,10 @@ export function SecurityPage() {
     });
     const byName = new Map((policies.data ?? []).map((policy) => [policy.name, policy]));
     return (
-        <SettingsLayout title="Security">
+        <SettingsLayout
+            title="Security"
+            caption="Install-wide policies: network, sign-in, request logs, exports and encryption."
+        >
             <ErrorLine error={policies.error} onRetry={policies.refetch} />
             <PanelSections>
                 {policies.data &&

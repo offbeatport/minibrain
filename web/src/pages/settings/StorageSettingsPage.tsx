@@ -254,7 +254,10 @@ export function StorageSettingsPage() {
         queryFn: () => unwrap(api.GET("/api/settings/storage")),
     });
     return (
-        <SettingsLayout title="Storage">
+        <SettingsLayout
+            title="Storage"
+            caption="Where minibrain keeps uploads, dataset versions, adapters, logs and base model files."
+        >
             <ErrorLine error={settings.error} onRetry={settings.refetch} />
             <PanelSections>
                 <PanelSection

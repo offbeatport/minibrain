@@ -601,7 +601,10 @@ function SignInSources() {
 
 export function AccountsSettingsPage() {
     return (
-        <SettingsLayout title="Accounts">
+        <SettingsLayout
+            title="Accounts"
+            caption="People who can sign in, their roles and the sources they sign in with."
+        >
             <PanelSections>
                 <People />
                 <SignInSources />

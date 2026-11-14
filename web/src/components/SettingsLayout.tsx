@@ -5,13 +5,14 @@ import { useSettingsLanding } from "~/lib/settingsLanding";
 
 export function SettingsLayout({
     title,
+    caption,
     actions,
     children,
-}: { title: string; actions?: ReactNode; children: ReactNode }) {
+}: { title: string; caption: ReactNode; actions?: ReactNode; children: ReactNode }) {
     useSettingsLanding();
     return (
         <Page>
-            <PageHeader title={title} actions={actions} />
+            <PageHeader title={title} caption={caption} actions={actions} />
             {children}
         </Page>
     );
