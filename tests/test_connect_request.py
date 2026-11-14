@@ -55,3 +55,17 @@ def test_unknown_expired_and_revoked_keys_are_401(harness: Harness, tmp_path: Pa
     assert harness.client.delete(f"/api/keys/{created['id']}").status_code == 204
     revoked = send(harness, created["secret"])
     assert revoked.status_code == 401 and shown(revoked) == "invalid API key"
+
+
+def test_an_undeployed_model_says_so_and_names_a_version_to_call(harness: Harness, tmp_path: Path) -> None:
+    two_models(harness, tmp_path)
+    own = add_key(harness, CUSTOM)
+    other = add_key(harness, BASE, name="base only")
+    assert harness.client.post(f"/api/models/{SLUG}/deploy", json={"deployed": False}).status_code == 202
+    harness.app.state.gateway_config.rebuild()
+    refused = send(harness, own["secret"])
+    assert refused.status_code == 404
+    assert shown(refused) == f"{SLUG} is not deployed; deploy it, or call one of its versions such as {SLUG}@0"
+    assert send(harness, own["secret"], f"{SLUG}@0").status_code == 200
+    hidden = send(harness, other["secret"])
+    assert hidden.status_code == 404 and shown(hidden) == f"model {SLUG} not found"

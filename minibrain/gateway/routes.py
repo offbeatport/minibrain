@@ -163,15 +163,26 @@ def list_models(grant: GrantDep, config: ConfigDep) -> ModelList:
     return ModelList(data=[ModelInfo(id=name, created=0, owned_by="minibrain") for name in names])
 
 
-def missing(config: GatewayConfig, name: str) -> OpenAIError:
-    message = config.deleted.get(name.partition("@")[0]) or f"model {name} not found"
-    return OpenAIError(404, message, "model", "model_not_found")
+def undeployed(config: GatewayConfig, grant: Grant, name: str) -> str | None:
+    numbers = [
+        route.version
+        for route in config.routes.values()
+        if route.slug == name and route.version is not None and route.name != name and grant.covers(route)
+    ]
+    if not numbers:
+        return None
+    return f"{name} is not deployed; deploy it, or call one of its versions such as {name}@{max(numbers)}"
+
+
+def missing(config: GatewayConfig, grant: Grant, name: str) -> OpenAIError:
+    message = config.deleted.get(name.partition("@")[0]) or undeployed(config, grant, name)
+    return OpenAIError(404, message or f"model {name} not found", "model", "model_not_found")
 
 
 def routed(config: GatewayConfig, grant: Grant, model: str) -> Route:
     route = config.routes.get(model)
     if route is None:
-        raise missing(config, model)
+        raise missing(config, grant, model)
     if not grant.covers(route):
         raise HTTPException(status_code=403, detail=f"this API key does not cover {model}")
     return route
