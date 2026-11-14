@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ChartLine, CircleAlert, History, KeyRound, Logs, Timer } from "lucide-react";
 import {
     Badge,
-    EmptyState,
     Link,
     Table,
     TableBody,
@@ -41,7 +40,7 @@ import {
     xFormat,
 } from "~/lib/traffic";
 import { isDeployed } from "./header";
-import { RangeSwitch, TrafficChart, useTrafficRange } from "./usage";
+import { TrafficChart, useTrafficRange } from "./usage";
 
 const LOG_ROWS = 8;
 
@@ -459,13 +458,10 @@ function RequestLogSection({ row }: { row: ModelRow }) {
 }
 
 function emptyText(row: ModelRow, range: TrafficRange): string {
-    if (row.kind === "custom" && row.current_version === null) {
-        return "No version is live, so its name answers nothing. Make a version live to deploy it.";
+    if (!isDeployed(row) || (row.kind === "custom" && row.current_version === null)) {
+        return "Not deployed yet. Deploy it, then connect an app with an API key.";
     }
-    if (!isDeployed(row)) {
-        return `${row.name} is not deployed, so nothing calls it. Deploy it from the header.`;
-    }
-    return `No requests ${SPAN[range]}. Latency, errors, versions and callers show here once requests arrive.`;
+    return `No requests ${SPAN[range]}. Connect an app with an API key to see traffic here.`;
 }
 
 export function MonitoringTab({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
@@ -476,21 +472,20 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
     const empty = !report || report.totals.requests === 0;
     return (
         <div className="flex flex-col gap-4 pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <RangeSwitch range={range} onRange={setRange} />
-                <Link
-                    href={`/monitor?model=${encodeURIComponent(row.key)}`}
-                    className="text-sm text-primary hover:underline"
-                >
-                    All models in Monitor →
-                </Link>
-            </div>
             <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
             <PanelSections>
                 <PanelSection
                     icon={ChartLine}
                     title="Traffic"
                     tip={`Changes compare with ${PERIOD[range]}.`}
+                    actions={
+                        <Link
+                            href={`/monitor?model=${encodeURIComponent(row.key)}`}
+                            className="text-sm text-primary hover:underline"
+                        >
+                            All models in Monitoring
+                        </Link>
+                    }
                 >
                     <div className="flex flex-col gap-6">
                         {report && !empty && (
@@ -504,13 +499,14 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                             versions={versions}
                             report={report}
                             range={range}
+                            onRange={setRange}
                             height={300}
                             showHeadline={false}
                             emptyHint={emptyText(row, range)}
                         />
                     </div>
                 </PanelSection>
-                {report && !empty ? (
+                {report && !empty && (
                     <>
                         <LatencySection row={row} report={report} range={range} />
                         <ErrorsSection row={row} report={report} range={range} />
@@ -518,12 +514,6 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                         <CallersSection row={row} report={report} range={range} />
                         <RequestLogSection row={row} />
                     </>
-                ) : (
-                    report && (
-                        <EmptyState variant="panel" title="No traffic to show">
-                            {emptyText(row, range)}
-                        </EmptyState>
-                    )
                 )}
             </PanelSections>
         </div>
