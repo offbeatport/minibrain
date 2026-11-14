@@ -215,7 +215,10 @@ function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
     const live = liveOf(model);
     const baseline = baselineOf(model);
     const best = bestOf(model);
-    const better = best && best.number !== headline.number ? best : undefined;
+    const better =
+        best && best.number !== headline.number && (best.score ?? 0) > headline.score
+            ? best
+            : undefined;
     const showBaseline = baseline && baseline.number !== headline.number ? baseline : undefined;
     const facts: [string, number | null | undefined][] = [
         [live ? `Live v${headline.number}` : `v${headline.number}, not live`, headline.score],
