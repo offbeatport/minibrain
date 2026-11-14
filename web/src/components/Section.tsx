@@ -12,7 +12,7 @@ import {
 } from "obp-ui";
 import type { ReactNode } from "react";
 
-const FLUSH_GRID =
+export const FLUSH_GRID =
     "px-0 [--data-grid-surface:var(--card)] [&_[data-slot=data-grid]]:rounded-none [&_[data-slot=data-grid]]:border-0";
 
 const CARD_GRID =

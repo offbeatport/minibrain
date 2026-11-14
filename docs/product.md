@@ -435,7 +435,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Feedback · API: GET /api/feedback, GET /api/feedback/facets, GET /api/feedback/{feedback_id}, POST /api/feedback/{feedback_id}/assign, POST /api/feedback/{feedback_id}/review · Roadmap: Feedback loop
 - **Test examples** · shipped · product, ml
   Tests the next version faces, added by hand or from the Playground.
-  UI: Playground › Save as test example, Models › model › Evaluation › Test examples, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples, DELETE /api/models/{name}/test-examples/{feedback_id}
+  UI: Playground › Save as test example, Models › model › Evaluation › What it's tested on, Data › dataset › Used by · API: POST /api/models/{name}/test-examples, GET /api/models/{name}/test-examples, DELETE /api/models/{name}/test-examples/{feedback_id}
 - **Train with feedback** · shipped · product, ml
   Retrain with accepted feedback merged into the training rows.
   UI: Models › model › Train › Data · API: GET /api/models/{name}/feedback/summary

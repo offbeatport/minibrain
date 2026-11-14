@@ -4,7 +4,7 @@ import { useCan } from "~/lib/access";
 import { FailuresPanel } from "./failures";
 import { ScoresPanel } from "./scores";
 import { ScoringPanel } from "./scoring";
-import { HeldOutPanel, TestExamplesPanel } from "./testedOn";
+import { TestedOnPanel } from "./testedOn";
 
 export function EvaluationTab({
     row,
@@ -20,8 +20,7 @@ export function EvaluationTab({
         <PanelSections>
             <ScoresPanel row={row} detail={detail} versions={versions} />
             {can.build && <FailuresPanel row={row} versions={versions} />}
-            <HeldOutPanel row={row} detail={detail} versions={versions} />
-            {can.build && detail && <TestExamplesPanel row={row} detail={detail} />}
+            <TestedOnPanel row={row} detail={detail} versions={versions} />
             {can.build && detail && (
                 <ScoringPanel
                     key={JSON.stringify([detail.graders, detail.judge, detail.promotion])}

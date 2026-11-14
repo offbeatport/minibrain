@@ -217,10 +217,10 @@ threshold on the main metric as a dashed level and the deployed version marked, 
 passes the rule · deployed v3 · 86%", the same height with an empty frame and "No scores yet" before any score),
 Where it fails (Builders: the held-out rows a picked version, the latest scored by default, does not get fully right,
 with input, expected, answer and the grader's score and reason, or against the deployed version the rows newly right
-or newly wrong; a row opens the whole conversation in a sheet), What it's tested on (the held-out rows of the latest
-scored version, its dataset version with a link, newer data and the test example count), Test examples (Builders: the
-list, Add by hand, From the Playground, and remove, which rejects the row with `DELETE
-/api/models/<slug>/test-examples/<id>`, audited as `feedback.example_remove`) and How it's scored (Builders: answers,
+or newly wrong; a row opens the whole conversation in a sheet), What it's tested on (one section, 2026-11-14: the
+held-out rows of the latest scored version, its dataset version with a link and newer data, then for Builders the test
+examples with their count, Add test example and From the Playground, and a Remove on a row's hover or focus, which
+rejects the row with `DELETE /api/models/<slug>/test-examples/<id>`, audited as `feedback.example_remove`) and How it's scored (Builders: answers,
 graders, judge, judge rubric, promotion rule). Changing the graders or the judge asks to re-score every version and
 runs it as a `score` job, so versions stay comparable; changing the promotion rule saves without re-scoring.
 
