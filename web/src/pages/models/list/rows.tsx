@@ -896,7 +896,7 @@ function VariantStatus({ row }: { row: ModelRow }) {
     return (
         <span className="flex min-w-0 flex-col items-start">
             {line.kind === "on" ? (
-                <LiveStatus replicas={row.replicas ?? []} />
+                <LiveStatus replicas={row.replicas ?? []} pool={row.deployment.pool} />
             ) : (
                 <StatusLineText line={line} name={row.name} replicas={row.replicas ?? []} />
             )}

@@ -10,6 +10,7 @@ import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
 import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { Tone } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -138,18 +139,26 @@ export function ModelAvatar({ row, size = "md" }: { row: ModelRow; size?: "sm" |
     );
 }
 
-type Shown = { tone: Tone; label: string; href?: string };
+type Shown = { tone: Tone; label: string; href?: string; pool?: string; joiner?: string };
 
 function deploymentShown(row: ModelRow): Shown {
     const version =
         row.kind === "custom" && row.current_version !== null ? ` v${row.current_version}` : "";
     const job = row.teardown?.jobs?.[0];
     const jobLink = job ? `/jobs/${job}` : undefined;
+    const pool = row.deployment.pool ?? undefined;
     switch (row.deployment.state) {
         case "running":
-            return { tone: "success", label: version ? `Deployed ·${version}` : "Deployed" };
+            return {
+                tone: "success",
+                label: version ? `Deployed ·${version}` : "Deployed",
+                pool,
+                joiner: " on ",
+            };
         case "starting":
-            return { tone: "info", label: `Deploying${version}…` };
+            return row.deployment.waiting
+                ? { tone: "warning", label: "Waiting for a machine", pool, joiner: " in " }
+                : { tone: "info", label: `Deploying${version}`, pool, joiner: " on " };
         case "unhealthy":
             return {
                 tone: "destructive",
@@ -188,7 +197,15 @@ export function DeploymentStatus({ row }: { row: ModelRow }) {
             )}
         >
             <Icon aria-hidden="true" className={cn("size-4 shrink-0", className)} />
-            {shown.label}
+            <span>
+                {shown.label}
+                {shown.pool && (
+                    <>
+                        {shown.joiner}
+                        <PoolLink name={shown.pool} />
+                    </>
+                )}
+            </span>
         </span>
     );
     return shown.href ? (
@@ -235,8 +252,10 @@ export function rolloutBlock(row: ModelRow): string | null {
     if (busyTearingDown(row)) {
         return row.teardown?.label ?? "A rollout is running.";
     }
-    if (row.deployment.state === "starting" || row.deployment.state === "stopping") {
-        return `${deploymentShown(row).label.replace("…", "")}: wait for it to finish.`;
+    const starting = row.deployment.state === "starting" && !row.deployment.waiting;
+    if (starting || row.deployment.state === "stopping") {
+        const shown = deploymentShown(row);
+        return `${shown.label.replace("…", "")}${shown.pool ? `${shown.joiner}${shown.pool}` : ""}: wait for it to finish.`;
     }
     return null;
 }

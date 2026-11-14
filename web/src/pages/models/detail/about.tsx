@@ -188,19 +188,35 @@ function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
-function Deployment({ replicas, href }: { replicas: Place[]; href: string }) {
+function Deployment({
+    replicas,
+    href,
+    pool,
+}: {
+    replicas: Place[];
+    href: string;
+    pool: string | null | undefined;
+}) {
+    const here = pool ? replicas.filter((replica) => replica.pool === pool) : replicas;
     return (
         <span className="flex min-w-0 items-baseline gap-1">
             <Clipped
-                text={`${replicas.length} ${replicas.length === 1 ? "replica" : "replicas"}`}
+                text={`${here.length} ${here.length === 1 ? "replica" : "replicas"}`}
                 href={href}
                 className="shrink-0"
             />
-            {replicas.length > 0 && (
+            {pool ? (
                 <>
-                    <span className="shrink-0">in</span>
-                    <PoolPlaces places={replicas} machines={false} />
+                    <span className="shrink-0">on</span>
+                    <PoolLink name={pool} />
                 </>
+            ) : (
+                here.length > 0 && (
+                    <>
+                        <span className="shrink-0">in</span>
+                        <PoolPlaces places={replicas} machines={false} />
+                    </>
+                )
             )}
         </span>
     );
@@ -288,6 +304,7 @@ export function About({
                     <Deployment
                         replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
+                        pool={row.deployment.pool}
                     />
                 ) : (
                     <Muted>Not deployed</Muted>
@@ -525,6 +542,7 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
                     <Deployment
                         replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
+                        pool={row.deployment.pool}
                     />
                 ) : (
                     <Muted>Not deployed</Muted>

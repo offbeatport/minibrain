@@ -7,21 +7,19 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Field,
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
     useToast,
 } from "obp-ui";
 import { useState } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { api, unwrap } from "~/api/client";
+import { usePlacement } from "~/api/queries";
+import { FormRow, FormRows } from "~/components/FormRows";
+import { type PickOption, PickSelect } from "~/components/PickSelect";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
+import { PoolRow, initialPool, resolvedPool } from "./poolPicker";
 
 export function points(delta: number): string {
     const value = Math.abs(delta * 100).toFixed(1);
@@ -94,39 +92,29 @@ export function deployable(versions: VersionInfo[]): VersionInfo[] {
         .sort((left, right) => right.number - left.number);
 }
 
-function VersionPicker({
-    versions,
-    value,
-    onChange,
-}: {
-    versions: VersionInfo[];
-    value: number;
-    onChange: (number: number) => void;
-}) {
+function versionOptions(versions: VersionInfo[]): PickOption[] {
+    return versions.map((version) => ({
+        value: String(version.number),
+        label: versionLabel(version),
+        meta:
+            [
+                version.score === null ? null : percent(version.score),
+                version.current ? "deployed" : null,
+            ]
+                .filter(Boolean)
+                .join(" · ") || undefined,
+    }));
+}
+
+export function ModelCard({ row }: { row: ModelRow }) {
     return (
-        <Field id="deploy-version" label="Version">
-            <Select value={String(value)} onValueChange={(next) => onChange(Number(next ?? value))}>
-                <SelectTrigger id="deploy-version" className="w-full max-w-64">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {versions.map((version) => {
-                        const text = [
-                            versionLabel(version),
-                            version.score === null ? null : percent(version.score),
-                            version.current ? "deployed" : null,
-                        ]
-                            .filter(Boolean)
-                            .join(" · ");
-                        return (
-                            <SelectItem key={version.number} value={String(version.number)}>
-                                {text}
-                            </SelectItem>
-                        );
-                    })}
-                </SelectContent>
-            </Select>
-        </Field>
+        <div className="flex items-center gap-3 rounded-md border px-3 py-2.5">
+            <ModelAvatar row={row} size="md" />
+            <span className="flex min-w-0 flex-col">
+                <span className="truncate font-medium">{row.name}</span>
+                <span className="truncate font-mono text-sm text-muted-foreground">{row.key}</span>
+            </span>
+        </div>
     );
 }
 
@@ -146,60 +134,64 @@ export function DeployVersionDialog({
     const client = useQueryClient();
     const toast = useToast();
     const can = useCan();
+    const open = number !== null && can.build;
+    const placement = usePlacement(row.key, open);
     const [picked, setPicked] = useState<number | null>(null);
+    const [pool, setPool] = useState<string | null>(null);
     const chosen = picked ?? number;
+    const poolValue = pool ?? initialPool(placement.data);
+    const target = resolvedPool(placement.data, poolValue);
     const version = versions.find((item) => item.number === chosen);
     const deployed = isDeployed(row);
     const live = deployed ? liveOf(versions) : undefined;
-    const already = Boolean(version && live && live.number === version.number);
-    const close = (open: boolean) => {
-        if (!open) {
+    const moving = Boolean(
+        deployed && target && placement.data?.pool && target !== placement.data.pool,
+    );
+    const already = Boolean(version && live && live.number === version.number) && !moving;
+    const close = (next: boolean) => {
+        if (!next) {
             setPicked(null);
+            setPool(null);
         }
-        onOpenChange(open);
+        onOpenChange(next);
     };
     const promote = useMutation({
         mutationFn: (target: number) =>
             unwrap(
                 api.POST("/api/models/{name}/versions/{number}/promote", {
                     params: { path: { name: row.key, number: target } },
+                    body: { pool: poolValue },
                 }),
             ),
-        onSuccess: async (_, target) => {
+        onSuccess: async (_, number) => {
             await client.invalidateQueries();
             close(false);
             toast({
-                title: `v${target} of ${row.name} is deployed`,
-                description: live
-                    ? `v${live.number} stays callable as ${row.key}@${live.number}.`
-                    : undefined,
+                title: `v${number} of ${row.name} is deployed${target ? ` on ${target}` : ""}`,
+                description:
+                    live && live.number !== number
+                        ? `v${live.number} stays callable as ${row.key}@${live.number}.`
+                        : undefined,
                 tone: "success",
             });
         },
     });
     const blocked = version && !already ? liveBlock(row, version) : null;
+    const replacing = version && live && live.number !== version.number;
     return (
-        <Dialog open={number !== null && can.build} onOpenChange={close}>
+        <Dialog open={open} onOpenChange={close}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
                         {pick || !version ? "Deploy" : `Deploy v${version.number}?`}
                     </DialogTitle>
-                    <div className="flex items-center gap-3 rounded-md border px-3 py-2.5">
-                        <ModelAvatar row={row} size="md" />
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate font-medium">{row.name}</span>
-                            <span className="truncate font-mono text-sm text-muted-foreground">
-                                {row.key}
-                            </span>
-                        </span>
-                    </div>
+                    <ModelCard row={row} />
                     {version && !already && (
                         <DialogDescription>
                             {[
                                 direction(version, live),
                                 `Requests to ${row.key} are answered by v${version.number} from now on.`,
-                                live
+                                replacing
                                     ? `v${live.number} stays callable as ${row.key}@${live.number}, and you can deploy it again at any time.`
                                     : "",
                             ]
@@ -208,13 +200,20 @@ export function DeployVersionDialog({
                         </DialogDescription>
                     )}
                 </DialogHeader>
-                {pick && version && (
-                    <VersionPicker
-                        versions={deployable(versions)}
-                        value={version.number}
-                        onChange={setPicked}
-                    />
-                )}
+                <FormRows labels="narrow">
+                    {pick && version && (
+                        <FormRow id="deploy-version" label="Version">
+                            <PickSelect
+                                id="deploy-version"
+                                compact
+                                value={String(version.number)}
+                                options={versionOptions(deployable(versions))}
+                                onChange={(next) => setPicked(Number(next))}
+                            />
+                        </FormRow>
+                    )}
+                    <PoolRow placement={placement.data} value={poolValue} onChange={setPool} />
+                </FormRows>
                 {already && version && (
                     <p className="rounded-md border bg-muted px-3 py-2">
                         {`v${version.number} is deployed and answers ${row.key}.`}
@@ -225,13 +224,15 @@ export function DeployVersionDialog({
                         {blocked}
                     </p>
                 )}
-                <ErrorLine error={promote.error} />
+                <ErrorLine error={promote.error ?? placement.error} />
                 <DialogFooter>
                     <Button variant="outline" onClick={() => close(false)}>
                         Cancel
                     </Button>
                     <Button
-                        disabled={!version || already || Boolean(blocked) || promote.isPending}
+                        disabled={
+                            !version || !target || already || Boolean(blocked) || promote.isPending
+                        }
                         onClick={() => version && promote.mutate(version.number)}
                     >
                         {version ? `Deploy v${version.number}` : "Deploy"}

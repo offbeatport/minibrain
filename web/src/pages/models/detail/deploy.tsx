@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
 import { ChevronDown, GraduationCap, Play, Plug, Rocket, SquarePlus } from "lucide-react";
 import {
@@ -14,23 +14,21 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Link,
+    useToast,
 } from "obp-ui";
 import { useState } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow, VersionInfo } from "~/api/client";
-import { keys } from "~/api/queries";
+import { keys, usePlacement } from "~/api/queries";
+import { FormRows } from "~/components/FormRows";
+import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
-import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
+import { setDeployed } from "~/lib/teardown";
+import { useModelsRefresh } from "../dialogs";
 import { ConnectDialog } from "./connect";
-import {
-    DeploymentStatus,
-    Tip,
-    deployBlock,
-    deployConfirmation,
-    isDeployed,
-    trainBlock,
-} from "./header";
-import { DeployVersionDialog, deployable } from "./makeLive";
+import { DeploymentStatus, Tip, deployBlock, isDeployed, trainBlock } from "./header";
+import { DeployVersionDialog, ModelCard, deployable } from "./makeLive";
+import { PoolRow, initialPool, resolvedPool } from "./poolPicker";
 
 function startingVersion(row: ModelRow, versions: VersionInfo[]): number | null {
     const ready = deployable(versions);
@@ -43,37 +41,89 @@ function startingVersion(row: ModelRow, versions: VersionInfo[]): number | null 
     return (best ?? ready[0])?.number ?? null;
 }
 
-function BaseDeployedDialog({
+function DeployBaseDialog({
     row,
     open,
     onOpenChange,
+    after,
 }: {
     row: ModelRow;
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    after: () => Promise<unknown>;
 }) {
+    const toast = useToast();
+    const placement = usePlacement(row.key, open);
+    const [pool, setPool] = useState<string | null>(null);
+    const poolValue = pool ?? initialPool(placement.data);
+    const target = resolvedPool(placement.data, poolValue);
+    const deployed = isDeployed(row);
+    const moving = Boolean(deployed && target && target !== placement.data?.pool);
+    const close = (next: boolean) => {
+        if (!next) {
+            setPool(null);
+        }
+        onOpenChange(next);
+    };
+    const deploy = useMutation({
+        mutationFn: () => setDeployed(row, true, poolValue),
+        onSuccess: async () => {
+            await after();
+            close(false);
+            toast({
+                title: `${row.name} is deployed${target ? ` on ${target}` : ""}`,
+                tone: "success",
+            });
+        },
+    });
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={close}>
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
-                    <DialogTitle>{`Deploy ${row.name}`}</DialogTitle>
-                    <DialogDescription>
-                        It answers as <span className="font-mono">{row.key}</span>.
-                    </DialogDescription>
+                    <DialogTitle>
+                        {deployed ? `Deploy ${row.name}` : `Deploy ${row.name}?`}
+                    </DialogTitle>
+                    <ModelCard row={row} />
+                    {!deployed && (
+                        <DialogDescription>
+                            It becomes callable as <span className="font-mono">{row.key}</span>.
+                        </DialogDescription>
+                    )}
                 </DialogHeader>
-                <p className="rounded-md border bg-muted px-3 py-2">
-                    <DeploymentStatus row={row} />
-                </p>
+                {deployed && (
+                    <p className="rounded-md border bg-muted px-3 py-2">
+                        <DeploymentStatus row={row} />
+                    </p>
+                )}
+                <FormRows labels="narrow">
+                    <PoolRow placement={placement.data} value={poolValue} onChange={setPool} />
+                </FormRows>
+                <ErrorLine error={deploy.error ?? placement.error} />
                 <DialogFooter>
-                    <Button variant="outline" asChild>
-                        <Link
-                            href={`${modelPageHref(row.key, "settings")}#deployment`}
-                            onClick={() => onOpenChange(false)}
+                    {deployed ? (
+                        <Button variant="outline" asChild>
+                            <Link
+                                href={`${modelPageHref(row.key, "settings")}#deployment`}
+                                onClick={() => close(false)}
+                            >
+                                Undeploy in Settings
+                            </Link>
+                        </Button>
+                    ) : (
+                        <Button variant="outline" onClick={() => close(false)}>
+                            Cancel
+                        </Button>
+                    )}
+                    {deployed && !moving ? (
+                        <Button onClick={() => close(false)}>Done</Button>
+                    ) : (
+                        <Button
+                            disabled={!target || deploy.isPending}
+                            onClick={() => deploy.mutate()}
                         >
-                            Undeploy in Settings
-                        </Link>
-                    </Button>
-                    <Button onClick={() => onOpenChange(false)}>Done</Button>
+                            {moving ? `Move to ${target}` : `Deploy ${row.name}`}
+                        </Button>
+                    )}
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -92,7 +142,6 @@ function DeployButton({
     const client = useQueryClient();
     const refresh = useModelsRefresh();
     const [number, setNumber] = useState<number | null>(null);
-    const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [showing, setShowing] = useState(false);
     const custom = row.kind === "custom";
     const deployed = isDeployed(row);
@@ -110,10 +159,8 @@ function DeployButton({
     const open = () => {
         if (custom) {
             setNumber(starting);
-        } else if (deployed) {
-            setShowing(true);
         } else {
-            setConfirmation(deployConfirmation(row, false, reload));
+            setShowing(true);
         }
     };
     return (
@@ -133,12 +180,13 @@ function DeployButton({
                     onOpenChange={(next) => !next && setNumber(null)}
                 />
             ) : (
-                <BaseDeployedDialog row={row} open={showing} onOpenChange={setShowing} />
+                <DeployBaseDialog
+                    row={row}
+                    open={showing}
+                    onOpenChange={setShowing}
+                    after={reload}
+                />
             )}
-            <ConfirmAction
-                confirmation={confirmation}
-                onOpenChange={(next) => !next && setConfirmation(null)}
-            />
         </>
     );
 }

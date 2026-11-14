@@ -1,6 +1,7 @@
 import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import type { ReactNode } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
+import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { HealthStatus } from "~/components/models/HealthStatus";
 import { ProgressBar, StatusText } from "~/components/models/StatusText";
@@ -71,10 +72,33 @@ export function Tip({ tip, children }: { tip: ReactNode; children: ReactNode }) 
     );
 }
 
+function PoolSuffix({ pool, joiner = "on" }: { pool?: string | null; joiner?: string }) {
+    if (!pool) {
+        return null;
+    }
+    return (
+        <span className="max-w-full truncate text-sm text-muted-foreground">
+            {`${joiner} `}
+            <PoolLink name={pool} className="relative z-10" />
+        </span>
+    );
+}
+
 export function LiveStatus({
     replicas,
     text = "Deployed",
-}: { replicas: Replica[]; text?: string }) {
+    pool,
+}: { replicas: Replica[]; text?: string; pool?: string | null }) {
+    const here = pool ? replicas.filter((replica) => replica.pool === pool) : replicas;
+    return (
+        <span className="flex min-w-0 flex-col items-start">
+            <ReplicaStatus replicas={here} text={text} />
+            <PoolSuffix pool={pool} />
+        </span>
+    );
+}
+
+function ReplicaStatus({ replicas, text }: { replicas: Replica[]; text: string }) {
     const label = (
         <StatusText tone="success">
             {text}
@@ -150,7 +174,7 @@ export function StatusLineText({
         );
     }
     if (line.kind === "on") {
-        return <LiveStatus replicas={replicas} />;
+        return <LiveStatus replicas={replicas} pool={line.row.deployment.pool} />;
     }
     if (line.tone === null) {
         return <Muted>{line.text}</Muted>;
@@ -160,6 +184,17 @@ export function StatusLineText({
             <span className="tabular-nums">{line.text}</span>
         </StatusText>
     );
+    if (line.kind === "starting") {
+        return (
+            <span className="flex min-w-0 flex-col items-start">
+                {text}
+                <PoolSuffix
+                    pool={line.row.deployment.pool}
+                    joiner={line.row.deployment.waiting ? "in" : "on"}
+                />
+            </span>
+        );
+    }
     if (line.kind === "training" || line.kind === "transfer") {
         return (
             <span className="flex items-center gap-2">

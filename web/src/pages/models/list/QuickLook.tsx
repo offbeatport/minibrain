@@ -117,7 +117,7 @@ function Variants({ model }: { model: ListModel }) {
                             </span>
                         </span>
                         {isDeployed(row) && line.kind === "on" ? (
-                            <LiveStatus replicas={row.replicas ?? []} />
+                            <LiveStatus replicas={row.replicas ?? []} pool={row.deployment.pool} />
                         ) : (
                             <StatusLineText
                                 line={line}
