@@ -1,4 +1,5 @@
 import logging
+import sys
 from collections import deque
 
 LIMIT = 1000
@@ -21,7 +22,20 @@ class RecentLogs(logging.Handler):
         return "\n".join(self.lines) + "\n" if self.lines else ""
 
 
+class Console(logging.StreamHandler):
+    def __init__(self) -> None:
+        super().__init__(sys.stderr)
+        self.setLevel(logging.WARNING)
+        self.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if not logging.getLogger().handlers:
+            self.stream = sys.stderr
+            super().emit(record)
+
+
 RECENT = RecentLogs()
+CONSOLE = Console()
 
 
 def capture() -> None:
@@ -29,3 +43,6 @@ def capture() -> None:
         logger = logging.getLogger(name)
         if RECENT not in logger.handlers:
             logger.addHandler(RECENT)
+    owned = logging.getLogger(CAPTURED[0])
+    if CONSOLE not in owned.handlers:
+        owned.addHandler(CONSOLE)

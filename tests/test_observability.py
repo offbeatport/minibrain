@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from minibrain.recent_logs import capture
 from minibrain.telemetry.call import CURRENT, Call
 from minibrain.telemetry.context import RequestContext
 from minibrain.telemetry.logs import UVICORN_LOGGERS, JsonFormatter, LogFormatError, configure_logging, log_format
@@ -192,3 +193,30 @@ def test_logs_inside_a_request_know_its_id() -> None:
         logger.removeHandler(handler)
     assert reply.headers["x-request-id"] == "trace-me"
     assert json.loads(stream.getvalue())["request_id"] == "trace-me"
+
+
+def test_a_crash_answers_500_with_its_request_id() -> None:
+    app = FastAPI()
+
+    @app.get("/crash")
+    def crash() -> None:
+        raise RuntimeError("boom")
+
+    app.add_middleware(RequestContext)
+    reply = TestClient(app, raise_server_exceptions=False).get("/crash", headers={"X-Request-ID": "crash-1"})
+    assert reply.status_code == 500 and reply.headers["x-request-id"] == "crash-1"
+    with pytest.raises(RuntimeError):
+        TestClient(app).get("/crash")
+
+
+def test_text_logs_still_reach_the_console_once_captured(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    capture()
+    monkeypatch.setattr(logging.getLogger(), "handlers", [])
+    logging.getLogger("minibrain").error("audit chain seal failed")
+    logging.getLogger("minibrain").info("quiet")
+    assert capsys.readouterr().err == "ERROR: audit chain seal failed\n"
+    monkeypatch.setattr(logging.getLogger(), "handlers", [logging.NullHandler()])
+    logging.getLogger("minibrain").error("handled by root")
+    assert capsys.readouterr().err == ""

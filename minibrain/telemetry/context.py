@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 import uuid
@@ -5,6 +6,7 @@ from typing import Any
 
 from opentelemetry.trace import Span, Status, StatusCode
 from starlette.datastructures import Headers
+from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from minibrain.telemetry.call import CURRENT, Call
@@ -17,6 +19,8 @@ GATEWAY_PREFIX = "/v1/"
 MODEL_MAX = 200
 CLIENT_ERROR = 400
 SERVER_ERROR = 500
+
+log = logging.getLogger("minibrain")
 
 
 def request_id_of(headers: Headers) -> str:
@@ -109,10 +113,12 @@ class RequestContext:
             name = f"{scope['method']} {scope['path']}"
             span = telemetry.start_span(name, carrier, {key: value for key, value in first.items() if value})
         status = SERVER_ERROR
+        responded = False
 
         async def tagged(message: Message) -> None:
-            nonlocal status
+            nonlocal status, responded
             if message["type"] == "http.response.start":
+                responded = True
                 status = int(message["status"])
                 extra = [(REQUEST_ID_HEADER.encode(), call.request_id.encode())]
                 message = {**message, "headers": [*message.get("headers", []), *extra]}
@@ -123,6 +129,9 @@ class RequestContext:
             await self.app(scope, receive, tagged)
         except BaseException as error:
             failure = error
+            if isinstance(error, Exception) and not responded:
+                log.error("request %s failed: %s: %s", call.request_id, type(error).__qualname__, error)
+                await PlainTextResponse("Internal Server Error", status_code=SERVER_ERROR)(scope, receive, tagged)
             raise
         finally:
             if watched and telemetry is not None:
