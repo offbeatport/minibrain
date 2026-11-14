@@ -78,7 +78,9 @@ const ACTIONS: Record<string, string> = {
     "model.deploy": "Model deployed",
     "model.avatar": "Avatar changed",
     "model.base_change": "Model base switched",
+    "model.download": "Model download started",
     "model.duplicate": "Model duplicated",
+    "model.import": "Model import started",
     "model.reimport": "Model re-imported",
     "model.request_bodies": "Request inputs and answers changed",
     "model.safety": "Safety model changed",
@@ -422,6 +424,8 @@ const SUMMARIES: Record<string, (detail: Detail) => string> = {
         typeof detail.version === "number"
             ? `From ${plainValue(detail.source)} v${detail.version}`
             : `From ${plainValue(detail.source)}`,
+    "model.download": (detail) => `From ${plainValue(detail.repo)}`,
+    "model.import": (detail) => `From ${plainValue(detail.source)}`,
     "model.reimport": (detail) => `From ${plainValue(detail.source)}`,
     "model.relocate": (detail) => `${plainValue(detail.from)} → ${plainValue(detail.to)}`,
     "model.repair": (detail) => `From ${plainValue(detail.source)}`,
