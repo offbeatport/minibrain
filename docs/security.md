@@ -136,7 +136,9 @@ password, or read it with `--password-stdin`, and record `command line` as the a
 - GPU boxes need no internet access: engines and workers pull adapters and dataset versions from `main`, and base weights
   from `main` or, when Storage is S3, from the bucket on links `main` signs. They never hold bucket keys.
 - Workers and engines hold a shared token (`MINIBRAIN_WORKER_TOKEN`, `MINIBRAIN_GATEWAY_TOKEN`), never database
-  credentials.
+  credentials. The worker token reaches `/internal/worker/*` only. Engines a worker starts in a pool get a narrower
+  engine token for that pool (announce in that pool, base weights, adapters; [serving](serving.md#deployments-on-a-pool)),
+  never the gateway token, whose config carries routes and API key digests.
 - Identity headers from a reverse proxy are trusted only when the request comes from a configured proxy address.
 - Deleting a model writes an audit event with who, what and its size.
 - No outbound telemetry. With the Offline network policy nothing leaves the install, except audit events to the SIEM
@@ -286,7 +288,7 @@ wiped at any time. A worker's outputs are encrypted the moment main stores them.
 With Storage on S3, base model files stay sealed in the bucket and machines read them from there, not through main:
 
 1. A worker or engine asks main over its authenticated channel (`GET /internal/worker/bases/<key>` with the worker
-   token, `/internal/gateway/bases/<key>` with the gateway token).
+   token, `/internal/gateway/bases/<key>` with the gateway token or a pool's engine token).
 2. Main answers, with `Cache-Control: no-store`, each file's path, size and SHA-256, a presigned GET link (SigV4,
    valid 15 minutes, for the configured endpoint and nothing else) and the file's data key: main reads the object's
    4 KiB header with its own bucket credentials and unwraps the data key with the master key, through the same

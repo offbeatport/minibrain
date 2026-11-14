@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select, update
 
+from minibrain.auth.engine_tokens import engine_token
 from minibrain.base_models import QWEN3_0_6B, BaseModelSpec
 from minibrain.models.hardware import GIB, Gpu, NodeReport
 from minibrain.registry.models import AuditEvent, Worker, now
@@ -169,11 +170,49 @@ def test_workers_in_the_pool_start_and_stop_its_engines(harness: Harness) -> Non
     assert hosts["a"][1] == [] and hosts["b"][1] == []
 
 
+def worker_body(pool: str) -> dict[str, Any]:
+    return {"worker": {"id": "w", "host": "h", "kinds": [], "pool": pool}}
+
+
 def test_engines_answer_only_with_the_worker_token(harness: Harness) -> None:
-    body = {"worker": {"id": "w", "host": "h", "kinds": [], "pool": "rack"}}
+    body = worker_body("rack")
     assert harness.client.post("/internal/worker/engines", json=body).status_code == 401
     found = harness.internal("/engines", body).json()
-    assert found["engines"] == [] and found["gateway_token"] == harness.settings.secret("gateway_token")
+    assert found["engines"] == [] and found["engine_token"] == engine_token(harness.settings, "rack")
+    assert harness.settings.secret("gateway_token") not in str(found)
+    assert harness.internal("/engines", worker_body("local")).json()["engine_token"] is None
+
+
+def bearer(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_worker_token_reaches_no_gateway_endpoint(harness: Harness) -> None:
+    worker = bearer(harness.token)
+    assert harness.client.get("/internal/gateway/config", headers=worker).status_code == 401
+    assert harness.client.get("/internal/gateway/bases", headers=worker).status_code == 401
+    engine = {"id": "e", "host": "h", "url": "http://h:1", "base_model": BASE, "engine": "sglang", "state": "ready"}
+    assert harness.client.post("/internal/gateway/engines", json=engine, headers=worker).status_code == 401
+
+
+def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
+    token = harness.internal("/engines", worker_body("rack")).json()["engine_token"]
+    engine = bearer(token)
+    announce = {"id": "e", "host": "h", "url": "http://h:1", "base_model": BASE, "engine": "sglang", "state": "ready"}
+    assert (
+        harness.client.post("/internal/gateway/engines", json=announce | {"pool": "rack"}, headers=engine).status_code
+        == 204
+    )
+    elsewhere = harness.client.post("/internal/gateway/engines", json=announce, headers=engine)
+    assert elsewhere.status_code == 403 and "pool rack only" in elsewhere.json()["detail"]
+    assert harness.client.get("/internal/gateway/bases", headers=engine).status_code == 200
+    assert harness.client.get("/internal/gateway/artifacts/nope", headers=engine).status_code == 404
+    for method, path in [("GET", "/config"), ("POST", "/logs"), ("POST", "/feedback"), ("POST", "/gateways")]:
+        refused = harness.client.request(method, f"/internal/gateway{path}", headers=engine, json={})
+        assert refused.status_code == 403 and "engine token" in refused.json()["detail"], path
+    forged = bearer(token.replace("engine.rack.", "engine.local."))
+    assert harness.client.get("/internal/gateway/bases", headers=forged).status_code == 401
+    assert harness.client.get("/internal/gateway/bases", headers=bearer("engine.rack.00")).status_code == 401
 
 
 def announce(harness: Harness, state: str, pool: str = "rack") -> None:

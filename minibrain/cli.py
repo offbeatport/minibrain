@@ -194,7 +194,8 @@ def engine(args: argparse.Namespace) -> None:
     from minibrain.settings import load_settings
 
     settings = load_settings()
-    token = os.environ.get("MINIBRAIN_GATEWAY_TOKEN") or settings.secret("gateway_token")
+    given = os.environ.get("MINIBRAIN_ENGINE_TOKEN") or os.environ.get("MINIBRAIN_GATEWAY_TOKEN")
+    token = given or settings.secret("gateway_token")
     client = httpx.Client(base_url=args.main_url, timeout=httpx.Timeout(120.0, connect=10.0))
     if args.spec:
         spec = BaseModelSpec.from_dict(json.loads(args.spec))

@@ -14,6 +14,7 @@ from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.uploads import store_body
 from minibrain.artifacts import ArtifactError, Packing, is_artifact_id
+from minibrain.auth.engine_tokens import engine_token
 from minibrain.connections.s3 import job_env
 from minibrain.connections.spec import ConnectionProblem
 from minibrain.connections.store import get_connection, resolve
@@ -81,7 +82,7 @@ class EnginesRequest(pydantic.BaseModel):
 
 class EnginesResponse(pydantic.BaseModel):
     engines: list[HostedEngine]
-    gateway_token: str
+    engine_token: str | None
 
 
 class TokenBody(pydantic.BaseModel):
@@ -195,9 +196,8 @@ def hosted_engines(
     config = request.app.state.gateway_config.current()
     placements = {key: found for key, found in config.placements.items() if key not in config.problems}
     wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)
-    return EnginesResponse(
-        engines=[HostedEngine(model=key) for key in wanted], gateway_token=settings.secret("gateway_token")
-    )
+    token = engine_token(settings, worker.pool) if worker.pool != LOCAL_POOL else None
+    return EnginesResponse(engines=[HostedEngine(model=key) for key in wanted], engine_token=token)
 
 
 @router.post("/jobs/{job_id}/heartbeat")

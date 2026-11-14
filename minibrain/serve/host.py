@@ -11,6 +11,7 @@ from minibrain.supervise import Supervisor
 from minibrain.worker import MainClient, WorkerConfig, WorkerStoppedError
 
 RECONCILE_SECONDS = 10.0
+ENGINE_KEY_ENV = "MINIBRAIN_ENGINE_TOKEN"
 
 log = logging.getLogger("minibrain.host")
 
@@ -64,7 +65,7 @@ class EngineHost:
 
     def start(self, key: str, token: str) -> Running:
         command = engine_command(self.config, key, free_port(), self.advertise, self.bind)
-        supervisor = Supervisor(f"engine {key}", command, os.environ | {"MINIBRAIN_GATEWAY_TOKEN": token})
+        supervisor = Supervisor(f"engine {key}", command, os.environ | {ENGINE_KEY_ENV: token})
         supervisor.start()
         return supervisor
 
@@ -74,7 +75,7 @@ class EngineHost:
         with self.lock:
             for key in sorted(wanted - self.running.keys()):
                 log.info("starting an engine for %s in pool %s", key, self.config.pool)
-                self.running[key] = self.launch(key, str(found["gateway_token"]))
+                self.running[key] = self.launch(key, str(found["engine_token"]))
             for key in sorted(self.running.keys() - wanted):
                 log.info("stopping the engine for %s; it is no longer placed here", key)
                 self.running.pop(key).shutdown()

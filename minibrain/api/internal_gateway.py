@@ -11,6 +11,7 @@ from minibrain.api.bases import base_file as file_of
 from minibrain.api.bases import base_weights as weights_of
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
 from minibrain.artifacts import is_artifact_id
+from minibrain.auth.engine_tokens import engine_pool
 from minibrain.data.feedback import Submission, record
 from minibrain.gateway.config import LocalConfig
 from minibrain.gateway.logs import CHAT_KIND, LogEntry, database_sink
@@ -22,14 +23,31 @@ from minibrain.registry.compute import EngineReport, GatewayReport, record_engin
 MAX_WAIT_SECONDS = 30.0
 
 
-def gateway_token(request: Request, authorization: Annotated[str, Header()] = "") -> None:
-    expected = request.app.state.settings.secret("gateway_token")
-    scheme, _, token = authorization.partition(" ")
-    if scheme.lower() != "bearer" or not hmac.compare_digest(token.strip(), expected):
+ENGINE_ONLY = "an engine token reaches only what engines need: announcing themselves, base weights and adapters"
+
+
+def caller_pool(request: Request, authorization: Annotated[str, Header()] = "") -> str | None:
+    settings = request.app.state.settings
+    scheme, _, given = authorization.partition(" ")
+    token = given.strip() if scheme.lower() == "bearer" else ""
+    if token and hmac.compare_digest(token, settings.secret("gateway_token")):
+        return None
+    pool = engine_pool(settings, token) if token else None
+    if pool is None:
         raise HTTPException(status_code=401, detail="invalid gateway token")
+    return pool
 
 
-router = APIRouter(prefix="/internal/gateway", include_in_schema=False, dependencies=[Depends(gateway_token)])
+CallerPool = Annotated[str | None, Depends(caller_pool)]
+
+
+def gateway_token(pool: CallerPool) -> None:
+    if pool is not None:
+        raise HTTPException(status_code=403, detail=ENGINE_ONLY)
+
+
+router = APIRouter(prefix="/internal/gateway", include_in_schema=False, dependencies=[Depends(caller_pool)])
+GatewayOnly = [Depends(gateway_token)]
 
 
 class LogBody(BaseModel):
@@ -95,7 +113,9 @@ class GatewayBody(BaseModel):
 
 
 @router.post("/engines", status_code=204)
-def register_engine(body: EngineBody, session: SessionDep) -> None:
+def register_engine(body: EngineBody, session: SessionDep, pool: CallerPool) -> None:
+    if pool is not None and body.pool != pool:
+        raise HTTPException(status_code=403, detail=f"this engine token announces engines in pool {pool} only")
     record_engine(session, EngineReport(**body.model_dump(exclude={"error", "code"})))
     if body.state == "failed":
         record_load_failure(session, body.base_model, body.code, body.error, body.host)
@@ -105,7 +125,7 @@ def register_engine(body: EngineBody, session: SessionDep) -> None:
     session.commit()
 
 
-@router.post("/gateways", status_code=204)
+@router.post("/gateways", status_code=204, dependencies=GatewayOnly)
 def report_gateway(body: GatewayBody, session: SessionDep) -> None:
     record_gateway(session, GatewayReport(kind="standalone", **body.model_dump()))
     session.commit()
@@ -128,7 +148,7 @@ def base_file(key: str, path: str, session: SessionDep, settings: SettingsDep) -
     return file_of(session, settings, key, path)
 
 
-@router.get("/config")
+@router.get("/config", dependencies=GatewayOnly)
 def config(request: Request, version: str = "", wait: float = 0.0) -> Response:
     source: LocalConfig = request.app.state.gateway_config
     current = source.wait_for_change(version, max(0.0, min(wait, MAX_WAIT_SECONDS))) if version else source.current()
@@ -137,12 +157,12 @@ def config(request: Request, version: str = "", wait: float = 0.0) -> Response:
     return Response(content=current.to_json(), media_type="application/json", headers={"ETag": current.version})
 
 
-@router.post("/logs", status_code=204)
+@router.post("/logs", status_code=204, dependencies=GatewayOnly)
 def logs(body: LogsBody, request: Request) -> None:
     database_sink(request.app.state.sessions)([LogEntry(**entry.model_dump()) for entry in body.entries])
 
 
-@router.post("/feedback", status_code=201)
+@router.post("/feedback", status_code=201, dependencies=GatewayOnly)
 def feedback(body: FeedbackBody, session: SessionDep) -> FeedbackStored:
     item = record(session, Submission(**body.model_dump()))
     session.commit()
