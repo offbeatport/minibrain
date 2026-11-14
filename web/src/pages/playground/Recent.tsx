@@ -161,17 +161,13 @@ export function Recent({
     current,
     note,
     onOpen,
-    onNew,
     onDeleted,
-    busy,
     titled = true,
 }: {
     current: number | null;
     note: string | null;
     onOpen: (id: number) => void;
-    onNew: () => void;
     onDeleted: (id: number) => void;
-    busy: boolean;
     titled?: boolean;
 }) {
     const toast = useToast();
@@ -184,23 +180,20 @@ export function Recent({
     const shown = items.filter((chat) => matches(chat, filter));
     return (
         <div className="flex min-h-0 flex-col">
-            <div className="flex flex-col gap-3 border-b px-4 py-3">
-                <div className="flex items-center justify-between gap-2">
+            {(titled || items.length > 0 || note) && (
+                <div className="flex flex-col gap-3 border-b px-4 py-3">
                     {titled && <h2 className="text-base font-semibold">Recent</h2>}
-                    <Button size="sm" variant="outline" onClick={onNew} disabled={busy}>
-                        New chat
-                    </Button>
+                    {items.length > 0 && (
+                        <SearchInput
+                            value={filter}
+                            onValueChange={setFilter}
+                            placeholder="Filter chats"
+                            aria-label="Filter chats"
+                        />
+                    )}
+                    {note && <p className="text-sm text-muted-foreground">{note}</p>}
                 </div>
-                {items.length > 0 && (
-                    <SearchInput
-                        value={filter}
-                        onValueChange={setFilter}
-                        placeholder="Filter chats"
-                        aria-label="Filter chats"
-                    />
-                )}
-                {note && <p className="text-sm text-muted-foreground">{note}</p>}
-            </div>
+            )}
             <div className="min-h-0 flex-1 overflow-y-auto p-2">
                 {chats.isLoading && (
                     <div className="flex flex-col gap-2 p-2">

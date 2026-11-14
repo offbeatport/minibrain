@@ -150,7 +150,6 @@ export function PlaygroundPage() {
     const saveChat = useSaveChat();
     const openChat = useOpenChat();
     const targets = models.data?.targets ?? [];
-    const guards = models.data?.guards ?? [];
     const [picked, setPicked] = useState<string | null>(null);
     const target = chosenTarget(targets, [picked, requested, remembered()]);
     const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
@@ -368,7 +367,6 @@ export function PlaygroundPage() {
           : null;
     const panelBody = target && (
         <SettingsPanel
-            guards={guards}
             target={target}
             settings={settings}
             onSettings={loadSettings}
@@ -382,9 +380,7 @@ export function PlaygroundPage() {
             current={chatId}
             note={target && !target.chats_saved ? (target.chats_note ?? null) : null}
             onOpen={open}
-            onNew={newChat}
             onDeleted={(id) => id === chatId && newChat()}
-            busy={busy}
         />
     );
     const showSettings = () => (wide ? setPanel((shown) => !shown) : setDrawer(true));

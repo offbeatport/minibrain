@@ -14,7 +14,6 @@ import {
     SelectItem,
     SelectTrigger,
     SelectValue,
-    Switch,
     Tooltip,
     TooltipContent,
     TooltipTrigger,
@@ -23,7 +22,6 @@ import { type ReactNode, useState } from "react";
 import {
     DEFAULT_PARAMETERS,
     type FunctionSpec,
-    type Guard,
     type ResponseFormat,
     type Settings,
     type Target,
@@ -34,7 +32,6 @@ import {
 import { Presets } from "./Presets";
 
 const MODEL_DEFAULT = "default";
-const NONE = "none";
 const MAX_STOPS = 4;
 const TOKEN_CAP = 32768;
 const WHOLE = { maximumFractionDigits: 0 };
@@ -80,73 +77,6 @@ function Labelled({
 
 function Note({ children }: { children: ReactNode }) {
     return <p className="text-sm text-muted-foreground">{children}</p>;
-}
-
-function SafetyControls({
-    target,
-    guards,
-    settings,
-    onChange,
-}: {
-    target: Target | undefined;
-    guards: Guard[];
-    settings: Settings;
-    onChange: Change;
-}) {
-    const enforced = target?.safety ?? null;
-    const value = enforced ?? settings.safety_model ?? NONE;
-    const answers = Boolean(target?.safety_answers) || settings.safety_answers;
-    const name = (key: string) => guards.find((guard) => guard.key === key)?.name ?? key;
-    return (
-        <Labelled
-            id="playground-safety"
-            label="Safety model"
-            help="A guard model that checks your message before the model answers, and its answer too if you ask. A blocked call returns a refusal with the categories it found. None by default."
-        >
-            <Select
-                value={value}
-                disabled={Boolean(enforced)}
-                onValueChange={(next) =>
-                    onChange({ safety_model: !next || next === NONE ? null : String(next) })
-                }
-            >
-                <SelectTrigger id="playground-safety" className="w-full">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value={NONE}>None</SelectItem>
-                    {enforced && !guards.some((guard) => guard.key === enforced) && (
-                        <SelectItem value={enforced}>{name(enforced)}</SelectItem>
-                    )}
-                    {guards.map((guard) => (
-                        <SelectItem key={guard.key} value={guard.key}>
-                            {guard.name}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            {enforced && (
-                <Note>
-                    Set for this model in Settings or on its Deployments page; a request cannot
-                    change it.
-                </Note>
-            )}
-            {!enforced && guards.length === 0 && (
-                <Note>No safety model is installed; Discover lists them under Safety.</Note>
-            )}
-            {value !== NONE && (
-                <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor="playground-safety-answers">Also check answers</Label>
-                    <Switch
-                        id="playground-safety-answers"
-                        checked={answers}
-                        disabled={Boolean(target?.safety_answers)}
-                        onCheckedChange={(checked) => onChange({ safety_answers: checked })}
-                    />
-                </div>
-            )}
-        </Labelled>
-    );
 }
 
 function ReasoningControl({
@@ -456,14 +386,12 @@ function StopControl({ settings, onChange }: { settings: Settings; onChange: Cha
 }
 
 export function SettingsPanel({
-    guards,
     target,
     settings,
     onSettings,
     preset,
     onPreset,
 }: {
-    guards: Guard[];
     target: Target | undefined;
     settings: Settings;
     onSettings: (next: Settings) => void;
@@ -514,12 +442,6 @@ export function SettingsPanel({
                     largeStep={0.1}
                     fallback={0.7}
                     format={TWO}
-                />
-                <SafetyControls
-                    target={target}
-                    guards={guards}
-                    settings={settings}
-                    onChange={change}
                 />
                 <ReasoningControl target={target} settings={settings} onChange={change} />
             </Group>
