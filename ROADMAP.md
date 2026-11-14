@@ -245,6 +245,11 @@ runs it as a `score` job, so versions stay comparable; changing the promotion ru
 Every UI change serves one of these steps or questions itself (2026-11-13). Home's checklist, empty states and each
 model's next-step line follow them.
 
+Home's checklist (built 2026-11-14, Builders): Get started lists Add data, Add a model, Train, Evaluate, Deploy and
+Connect an app, each done or not from real state (a dataset, a custom model, a ready trained version, a scored trained
+version, a live version, an API key on a model) with a link to where it is done, the next one as the primary button,
+and "N of 6 done". It hides once every step is done or when Dismiss is clicked (kept in the browser).
+
 1. **Install** on one server; sign in with the setup link as the admin.
 2. **Add data**: upload a CSV or JSONL, or connect Postgres; it becomes a dataset with held-out rows set aside.
 3. **Add a model**: base (downloads or imports in the background if missing), dataset, name, output (labels, JSON or

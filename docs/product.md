@@ -554,6 +554,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Home** · shipped · product
   See models, serving and running jobs at a glance.
   UI: Home
+- **Getting-started checklist** · shipped · product
+  Six steps from data to a connected app, checked from real state.
+  UI: Home › Get started
 - **Monitoring overview** · shipped · engineer, admin
   Chart requests, errors, latency and tokens per model, live.
   UI: Monitoring › Overview · API: GET /api/requests/overview
