@@ -17,7 +17,13 @@ import { count } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
-import { AddModelSummary, Formats, Licence, servesOnlyOf } from "./AddModelSummary";
+import {
+    AddModelNotices,
+    AddModelSummary,
+    Formats,
+    Licence,
+    servesOnlyOf,
+} from "./AddModelSummary";
 import { ApiNameHint } from "./ApiNameHint";
 import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
@@ -427,6 +433,14 @@ export function AddModelPage() {
                     </FormRow>
                 )}
             </FormGroup>
+            <AddModelNotices
+                option={option}
+                plan={plan}
+                need={need}
+                catalog={catalog.data}
+                onVariant={changeVariant}
+                onPickAnother={() => setOpen(true)}
+            />
         </FormCard>
     );
     return (
@@ -446,8 +460,6 @@ export function AddModelPage() {
                         catalog={catalog.data}
                         outcome={outcome}
                         blocked={[]}
-                        onVariant={changeVariant}
-                        onPickAnother={() => setOpen(true)}
                     />
                 }
                 submit={

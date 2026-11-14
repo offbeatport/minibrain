@@ -103,13 +103,16 @@ export function DiskGauge({
     total,
     onDisk,
     store,
+    pool,
 }: {
     need: DiskNeed;
     free: number | null | undefined;
     total: number | null | undefined;
     onDisk: number | null;
     store: WeightsStore;
+    pool: string;
 }) {
+    const place = pool === MAIN_POOL ? null : <FolderPlace label={store.label} />;
     const size = need?.size ?? onDisk;
     const amount = size === null ? "Size unknown" : `${bytes(size)} ${need ? "needed" : "on disk"}`;
     if (store.kind === "s3") {
@@ -128,7 +131,7 @@ export function DiskGauge({
         return (
             <>
                 <Figures icon={HardDrive}>{`${amount} · free space unknown`}</Figures>
-                <FolderPlace label={store.label} />
+                {place}
             </>
         );
     }
@@ -151,15 +154,13 @@ export function DiskGauge({
                     },
                 ]}
             />
-            <Figures
-                icon={HardDrive}
-            >{`${amount} · ${bytes(free)} free of ${bytes(total)}`}</Figures>
-            <FolderPlace label={store.label} />
+            <Figures icon={HardDrive}>{`${amount} · ${bytes(free)} free`}</Figures>
+            {place}
         </>
     );
 }
 
-export type ComputeInfo = { memoryLabel: string; pool: string };
+export type ComputeInfo = { pool: string };
 
 function servePools(fit: FitInfo, compute: ComputeInfo | null, fits: PoolFits | null): string[] {
     if (fits) {
@@ -249,14 +250,10 @@ function TrainStatus({
 
 export function MemoryGauge({
     fit,
-    trainFit,
     compute,
-    fits,
 }: {
     fit: FitInfo | null;
-    trainFit: TrainFitInfo | null;
     compute: ComputeInfo | null;
-    fits: PoolFits | null;
 }) {
     const available = fit?.available_bytes;
     if (!fit || !available || fit.level === "unknown") {
@@ -269,11 +266,11 @@ export function MemoryGauge({
     const needed = fit.needed_bytes;
     const short = needed > available;
     const tone: Tone = short ? "destructive" : fit.level === "limited" ? "warning" : "normal";
-    const label = compute?.memoryLabel ?? "memory";
+    const label = compute ? `Memory in pool ${compute.pool}` : "Memory";
     return (
         <>
             <ResourceBar
-                label={compute ? `${label} in pool ${compute.pool}` : label}
+                label={label}
                 total={available}
                 segments={[
                     { id: "needs", value: Math.min(needed, available), fill: TONE_FILL[tone] },
@@ -281,19 +278,31 @@ export function MemoryGauge({
             />
             <Figures icon={MemoryStick}>
                 {short
-                    ? `${bytes(needed)} needed · only ${bytes(available)} ${label}`
-                    : `${bytes(needed)} of ${bytes(available)} ${label}`}
-                {compute && (
-                    <>
-                        {" in "}
-                        <PoolLink name={compute.pool} />
-                    </>
-                )}
+                    ? `${bytes(needed)} needed · only ${bytes(available)}`
+                    : `${bytes(needed)} of ${bytes(available)}`}
             </Figures>
-            <span className="flex flex-col gap-1">
-                <ServeStatus fit={fit} compute={compute} fits={fits} />
-                {trainFit && <TrainStatus trainFit={trainFit} compute={compute} fits={fits} />}
-            </span>
         </>
+    );
+}
+
+export function PoolStatus({
+    fit,
+    trainFit,
+    compute,
+    fits,
+}: {
+    fit: FitInfo | null;
+    trainFit: TrainFitInfo | null;
+    compute: ComputeInfo | null;
+    fits: PoolFits | null;
+}) {
+    if (!fit || !fit.available_bytes || fit.level === "unknown") {
+        return null;
+    }
+    return (
+        <span className="flex flex-col gap-1">
+            <ServeStatus fit={fit} compute={compute} fits={fits} />
+            {trainFit && <TrainStatus trainFit={trainFit} compute={compute} fits={fits} />}
+        </span>
     );
 }

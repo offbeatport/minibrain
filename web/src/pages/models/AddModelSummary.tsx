@@ -17,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "obp-ui";
+import type { ReactNode } from "react";
 import type {
     CatalogEntry,
     CatalogResponse,
@@ -31,15 +32,16 @@ import {
     SummaryFacts,
     SummarySection,
 } from "~/components/CreateLayout";
+import { PoolLink } from "~/components/PoolLink";
 import { StatusText } from "~/components/models/StatusText";
 import { bytes } from "~/lib/time";
 import type { SourcePlan } from "./BaseSource";
 import { ComputeHelp, DiskLine, type DiskNeed } from "./BaseSummary";
 import { licenceUseLabel } from "./DiscoverFilters";
-import { DiskGauge, MemoryGauge } from "./ResourceGauges";
+import { DiskGauge, MAIN_POOL, MemoryGauge, PoolStatus } from "./ResourceGauges";
 import { type BaseOption, trainableVariant } from "./baseOptions";
 import { formatName, formatUse, scheme, trainable } from "./formats";
-import { usePoolFits } from "./runsHere";
+import { type PoolFits, usePoolFits } from "./runsHere";
 
 function variantLabel(variant: CatalogVariantInfo): string {
     const name = variant.format === "gguf" ? `GGUF ${scheme(variant)}` : scheme(variant);
@@ -265,6 +267,23 @@ export function servesOnlyOf(option: BaseOption | null, plan: SourcePlan): boole
         : Boolean(found?.quantized) || trainFit?.level === "unsupported";
 }
 
+function summaryPool(catalog: CatalogResponse | undefined, fits: PoolFits): string {
+    const home = catalog?.pool ?? MAIN_POOL;
+    if (fits.serve.length === 0 || fits.serve.includes(home)) {
+        return home;
+    }
+    return fits.serve[0] ?? home;
+}
+
+function Gauge({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="flex flex-col gap-2">
+            <span className="text-muted-foreground">{label}</span>
+            {children}
+        </div>
+    );
+}
+
 export function AddModelSummary({
     option,
     plan,
@@ -273,8 +292,6 @@ export function AddModelSummary({
     catalog,
     outcome,
     blocked,
-    onVariant,
-    onPickAnother,
 }: {
     option: BaseOption | null;
     plan: SourcePlan;
@@ -283,73 +300,109 @@ export function AddModelSummary({
     catalog: CatalogResponse | undefined;
     outcome: string;
     blocked: string[];
-    onVariant: (variant: string) => void;
-    onPickAnother: () => void;
 }) {
     const variant = plan.variant ?? option?.variant ?? null;
     const entry = plan.target.kind === "catalogue" ? plan.target.entry : (option?.entry ?? null);
     const found = option ? undefined : plan.found;
     const onDisk = need ? null : (variant?.size_bytes ?? option?.size ?? null);
     const local = option?.kind === "local";
-    const fit = local ? null : (variant?.fit ?? found?.fit ?? null);
+    const homeFit = local ? null : (variant?.fit ?? found?.fit ?? null);
     const trainFit = local ? null : (variant?.train_fit ?? found?.train_fit ?? null);
     const servesOnly = servesOnlyOf(option, plan);
     const storage = need?.size ?? onDisk ?? (found?.size_bytes || null);
-    const compute = catalog
-        ? { memoryLabel: catalog.hardware.memory_label, pool: catalog.pool }
-        : null;
     const fits = usePoolFits(catalog, local ? null : entry?.id, local ? null : variant?.id);
+    const pool = summaryPool(catalog, fits);
+    const fit = fits.fit[pool] ?? homeFit;
+    const compute = catalog ? { pool } : null;
     return (
         <SummaryCard>
             <SummarySection title="System requirements">
                 <Requirements
-                    fit={fit}
+                    fit={homeFit}
                     trainFit={trainFit}
                     servesOnly={servesOnly}
                     storage={storage}
                 />
             </SummarySection>
-            <SummarySection title="Memory">
-                <MemoryGauge
-                    fit={fit}
-                    trainFit={servesOnly ? null : trainFit}
-                    compute={compute}
-                    fits={entry && variant && !local ? fits : null}
-                />
-                {variant?.fit.level === "insufficient" && option && catalog && (
-                    <ComputeHelp
-                        option={{ ...option, variant }}
-                        catalog={catalog}
-                        onPickAnother={onPickAnother}
+            <SummarySection
+                title="Pool"
+                info={
+                    <span className="ml-auto font-normal">
+                        <PoolLink name={pool} />
+                    </span>
+                }
+            >
+                <div className="flex flex-col gap-4">
+                    <Gauge label="Memory">
+                        <MemoryGauge fit={fit} compute={compute} />
+                    </Gauge>
+                    <Gauge label="Disk">
+                        <DiskGauge
+                            need={need}
+                            free={free}
+                            total={catalog?.store_total_bytes}
+                            onDisk={storage}
+                            pool={pool}
+                            store={{
+                                kind: catalog?.store_kind ?? "folder",
+                                label: catalog?.store_label ?? "Main server disk",
+                                stagingFree: catalog?.staging_free_bytes,
+                            }}
+                        />
+                    </Gauge>
+                    <PoolStatus
+                        fit={fit}
+                        trainFit={servesOnly ? null : trainFit}
+                        compute={compute}
+                        fits={entry && variant && !local ? fits : null}
                     />
-                )}
-            </SummarySection>
-            <SummarySection title="Storage">
-                <DiskGauge
-                    need={need}
-                    free={free}
-                    total={catalog?.store_total_bytes}
-                    onDisk={storage}
-                    store={{
-                        kind: catalog?.store_kind ?? "folder",
-                        label: catalog?.store_label ?? "Main server disk",
-                        stagingFree: catalog?.staging_free_bytes,
-                    }}
-                />
-                <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
+                </div>
             </SummarySection>
             <SummarySection title="Result">
                 <p className="tabular-nums">{outcome}</p>
-                {variant && !trainable(variant) && (
-                    <ServeOnlyNotice
-                        entry={entry}
-                        variant={variant}
-                        onVariant={onVariant}
-                        onPickAnother={onPickAnother}
-                    />
-                )}
             </SummarySection>
             <BlockedReasons reasons={blocked} />
         </SummaryCard>
+    );
+}
+
+export function AddModelNotices({
+    option,
+    plan,
+    need,
+    catalog,
+    onVariant,
+    onPickAnother,
+}: {
+    option: BaseOption | null;
+    plan: SourcePlan;
+    need: DiskNeed;
+    catalog: CatalogResponse | undefined;
+    onVariant: (variant: string) => void;
+    onPickAnother: () => void;
+}) {
+    const variant = plan.variant ?? option?.variant ?? null;
+    const entry = plan.target.kind === "catalogue" ? plan.target.entry : (option?.entry ?? null);
+    const tooLarge = variant?.fit.level === "insufficient" && option && catalog;
+    const serveOnly = variant && !trainable(variant);
+    return (
+        <div className="mt-auto flex flex-col gap-6 empty:hidden">
+            {tooLarge && (
+                <ComputeHelp
+                    option={{ ...option, variant }}
+                    catalog={catalog}
+                    onPickAnother={onPickAnother}
+                />
+            )}
+            <DiskLine option={option} need={need} onPickAnother={onPickAnother} />
+            {serveOnly && (
+                <ServeOnlyNotice
+                    entry={entry}
+                    variant={variant}
+                    onVariant={onVariant}
+                    onPickAnother={onPickAnother}
+                />
+            )}
+        </div>
     );
 }

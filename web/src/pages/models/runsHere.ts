@@ -69,7 +69,12 @@ export function useTrainsHere(catalog: CatalogResponse | undefined): RunsHere {
     return matching(usePoolEntries(catalog), trainsAnywhere);
 }
 
-export type PoolFits = { serve: string[]; train: string[]; checked: boolean };
+export type PoolFits = {
+    serve: string[];
+    train: string[];
+    checked: boolean;
+    fit: Record<string, FitInfo>;
+};
 
 export function usePoolFits(
     catalog: CatalogResponse | undefined,
@@ -105,5 +110,8 @@ export function usePoolFits(
             .filter((item) => item.variant?.train_fit.level === "fits")
             .map((item) => item.name),
         checked: variants.every((item) => item.checked),
+        fit: Object.fromEntries(
+            variants.flatMap((item) => (item.variant ? [[item.name, item.variant.fit]] : [])),
+        ),
     };
 }
