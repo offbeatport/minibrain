@@ -485,6 +485,16 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                 ? [...picked.filter((n) => n !== number), number]
                 : picked.filter((n) => n !== number),
         );
+    const keptText = (doomed: VersionInfo[]) => {
+        const kept = chosen
+            .filter((version) => !doomed.includes(version))
+            .map((version) =>
+                version.number === 0 ? "Baseline v0" : `Deployed v${version.number}`,
+            );
+        return kept.length > 0
+            ? ` ${kept.join(" and ")} ${kept.length === 1 ? "is" : "are"} kept.`
+            : "";
+    };
     const remove = (doomed: VersionInfo[], kept: boolean) =>
         setConfirmation({
             title:
@@ -493,8 +503,8 @@ function VersionsTable({ row, versions }: { row: ModelRow; versions: VersionInfo
                     : `Delete ${doomed.length} versions of ${row.name}?`,
             description: (
                 <p>
-                    {`${doomed.map((version) => `${row.key}@${version.number}`).join(", ")} stop answering; adapters, scores and cards are removed, and their running jobs are cancelled.`}
-                    {kept && ` Deployed v${liveNumber} is kept.`}
+                    {`${doomed.map((version) => `${row.key}@${version.number}`).join(", ")} ${doomed.length === 1 ? "stops" : "stop"} answering; adapters, scores and cards are removed, and their running jobs are cancelled.`}
+                    {kept && keptText(doomed)}
                 </p>
             ),
             confirmLabel: doomed.length === 1 ? "Delete version" : "Delete versions",
