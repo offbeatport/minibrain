@@ -7,6 +7,8 @@ import pytest
 
 from minibrain import worker as worker_module
 from minibrain.jobs import queue as queue_module
+from minibrain.jobs.effects import DomainEffects
+from minibrain.registry.files import MissingArtifactError
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
@@ -71,6 +73,22 @@ def test_cancel_stops_the_child_process(harness: Harness, monkeypatch: pytest.Mo
     runner.join(timeout=30)
     assert time.monotonic() - started < 25
     assert train_job(harness)["status"] == "cancelled"
+    assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "failed"
+
+
+def test_a_result_that_cannot_be_saved_fails_the_job_instead_of_leaving_it_running(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    queued_training(harness)
+
+    def missing(_effects: DomainEffects, _session: Any, _job: Any) -> None:
+        raise MissingArtifactError("dataset version 1234 has no artifact")
+
+    monkeypatch.setattr(DomainEffects, "trained", missing)
+    assert harness.worker(kinds=["train"], modules=FAKE).run_once()
+    job = train_job(harness)
+    assert (job["status"], job["attempts"][0]["outcome"]) == ("failed", "failed")
+    assert "1234 has no artifact" in job["error"]
     assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "failed"
 
 

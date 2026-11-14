@@ -1,3 +1,4 @@
+import logging
 import secrets
 import threading
 from collections.abc import Callable, Sequence
@@ -26,6 +27,8 @@ from minibrain.registry.models import (
 )
 
 TERMINAL = tuple(str(status) for status in FINAL_JOB_STATUSES)
+
+logger = logging.getLogger("minibrain.jobs")
 
 
 class LeaseError(Exception):
@@ -354,13 +357,25 @@ class SqlJobQueue:
                 note_orphan(session, job)
                 self.close_attempt(job, AttemptOutcome.CANCELLED, None, None, log)
                 self.finish(session, job, JobStatus.CANCELLED)
-            else:
+                session.commit()
+                return
+            try:
                 self.close_attempt(job, AttemptOutcome.SUCCEEDED, None, None, log)
                 job.result = result
                 job.outputs = outputs
                 job.progress = 1.0
                 self.finish(session, job, JobStatus.SUCCEEDED)
-            session.commit()
+                session.commit()
+            except Exception as error:
+                session.rollback()
+                logger.exception("job %s finished but its result could not be saved", job_id)
+                self.reject(session, job_id, token, f"its result could not be saved: {error}", log)
+
+    def reject(self, session: Session, job_id: int, token: str, error: str, log: str | None) -> None:
+        job = self.leased(session, job_id, token)
+        self.close_attempt(job, AttemptOutcome.FAILED, error, False, log)
+        self.finish(session, job, JobStatus.FAILED, error)
+        session.commit()
 
     def settle_failure(self, session: Session, job: Job, error: str, retryable: bool) -> None:
         if stopping(job):
