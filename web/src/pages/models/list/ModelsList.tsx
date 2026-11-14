@@ -1,5 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
-import { Button, CubePlus, Link, SearchInput, cn, useToast } from "obp-ui";
+import { Button, SearchInput, cn, useToast } from "obp-ui";
 import { type KeyboardEvent, type ReactNode, useMemo, useRef, useState } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { useAllModels } from "~/api/queries";
@@ -186,22 +186,11 @@ function GroupBand({ group }: { group: Group }) {
     );
 }
 
-function Toolbar({
-    search,
-    chips,
-    actions,
-}: {
-    search: ReactNode;
-    chips: ReactNode;
-    actions: ReactNode;
-}) {
+function Toolbar({ search, chips }: { search: ReactNode; chips: ReactNode }) {
     return (
-        <div className="flex items-start gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                {search}
-                {chips}
-            </div>
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+            {search}
+            {chips}
         </div>
     );
 }
@@ -520,16 +509,6 @@ export function ModelsList() {
                     />
                 }
                 chips={<FilterChips models={models} filters={filters} onFilters={setFilters} />}
-                actions={
-                    can.build && (
-                        <Button asChild>
-                            <Link href="/models/new">
-                                <CubePlus />
-                                Add model
-                            </Link>
-                        </Button>
-                    )
-                }
             />
         );
     const empty = rows.length === 0;

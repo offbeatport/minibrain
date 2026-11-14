@@ -148,15 +148,10 @@ export function ErrorLine({ error, onRetry }: { error: unknown; onRetry?: () => 
     );
 }
 
+export function pageFrame(wide: boolean): string {
+    return cn("mx-auto w-full px-6 pt-8", wide ? "max-w-[96rem]" : "max-w-6xl");
+}
+
 export function Page({ children, wide = false }: { children: ReactNode; wide?: boolean }) {
-    return (
-        <div
-            className={cn(
-                "mx-auto flex w-full flex-col gap-4 px-6 pt-8 pb-6",
-                wide ? "max-w-[96rem]" : "max-w-6xl",
-            )}
-        >
-            {children}
-        </div>
-    );
+    return <div className={cn(pageFrame(wide), "flex flex-col gap-4 pb-6")}>{children}</div>;
 }

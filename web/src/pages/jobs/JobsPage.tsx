@@ -1,6 +1,5 @@
 import { useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { History } from "lucide-react";
 import { Button, CheckboxSelect, DataGrid, SearchInput, Tabs, TabsList, TabsTrigger } from "obp-ui";
 import { useState } from "react";
 import type { JobInfo } from "~/api/client";
@@ -8,7 +7,7 @@ import { type JobOrder, useJobFacets, useJobList } from "~/api/jobQueries";
 import { isActiveJob } from "~/api/queries";
 import { JobToolbar, useJobSelection } from "~/components/JobSelection";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { JOB_KINDS, kindGroup } from "~/lib/jobs";
 import { splitList, useListSearch } from "~/lib/listSearch";
@@ -99,7 +98,7 @@ function Queue() {
     }));
     const clear = () => update({ status: "", q: "" });
     return (
-        <div className="flex flex-col gap-3">
+        <>
             <KindTabs
                 value={kind}
                 counts={facets.data?.kinds ?? {}}
@@ -159,7 +158,7 @@ function Queue() {
                 }
                 minWidth="min-w-[760px]"
             />
-        </div>
+        </>
     );
 }
 
@@ -170,16 +169,7 @@ export function JobsPage() {
                 title="Jobs"
                 caption="Every job on this install: training, scoring, judging, downloads and imports."
             />
-            <PanelSections>
-                <PanelSection
-                    icon={History}
-                    title="Queue and history"
-                    description="Open a job for its progress, settings and logs."
-                    bare
-                >
-                    <Queue />
-                </PanelSection>
-            </PanelSections>
+            <Queue />
         </Page>
     );
 }

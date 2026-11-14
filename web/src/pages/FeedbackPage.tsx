@@ -1,8 +1,12 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { ChevronLeft } from "lucide-react";
 import { Badge, Button, CheckboxSelect, DataGrid, EmptyState, Link, SearchInput } from "obp-ui";
 import { useMemo } from "react";
-import { type FeedbackInfo, useFeedbackFacets, useFeedbackList } from "~/api/feedbackQueries";
+import {
+    type FeedbackInfo,
+    useFeedbackFacets,
+    useFeedbackItem,
+    useFeedbackList,
+} from "~/api/feedbackQueries";
 import { useModels } from "~/api/queries";
 import { PageHeader } from "~/components/PageHeader";
 import { modelOption } from "~/components/PublisherLogo";
@@ -28,6 +32,22 @@ const ASSIGNEES = [
 
 function Muted({ children }: { children: string }) {
     return <span className="text-muted-foreground">{children}</span>;
+}
+
+function ReviewHeader({ id, back }: { id: number; back: string }) {
+    const item = useFeedbackItem(id);
+    const model = item.data?.model_name;
+    return (
+        <PageHeader
+            title="Review feedback"
+            crumbs={[{ label: "Feedback", href: back }, { label: `#${id}` }]}
+            caption={
+                model
+                    ? `An answer from ${model}. Accept it, fix it or reject it.`
+                    : "Accept the answer, fix it or reject it."
+            }
+        />
+    );
 }
 
 export function FeedbackStatusBadge({ item }: { item: FeedbackInfo }) {
@@ -174,13 +194,10 @@ export function FeedbackPage() {
     if (selected !== null) {
         return (
             <Page>
-                <Link
-                    href={listHref(FEEDBACK_PATH, { ...search, item: "" })}
-                    className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                >
-                    <ChevronLeft className="size-4" />
-                    Feedback
-                </Link>
+                <ReviewHeader
+                    id={selected}
+                    back={listHref(FEEDBACK_PATH, { ...search, item: "" })}
+                />
                 <FeedbackReview
                     key={selected}
                     id={selected}

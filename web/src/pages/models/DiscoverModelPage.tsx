@@ -5,9 +5,9 @@ import { Button, CubePlus, DataGrid, Link, Skeleton } from "obp-ui";
 import { type ReactNode, useMemo } from "react";
 import type { CatalogEntry, CatalogResponse, CatalogVariantInfo } from "~/api/client";
 import { useCatalog } from "~/api/queries";
-import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
+import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { PublisherLogo } from "~/components/PublisherLogo";
@@ -227,14 +227,13 @@ export function DiscoverModelPage() {
             }),
         [blocked, entry, router, data?.pool],
     );
+    const crumbs = [
+        { label: "Discover", href: discoverListHref() },
+        { label: entry?.name ?? "Model" },
+    ];
     return (
-        <Page>
-            <Breadcrumbs
-                items={[
-                    { label: "Discover", href: discoverListHref() },
-                    { label: entry?.name ?? "Model" },
-                ]}
-            />
+        <Page wide>
+            {!(data && entry) && <PageCrumbs items={crumbs} />}
             {catalog.error && !data && <QueryError error={catalog.error} retry={catalog.refetch} />}
             {catalog.isLoading && (
                 <div className="flex flex-col gap-8 pt-2">
@@ -263,6 +262,7 @@ export function DiscoverModelPage() {
                 <>
                     <PageHeader
                         title={entry.name}
+                        crumbs={crumbs}
                         icon={
                             <PublisherLogo publisher={entry.provider} name={entry.name} size="lg" />
                         }

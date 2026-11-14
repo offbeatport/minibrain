@@ -1,7 +1,10 @@
 import { useRouterState } from "@tanstack/react-router";
 import { cn } from "obp-ui";
 import type { ReactNode } from "react";
+import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { navEntryFor } from "~/components/navigation";
+
+export type { Crumb };
 
 export function PageHeader({
     title,
@@ -9,12 +12,14 @@ export function PageHeader({
     actions,
     icon,
     badge,
+    crumbs,
 }: {
     title: string;
     caption?: ReactNode;
     actions?: ReactNode;
     icon?: ReactNode;
     badge?: ReactNode;
+    crumbs?: Crumb[];
 }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const Icon = icon ? undefined : navEntryFor(pathname)?.icon;
@@ -38,16 +43,21 @@ export function PageHeader({
         </div>
     );
     return (
-        <header className="flex flex-wrap items-end justify-between gap-3 pb-3">
-            {icon ? (
-                <div className="flex min-w-0 items-center gap-4">
-                    {icon}
-                    {heading}
-                </div>
-            ) : (
-                heading
-            )}
-            {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+        <header className="flex flex-col gap-2 pb-3">
+            <PageCrumbs items={crumbs ?? [{ label: title }]} />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                {icon ? (
+                    <div className="flex min-w-0 items-center gap-4">
+                        {icon}
+                        {heading}
+                    </div>
+                ) : (
+                    heading
+                )}
+                {actions && (
+                    <div className="flex min-h-8 flex-wrap items-center gap-2">{actions}</div>
+                )}
+            </div>
         </header>
     );
 }

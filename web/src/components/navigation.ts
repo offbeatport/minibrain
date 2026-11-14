@@ -84,12 +84,30 @@ export function isSettingsPath(pathname: string): boolean {
     return pathname === "/settings" || pathname.startsWith("/settings/");
 }
 
-export function navEntryFor(pathname: string): NavEntry | undefined {
-    const entries = [...SETTINGS_PAGES, ...SECTIONS.flatMap((section) => section.items)];
-    const matching = entries.filter(
-        (entry) =>
-            pathname === entry.path ||
-            (entry.path !== "/" && pathname.startsWith(`${entry.path}/`)),
-    );
+export type NavMatch = NavEntry & { group: string | null };
+
+const GROUPED: NavMatch[] = [
+    ...SETTINGS_PAGES.map((entry) => ({ ...entry, group: "Settings" })),
+    ...SECTIONS.flatMap((section) =>
+        section.items.map((entry) => ({ ...entry, group: section.label })),
+    ),
+];
+
+const OTHER_GROUPS = [{ path: "/developers", group: "Developers" }];
+
+function under(pathname: string, path: string): boolean {
+    return pathname === path || (path !== "/" && pathname.startsWith(`${path}/`));
+}
+
+export function navEntryFor(pathname: string): NavMatch | undefined {
+    const matching = GROUPED.filter((entry) => under(pathname, entry.path));
     return matching.sort((left, right) => right.path.length - left.path.length)[0];
+}
+
+export function navGroupFor(pathname: string): string | null {
+    const entry = navEntryFor(pathname);
+    if (entry) {
+        return entry.group;
+    }
+    return OTHER_GROUPS.find((other) => under(pathname, other.path))?.group ?? null;
 }

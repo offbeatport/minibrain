@@ -14,13 +14,13 @@ import { type ReactNode, useEffect, useState } from "react";
 import { type JobDetail, api, unwrap } from "~/api/client";
 import { useJobMetrics } from "~/api/jobPageQueries";
 import { isActiveJob, useJob } from "~/api/queries";
-import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { DeleteJobsDialog, deleteRefusal, deleteSummary } from "~/components/DeleteJobs";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { Facts } from "~/components/Facts";
 import { JobLogsSection } from "~/components/JobLogs";
 import { canCancel, canRetry } from "~/components/JobSelection";
 import { ModelName } from "~/components/ModelName";
+import { type Crumb, PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PoolLink } from "~/components/PoolLink";
 import { ErrorLine, Page, PanelSection, PanelSections, Stat } from "~/components/Section";
@@ -485,13 +485,14 @@ function SettingsSection({ job }: { job: JobDetail }) {
     );
 }
 
-function JobView({ job }: { job: JobDetail }) {
+function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
     const metrics = useJobMetrics(job.id, isActiveJob(job));
     const training = job.kind === TRAIN_KIND;
     return (
         <>
             <PageHeader
                 title={`Job #${job.id}`}
+                crumbs={crumbs}
                 caption={<Context job={job} />}
                 actions={<Actions job={job} />}
             />
@@ -543,12 +544,18 @@ export function JobPage() {
     const job = useJob(jobId);
     useCanonical(job.data, pathname);
     const section = sectionOf(job.data?.kind, pathname);
+    const crumbs = [section, { label: `Job #${id ?? ""}` }];
+    if (job.data) {
+        return (
+            <Page wide>
+                <JobView job={job.data} crumbs={crumbs} />
+            </Page>
+        );
+    }
     return (
-        <Page>
-            <Breadcrumbs items={[section, { label: `Job #${id ?? ""}` }]} />
-            {job.data ? (
-                <JobView job={job.data} />
-            ) : jobId === null ? (
+        <Page wide>
+            <PageCrumbs items={crumbs} />
+            {jobId === null ? (
                 <JobNotFound id={id ?? ""} section={section} />
             ) : job.error ? (
                 <QueryError

@@ -607,13 +607,13 @@ export function InfrastructurePage() {
             ?.versions ?? {};
     const active = SECTIONS.find((item) => item.href === pathname)?.href ?? "/infrastructure";
     return (
-        <Page>
+        <Page wide>
             <PageHeader
                 title="Infrastructure"
                 caption="Where minibrain runs and where it keeps its data."
             />
-            <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
             <TabNav label="Infrastructure pages" tabs={SECTIONS} />
+            <ErrorLine error={error ?? pools.error ?? infrastructure.error} />
             {active === "/infrastructure" && (
                 <Overview
                     info={infrastructure.data}

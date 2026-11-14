@@ -4,7 +4,6 @@ import { CubePlus, useToast } from "obp-ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { type CatalogEntry, type DatasetSummary, type ModelRow, api, unwrap } from "~/api/client";
 import { useAllModels, useCatalog, useDatasets } from "~/api/queries";
-import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
 import { PageHeader } from "~/components/PageHeader";
@@ -445,10 +444,10 @@ export function AddModelPage() {
     );
     return (
         <Page>
-            <Breadcrumbs
-                items={[{ label: "Models", href: modelsHref() }, { label: "Add model" }]}
+            <PageHeader
+                title="Add model"
+                crumbs={[{ label: "Models", href: modelsHref() }, { label: "Add model" }]}
             />
-            <PageHeader title="Add model" />
             <CreateLayout
                 form={form}
                 summary={

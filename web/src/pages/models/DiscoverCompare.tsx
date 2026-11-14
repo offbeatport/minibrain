@@ -406,18 +406,6 @@ function readCompare(search: unknown): {
     };
 }
 
-function Back({ ids }: { ids: string[] }) {
-    return (
-        <Link
-            href={discoverListHref({ selected: ids.join(",") })}
-            className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        >
-            <ChevronLeft className="size-4" />
-            Discover
-        </Link>
-    );
-}
-
 function IconAction({
     label,
     tip,
@@ -817,9 +805,12 @@ export function DiscoverComparePage() {
     }));
     return (
         <Page wide>
-            <Back ids={shown} />
             <PageHeader
                 title="Compare models"
+                crumbs={[
+                    { label: "Discover", href: discoverListHref({ selected: shown.join(",") }) },
+                    { label: "Compare models" },
+                ]}
                 caption={
                     data && comparing
                         ? `${entries.length} models side by side.`

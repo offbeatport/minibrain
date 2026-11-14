@@ -42,7 +42,7 @@ import { type DatasetFolder, useDatasetFolders, useFolderRoots } from "~/api/dat
 import { useDatasets, useSources } from "~/api/queries";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
 import { PageHeader } from "~/components/PageHeader";
-import { ErrorLine, Stat } from "~/components/Section";
+import { ErrorLine, Stat, pageFrame } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
 import { useSearchParam } from "~/lib/listSearch";
@@ -785,7 +785,7 @@ export function DataExplorer() {
 
     return (
         <div className="@container flex min-h-0 flex-1 flex-col">
-            <div className="px-6 pt-8">
+            <div className={pageFrame(true)}>
                 <PageHeader
                     title="Data"
                     caption="Datasets, the sources their queries read and the models that train on them."

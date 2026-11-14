@@ -16,8 +16,8 @@ import {
 import { useState } from "react";
 import { api, unwrap } from "~/api/client";
 import { useModel, useVersions } from "~/api/queries";
-import { Breadcrumbs } from "~/components/Breadcrumbs";
 import { NotFoundState, QueryError } from "~/components/ErrorState";
+import { PageCrumbs } from "~/components/PageCrumbs";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import { ErrorLine, Page, PanelSections, Stat, errorMessage } from "~/components/Section";
@@ -242,8 +242,9 @@ function CardView({
     const live = current && Boolean(model.data?.deployed);
     return (
         <>
-            <Breadcrumbs
-                items={[
+            <PageHeader
+                title={`${card.version.name} v${card.version.number}`}
+                crumbs={[
                     { label: "Models", href: modelsHref() },
                     { label: card.version.name, href: modelPageHref(target.slug) },
                     {
@@ -252,9 +253,6 @@ function CardView({
                     },
                     { label: "Model card" },
                 ]}
-            />
-            <PageHeader
-                title={`${card.version.name} v${card.version.number}`}
                 icon={<PublisherLogo name={card.version.name} size="lg" />}
                 caption="Model card and validation report, built from the stored version, its data, its scores and the audit log."
                 actions={<Downloads target={target} />}
@@ -294,11 +292,11 @@ export function ModelCardPage() {
     const target = { slug: params.name ?? "", number: Number(params.number) };
     const card = useModelCard(target);
     return (
-        <Page>
+        <Page wide>
             {card.isLoading && <p className="text-muted-foreground">Loading…</p>}
             {card.error && !card.data && (
                 <>
-                    <Breadcrumbs
+                    <PageCrumbs
                         items={[
                             { label: "Models", href: modelsHref() },
                             { label: target.slug, href: modelPageHref(target.slug) },

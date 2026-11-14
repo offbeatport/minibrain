@@ -1,6 +1,5 @@
 import { useParams, useRouter } from "@tanstack/react-router";
 import type { ColumnDef } from "@tanstack/react-table";
-import { History } from "lucide-react";
 import {
     Button,
     CheckboxSelect,
@@ -28,7 +27,7 @@ import { ModelName } from "~/components/ModelName";
 import { PageHeader } from "~/components/PageHeader";
 import { PublisherLogo, modelOption } from "~/components/PublisherLogo";
 import { Redirect } from "~/components/Redirect";
-import { ErrorLine, Page, PanelSection, PanelSections } from "~/components/Section";
+import { ErrorLine, Page } from "~/components/Section";
 import { JOB_STATUSES, jobStatusLabel } from "~/components/StatusBadge";
 import { useCan } from "~/lib/access";
 import { TRAIN_KIND, jobPageHref } from "~/lib/jobs";
@@ -263,7 +262,7 @@ function Runs() {
     }));
     const clear = () => update({ model: "", status: "", method: "", q: "" });
     return (
-        <div className="flex flex-col gap-3">
+        <>
             <JobToolbar selection={selection}>
                 <SearchInput
                     aria-label="Search runs"
@@ -335,7 +334,7 @@ function Runs() {
                 }
                 minWidth="min-w-[860px]"
             />
-        </div>
+        </>
     );
 }
 
@@ -351,16 +350,7 @@ export function TrainingListPage() {
                     can.build && <Button onClick={() => setPicking(true)}>Train a model</Button>
                 }
             />
-            <PanelSections>
-                <PanelSection
-                    icon={History}
-                    title="Runs"
-                    description="Each run trained one version; open one for its data, settings, loss and logs."
-                    bare
-                >
-                    <Runs />
-                </PanelSection>
-            </PanelSections>
+            <Runs />
             <TrainPicker open={picking} onOpenChange={setPicking} />
         </Page>
     );
