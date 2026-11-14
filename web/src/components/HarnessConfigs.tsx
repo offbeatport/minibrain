@@ -1,7 +1,13 @@
 import { type CodeLanguage, CodeTabs, Link } from "obp-ui";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 
-type Harness = { id: string; label: string; language: CodeLanguage; title?: string; code: string };
+export type Harness = {
+    id: string;
+    label: string;
+    language: CodeLanguage;
+    title?: string;
+    code: string;
+};
 
 const SAMPLE = "I was charged twice";
 
@@ -129,14 +135,17 @@ export function HarnessConfigs({
     model,
     keyValue,
     hint = true,
+    extra = [],
 }: {
     baseUrl: string;
     model: string;
     keyValue: string | null;
     hint?: boolean;
+    extra?: Harness[];
 }) {
     const key = keyValue ?? "YOUR_KEY";
-    const items = harnesses(baseUrl, model, key);
+    const all = harnesses(baseUrl, model, key);
+    const items = [...all.slice(0, 3), ...extra, ...all.slice(3)];
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <CodeTabs items={items} title="Copy, paste and run." />

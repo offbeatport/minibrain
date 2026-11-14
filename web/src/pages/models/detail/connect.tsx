@@ -1,7 +1,6 @@
-import { BookOpen, Plug } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import {
     Button,
-    CodeBlock,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -10,12 +9,10 @@ import {
     DialogTitle,
     Link,
 } from "obp-ui";
-import type { ReactNode } from "react";
 import type { ModelRow } from "~/api/client";
 import { useModel } from "~/api/queries";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs } from "~/components/HarnessConfigs";
-import { feedbackForModel } from "~/lib/feedback";
 import { API_REFERENCE_PATH, modelPageHref } from "~/lib/modelLinks";
 import { isDeployed } from "./header";
 
@@ -47,36 +44,6 @@ function Copyable({ label, value }: { label: string; value: string }) {
     );
 }
 
-function Step({
-    number,
-    title,
-    hint,
-    children,
-}: {
-    number: number;
-    title: string;
-    hint?: ReactNode;
-    children: ReactNode;
-}) {
-    return (
-        <li className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3">
-            <span
-                aria-hidden="true"
-                className="grid size-7 place-items-center rounded-md border bg-background text-sm font-medium tabular-nums"
-            >
-                {number}
-            </span>
-            <div className="flex min-w-0 flex-col gap-3">
-                <div className="flex min-h-7 flex-col justify-center gap-0.5">
-                    <h3 className="font-medium">{title}</h3>
-                    {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
-                </div>
-                {children}
-            </div>
-        </li>
-    );
-}
-
 export function ConnectDialog({
     row,
     open,
@@ -90,105 +57,58 @@ export function ConnectDialog({
 }) {
     const baseUrl = `${window.location.origin}/v1`;
     const custom = row.kind === "custom";
-    const pinned = custom ? (row.current_version ?? row.ready_version) : null;
     const detail = useModel(custom && open ? row.key : "");
     const kept = detail.data?.request_bodies.kept ?? false;
     const key = keyValue ?? "YOUR_KEY";
     const keysHref = modelPageHref(row.key, "api");
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+            <DialogContent className="sm:max-w-3xl">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Plug aria-hidden="true" className="size-5 text-muted-foreground" />
-                        {`Connect to ${row.name}`}
-                    </DialogTitle>
+                    <DialogTitle>{`Connect to ${row.name}`}</DialogTitle>
                     <DialogDescription>
-                        OpenAI-compatible, so any OpenAI client works.
-                    </DialogDescription>
-                </DialogHeader>
-                {!isDeployed(row) && (
-                    <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
-                        {`${row.name} is not deployed yet, so calls are refused until you deploy it.`}
-                    </p>
-                )}
-                <ol className="flex flex-col gap-8">
-                    <Step
-                        number={1}
-                        title="Endpoint"
-                        hint={
-                            custom
-                                ? `${row.key} answers with the deployed version; ${row.key}@N calls one version.`
-                                : undefined
-                        }
-                    >
-                        <div className="grid gap-4 sm:grid-cols-[3fr_2fr_2fr]">
-                            <Copyable label="Base URL" value={baseUrl} />
-                            <Copyable label="Model" value={row.key} />
-                            {pinned !== null && pinned !== undefined && (
-                                <Copyable label="One version" value={`${row.key}@${pinned}`} />
-                            )}
-                        </div>
-                    </Step>
-                    <Step
-                        number={2}
-                        title="API key"
-                        hint={keyValue ? "Your new key. It is shown once; copy it now." : undefined}
-                    >
+                        {"OpenAI-compatible. "}
                         {keyValue ? (
-                            <Copyable label="Key" value={keyValue} />
+                            "Your new key is filled in below; it is shown only once."
                         ) : (
-                            <p>
-                                {"Use a key that covers this model; the examples say "}
-                                <span className="font-mono">YOUR_KEY</span>
-                                {". "}
+                            <>
+                                {"Replace YOUR_KEY with a key from "}
                                 <Link
                                     href={keysHref}
                                     onClick={() => onOpenChange(false)}
                                     className="text-primary hover:underline"
                                 >
-                                    Create one in API keys
+                                    API keys
                                 </Link>
-                            </p>
-                        )}
-                    </Step>
-                    <Step number={3} title="Call it">
-                        <HarnessConfigs
-                            baseUrl={baseUrl}
-                            model={row.key}
-                            keyValue={keyValue}
-                            hint={false}
-                        />
-                    </Step>
-                    <Step
-                        number={4}
-                        title="Send feedback"
-                        hint={
-                            <>
-                                {"Optional. Rate an answer by its "}
-                                <span className="font-mono">id</span>
-                                {kept
-                                    ? " and give the right one. "
-                                    : ", give the right one and send the user message as input. "}
-                                {"Accepted corrections in "}
-                                <Link
-                                    href={feedbackForModel(row.key)}
-                                    onClick={() => onOpenChange(false)}
-                                    className="text-primary hover:underline"
-                                >
-                                    Feedback
-                                </Link>
-                                {" join the next training data."}
+                                {"."}
                             </>
-                        }
-                    >
-                        <CodeBlock
-                            code={feedbackCurl(baseUrl, row.key, key, kept)}
-                            language="bash"
-                            copyLabel="Copy the feedback call"
-                        />
-                    </Step>
-                </ol>
+                        )}
+                    </DialogDescription>
+                </DialogHeader>
+                {!isDeployed(row) && (
+                    <p className="text-warning">
+                        Not deployed yet: calls are refused until you deploy it.
+                    </p>
+                )}
+                <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
+                    <Copyable label="Base URL" value={baseUrl} />
+                    <Copyable label="Model" value={row.key} />
+                </div>
+                <HarnessConfigs
+                    baseUrl={baseUrl}
+                    model={row.key}
+                    keyValue={keyValue}
+                    hint={false}
+                    extra={[
+                        {
+                            id: "feedback",
+                            label: "Feedback",
+                            language: "bash",
+                            title: "Rate an answer by its id; corrections become training data",
+                            code: feedbackCurl(baseUrl, row.key, key, kept),
+                        },
+                    ]}
+                />
                 <DialogFooter className="sm:justify-between">
                     <Button variant="ghost" asChild>
                         <Link href={API_REFERENCE_PATH} onClick={() => onOpenChange(false)}>
