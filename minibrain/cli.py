@@ -235,7 +235,7 @@ def gateway(main_url: str, host: str, port: int) -> None:
 
 def worker(args: argparse.Namespace) -> None:
     from minibrain.models.hardware import LOCAL_POOL, report
-    from minibrain.serve.host import EngineHost
+    from minibrain.serve.host import AdvertiseError, EngineHost, advertise_address
     from minibrain.settings import load_settings
     from minibrain.worker import REMOTE_KINDS, MainClient, Worker, WorkerConfig
 
@@ -262,7 +262,11 @@ def worker(args: argparse.Namespace) -> None:
     if pool != LOCAL_POOL and not args.no_serve:
         client = MainClient(config)
         client.stop = stop
-        host = EngineHost(config, client, advertise=args.advertise, bind=args.engine_bind)
+        try:
+            advertise = advertise_address(args.advertise, api_url, pool)
+        except AdvertiseError as error:
+            raise SystemExit(f"minibrain worker: {error}") from error
+        host = EngineHost(config, client, advertise=advertise, bind=args.engine_bind)
         threading.Thread(target=host.forever, args=(stop,), daemon=True).start()
     try:
         Worker(config).run_forever(stop)
@@ -509,7 +513,10 @@ def main() -> None:
     worker_command.add_argument("--gpus", type=int, default=1)
     worker_command.add_argument("--pool", default="local", help="compute pool this machine joins")
     worker_command.add_argument(
-        "--advertise", default=None, help="address gateways reach this machine's engines at (default: its name)"
+        "--advertise",
+        default=None,
+        help="address gateways reach this machine's engines at (default: its name, or the address that reaches main "
+        "when the name resolves to loopback)",
     )
     worker_command.add_argument(
         "--engine-bind", default=None, help="interface engines listen on (default: the --advertise address)"

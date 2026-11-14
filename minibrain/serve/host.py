@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import os
 import socket
@@ -5,6 +6,7 @@ import sys
 import threading
 from collections.abc import Callable
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from minibrain.serve.engines import free_port
 from minibrain.supervise import Supervisor
@@ -14,6 +16,80 @@ RECONCILE_SECONDS = 10.0
 ENGINE_KEY_ENV = "MINIBRAIN_ENGINE_TOKEN"
 
 log = logging.getLogger("minibrain.host")
+
+
+class AdvertiseError(RuntimeError):
+    pass
+
+
+Resolve = Callable[[str], list[str]]
+RouteTo = Callable[[str, int], str | None]
+DEFAULT_PORTS = {"https": 443, "http": 80}
+
+
+def addresses_of(name: str) -> list[str]:
+    try:
+        return sorted({str(info[4][0]) for info in socket.getaddrinfo(name, None)})
+    except OSError:
+        return []
+
+
+def route_to(host: str, port: int) -> str | None:
+    try:
+        found = socket.getaddrinfo(host, port, type=socket.SOCK_DGRAM)
+    except OSError:
+        return None
+    for family, kind, proto, _, address in found:
+        try:
+            with socket.socket(family, kind, proto) as probe:
+                probe.connect(address)
+                return str(probe.getsockname()[0])
+        except OSError:
+            continue
+    return None
+
+
+def loopback(address: str) -> bool:
+    try:
+        return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
+    except ValueError:
+        return address == "localhost"
+
+
+def unreachable(name: str, found: list[str], main_url: str, pool: str) -> str:
+    resolved = ", ".join(found) if found else "no address"
+    return (
+        f"This machine's name {name} resolves to {resolved}, which gateways on other machines cannot reach, and no "
+        f"other address of this machine reaches main at {main_url}. Pass the address or name other machines reach "
+        f"it at: minibrain worker --pool {pool} --advertise <address> (add --engine-bind 0.0.0.0 to listen on every "
+        "interface), or --no-serve to run jobs only."
+    )
+
+
+def advertise_address(
+    explicit: str | None,
+    main_url: str,
+    pool: str,
+    name: str | None = None,
+    resolve: Resolve = addresses_of,
+    route: RouteTo = route_to,
+) -> str:
+    if explicit:
+        return explicit
+    name = name or socket.getfqdn()
+    found = resolve(name)
+    if found and not all(loopback(address) for address in found):
+        return name
+    parts = urlsplit(main_url)
+    main_host = parts.hostname or ""
+    if loopback(main_host):
+        log.warning("%s resolves to %s: only gateways on this machine reach its engines", name, found or "nothing")
+        return name if found else "127.0.0.1"
+    source = route(main_host, parts.port or DEFAULT_PORTS.get(parts.scheme, 80))
+    if source is None or loopback(source):
+        raise AdvertiseError(unreachable(name, found, main_url, pool))
+    log.warning("%s resolves to %s; engines advertise %s, the address that reaches main", name, found, source)
+    return source
 
 
 class Running(Protocol):

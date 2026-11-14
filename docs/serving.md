@@ -277,6 +277,20 @@ on a move, `from_pool`.
 - The engine binds and announces the worker's `--advertise` address (the machine's name by default; `--engine-bind`
   sets another interface) on a free port. It pulls weights and adapters from `main` like any remote engine and dies
   with the worker. `--no-serve` keeps a worker to jobs only.
+- A name that resolves only to loopback (common on Linux, where `/etc/hosts` maps the hostname to `127.0.1.1`) would
+  announce an address no gateway can reach. Without `--advertise`, the worker then takes the address its own traffic
+  to `main` leaves from, which is the one interface that is known to reach `main`, and logs it. When that is loopback
+  too, or `main` is unreachable, it refuses to start and says how to fix it:
+
+  ```
+  minibrain worker: This machine's name gpu-01 resolves to 127.0.1.1, which gateways on other machines cannot
+  reach, and no other address of this machine reaches main at http://main.corp:8000. Pass the address or name other
+  machines reach it at: minibrain worker --pool rack --advertise <address> (add --engine-bind 0.0.0.0 to listen on
+  every interface), or --no-serve to run jobs only.
+  ```
+
+  With `main` on the same machine (`--api-url http://127.0.0.1:8000`) a loopback name is kept: `main`'s gateway
+  reaches it, gateways on other machines do not.
 - Gateways route a deployed name only to that deployment's pool (`pool` on the route in the config snapshot), ready
   replicas first; a pinned version (`name@N`) and the Playground's versions use any replica. Moving a deployment
   routes to the new pool at once; the old engines stop within about 10 s.
