@@ -10,7 +10,9 @@ import {
 import { Button, Link, cn } from "obp-ui";
 import { type ReactNode, useId } from "react";
 import { errorStatus, isUnreachable } from "~/api/client";
+import { PageHeader } from "~/components/PageHeader";
 import { Page, errorMessage } from "~/components/Section";
+import { navEntryFor } from "~/components/navigation";
 
 export type ErrorAction = { label: string; href?: string; onClick?: () => void };
 
@@ -130,13 +132,20 @@ export function NotFoundState({
     );
 }
 
-export function ForbiddenState({ needs }: { needs: ReactNode }) {
+export function ForbiddenState({
+    needs,
+    heading,
+}: {
+    needs: ReactNode;
+    heading?: "h1" | "h2";
+}) {
     return (
         <ErrorState
             icon={ShieldX}
             title="You don't have access"
             primary={GO_HOME}
             code="403 Forbidden"
+            heading={heading}
         >
             {needs}
         </ErrorState>
@@ -166,6 +175,7 @@ export function QueryError({
         return (
             <ForbiddenState
                 needs={`${message}. Ask an admin to change your role under Settings, Accounts.`}
+                heading={heading}
             />
         );
     }
@@ -184,16 +194,23 @@ export function QueryError({
     );
 }
 
-export function NotFoundPage() {
+export function ErrorPage({ fallback, children }: { fallback: string; children: ReactNode }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     return (
         <Page>
-            <NotFoundState title="Page not found" primary={GO_HOME}>
-                {"Nothing lives at "}
-                <code className="font-mono">{pathname}</code>
-                {". Check the address, or start again from Home."}
-            </NotFoundState>
+            <PageHeader title={navEntryFor(pathname)?.label ?? fallback} />
+            {children}
         </Page>
+    );
+}
+
+export function NotFoundPage() {
+    return (
+        <ErrorPage fallback="Page not found">
+            <NotFoundState title="Nothing lives at this address" primary={GO_HOME} heading="h2">
+                Check the address, or start again from Home.
+            </NotFoundState>
+        </ErrorPage>
     );
 }
 
@@ -209,10 +226,11 @@ export function CrashPage({ error }: { error: unknown }) {
     const message = errorMessage(error) ?? "Unknown error";
     const stack = error instanceof Error ? error.stack : undefined;
     return (
-        <Page>
+        <ErrorPage fallback="Something went wrong">
             <ErrorState
                 icon={TriangleAlert}
-                title="Something went wrong"
+                title="This page hit an unexpected error"
+                heading="h2"
                 primary={{ label: "Reload", onClick: reload }}
                 secondary={{ label: "Go home", onClick: goHome }}
                 detail={
@@ -230,9 +248,8 @@ export function CrashPage({ error }: { error: unknown }) {
                     </details>
                 }
             >
-                This page hit an unexpected error. Reloading usually fixes it; your saved work is
-                safe on the server.
+                Reloading usually fixes it; your saved work is safe on the server.
             </ErrorState>
-        </Page>
+        </ErrorPage>
     );
 }

@@ -446,6 +446,7 @@ export function AddModelPage() {
         <Page>
             <PageHeader
                 title="Add model"
+                caption="Start from a base model and a dataset; v0 is the untrained baseline."
                 crumbs={[{ label: "Models", href: modelsHref() }, { label: "Add model" }]}
             />
             <CreateLayout
