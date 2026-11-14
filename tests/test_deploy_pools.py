@@ -124,11 +124,13 @@ def test_a_new_pool_moves_a_deployed_model_and_keeps_it_when_left_out(harness: H
     engine_host, started = host(harness, rack)
     engine_host.reconcile()
     assert started == []
-    assert deploy(harness, "rack").status_code == 200 and deployment(harness)["pool"] == "rack"
+    assert deploy(harness, "rack").status_code == 200
+    assert (deployment(harness)["pool"], deployment(harness)["moving_to"]) == ("local", "rack")
     assert audits(harness)[-1]["from_pool"] == "local"
     engine_host.reconcile()
     assert started == [BASE]
-    assert deploy(harness, "local").status_code == 200 and deployment(harness)["pool"] == "local"
+    assert deploy(harness, "local").status_code == 200
+    assert (deployment(harness)["pool"], deployment(harness)["moving_to"]) == ("local", None)
     engine_host.reconcile()
     assert started == []
 

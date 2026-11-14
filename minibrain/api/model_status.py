@@ -11,6 +11,7 @@ from minibrain.api.model_rows import model_job
 from minibrain.api.model_traffic import Subject, overall, subject_of, usual_error_rate
 from minibrain.api.request_logs import aware
 from minibrain.api.views import teardown_label
+from minibrain.models.handover import moving_to, serving_pool
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import (
@@ -214,9 +215,23 @@ def trained(model: Model) -> bool:
 
 def settled(session: Session, model: Model) -> ModelStatus:
     live = live_version(model)
-    serving = replicas_text(replica_count(session, serving_base(model), model.pool))
+    pool = serving_pool(model)
+    serving = replicas_text(replica_count(session, serving_base(model), pool))
     where = f"v{live.number}" if live is not None else "base weights"
-    return ModelStatus(tone="success", text=f"Live: {where}{pool_part(model.pool)} · {serving}", action=None)
+    return ModelStatus(tone="success", text=f"Live: {where}{pool_part(pool)} · {serving}", action=None)
+
+
+def move_status(row: Model | BaseRow) -> ModelStatus | None:
+    if not row.deployed:
+        return None
+    target = moving_to(row)
+    if target is not None:
+        return ModelStatus(
+            tone="info", text=f"Moving to {target} · {serving_pool(row)} serves until it is ready", action=None
+        )
+    if row.move_failure:
+        return ModelStatus(tone="warning", text=row.move_failure, action=StatusAction(kind="deploy", label="Deploy"))
+    return None
 
 
 def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly | None) -> ModelStatus:
@@ -224,7 +239,8 @@ def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly
     if teardown is not None and teardown.status == TeardownStatus.FAILED:
         return ModelStatus(tone="destructive", text=teardown_label(teardown), action=None)
     found = (
-        errors_status(session, subject_of(session, model.slug))
+        move_status(model)
+        or errors_status(session, subject_of(session, model.slug))
         or failed_status(session, model)
         or promote_status(model)
         or job_status(session, model)
@@ -262,16 +278,17 @@ def base_status(session: Session, settings: Settings, base: BaseRow) -> ModelSta
     health = base_health(base, model_job(session, base.id), HealthContext(settings=settings, hub_ok=False))
     if health is not None:
         return ModelStatus(tone="destructive", text=health.label, action=None)
-    found = errors_status(session, subject_of(session, base.id)) or transfer_status(session, base)
+    found = move_status(base) or errors_status(session, subject_of(session, base.id)) or transfer_status(session, base)
     if found is not None:
         return found
     if base.status != BaseModelStatus.AVAILABLE:
         return neutral("Not ready", None)
     if not base.deployed:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))
-    count = replica_count(session, base.id, base.pool)
+    pool = serving_pool(base)
+    count = replica_count(session, base.id, pool)
     return ModelStatus(
         tone="success",
-        text=f"Live{pool_part(base.pool)} · {replicas_text(count)}",
+        text=f"Live{pool_part(pool)} · {replicas_text(count)}",
         action=StatusAction(kind="create_custom", label="Add a model on it"),
     )

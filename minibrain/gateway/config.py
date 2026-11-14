@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from minibrain.artifacts import ArtifactStore
 from minibrain.base_models import BaseModelSpec
+from minibrain.models.handover import advance_moves, moving_to, serving_pool
 from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import problem_of
 from minibrain.models.registry import missing_files, resolve_spec
@@ -167,7 +168,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
         )
         routes.append(route)
         if model.deployed and version.number == model.current_version:
-            routes.append(replace(route, name=model.slug, pool=model.pool or LOCAL_POOL))
+            routes.append(replace(route, name=model.slug, pool=serving_pool(model)))
     if model.deployed and not any(route.name == model.slug for route in routes):
         routes.append(
             replace(
@@ -178,7 +179,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
                 base_model_id=None,
                 slug=model.slug,
                 request_bodies=bodies,
-                pool=model.pool or LOCAL_POOL,
+                pool=serving_pool(model),
             )
         )
     return routes
@@ -218,11 +219,12 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     guarded = install_safety(session).as_route()
     deployed_bases = [base for base in session.scalars(deployed) if base.id not in dropped]
     routes |= {
-        base.id: replace(base_route(base), request_bodies=default, safety=guarded, pool=base.pool or LOCAL_POOL)
+        base.id: replace(base_route(base), request_bodies=default, safety=guarded, pool=serving_pool(base))
         for base in deployed_bases
     }
-    wanted = {base.id: base.replicas for base in deployed_bases}
-    wanted |= {model.slug: model.replicas for model in session.scalars(select(Model).where(Model.deployed.is_(True)))}
+    wanted = {base.id: (base.replicas, moving_to(base)) for base in deployed_bases}
+    deployed_models = session.scalars(select(Model).where(Model.deployed.is_(True)))
+    wanted |= {model.slug: (model.replicas, moving_to(model)) for model in deployed_models}
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     guards = {str(route.safety["model"]) for route in routes.values() if route.safety}
@@ -237,11 +239,12 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         if problem is not None:
             problems[key] = problem
     placements: dict[str, dict[str, int]] = {}
-    for name, count in wanted.items():
+    for name, (count, target) in wanted.items():
         route = routes.get(name)
         if route is not None and route.pool is not None:
             pools_of = placements.setdefault(route.base_model, {})
-            pools_of[route.pool] = max(pools_of.get(route.pool, 0), count)
+            for pool in {route.pool, target or route.pool}:
+                pools_of[pool] = max(pools_of.get(pool, 0), count)
     models: dict[str, list[str]] = {}
     for route in routes.values():
         models.setdefault(route.owner, []).append(route.name)
@@ -357,6 +360,7 @@ class LocalConfig:
 
     def rebuild(self) -> GatewayConfig:
         with self.lock, self.sessions() as session:
+            advance_moves(session)
             draft = build_config(session, self.store, self.settings, {})
             specs = {
                 key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items() if key not in draft.problems

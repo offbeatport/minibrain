@@ -274,6 +274,15 @@ on a move, `from_pool`.
 - `main` places replicas on the pool's machines with a worker seen in the last 30 s, one worker per machine, skipping
   machines too small for the model, by rendezvous hashing on the model and machine name: a model stays on the same
   machines as long as they stay up, and moves when one goes away.
+- Replicas are bounded by the pool: one per online machine where the model fits (`room` on each pool in
+  `GET /api/models/{name}/placement`; `local` has room for one). Asking for more is a 422 ("Pool gpu-a10 has room for
+  2 replicas of Support triage: one per online machine where it fits"). Deploy and Promote take `replicas`; the
+  Deploy dialogs have a Replicas row under Pool, and Settings › Deployment changes them for a live deployment. A
+  move to a pool with less room keeps as many as fit. The header shows "· 2 replicas" when there are several, and
+  Overview "1 of 2 replicas" while they start.
+- The Models list's Deploy (the "…" menu on a variant) opens the same Deploy dialog; Deploy on several selected
+  variants opens a compact one with one Pool choice (Automatic, or a pool with how many of them fit) and each
+  variant's pool and fit, and deploys only those that fit.
 - The engine binds and announces the worker's `--advertise` address (the machine's name by default; `--engine-bind`
   sets another interface) on a free port. It pulls weights and adapters from `main` like any remote engine and dies
   with the worker. `--no-serve` keeps a worker to jobs only.
@@ -292,9 +301,18 @@ on a move, `from_pool`.
   With `main` on the same machine (`--api-url http://127.0.0.1:8000`) a loopback name is kept: `main`'s gateway
   reaches it, gateways on other machines do not.
 - Gateways route a deployed name only to that deployment's pool (`pool` on the route in the config snapshot), ready
-  replicas first; a pinned version (`name@N`) and the Playground's versions use any replica. Moving a deployment
-  routes to the new pool at once; the old engines stop within about 10 s.
-- Status: the header, Overview, Models list and Monitoring say where it runs ("Deployed · v2 on gpu-a10"). While
+  replicas first; a pinned version (`name@N`) and the Playground's versions use any replica.
+- Moving a deployment to another pool is a rolling handover. The old pool keeps its engines and its traffic (the
+  route's `pool` stays the old one) while the new pool's engines start (`placements` lists both pools). Once the new
+  pool has a ready engine on every machine it was given (one on `local`), main switches the route to it, and the old
+  engines stop within about 10 s. An engine in the new pool that reports `failed`, or no machine of the new pool
+  online for 5 minutes, rolls the move back: the deployment stays on the old pool and says why ("Moving to gpu-a10
+  failed: its engine in pool gpu-a10 failed to start. It stays on local.") until it is deployed again. Deploying it
+  back to the old pool before the move ends cancels it; deploying to a third pool retargets it, and the first pool
+  keeps serving. Main checks moves every time it rebuilds the gateway config (every second); each move that ends
+  writes a `model.move` audit event (`outcome` `moved` or `rolled_back`, with `from_pool`, `pool` and the error).
+- Status: the header, Overview, Models list and Monitoring say where it runs ("Deployed · v2 on gpu-a10"), and
+  during a move where it goes ("Deployed · v2 on local · moving to gpu-a10"). While
   the engine fetches and loads it shows "Deploying" or "Fetching weights"; with no worker of the pool online it shows
   "Waiting for a machine in gpu-a10".
 

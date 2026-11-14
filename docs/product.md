@@ -350,7 +350,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Models › model › Deploy, Models › model › version › Deploy, Evaluations › Deploy, Models › model › Settings › Undeploy · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote
 - **Deploy to a pool** · shipped · engineer, admin
   Pick the pool a model serves from; workers there run it.
-  UI: Models › model › Deploy › Pool, Models › model › version › Deploy › Pool · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote, GET /api/models/{name}/placement · CLI: minibrain worker
+  UI: Models › model › Deploy › Pool, Models › model › version › Deploy › Pool, Models › … › Deploy › Pool, Models › select › Deploy › Pool · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote, GET /api/models/{name}/placement · CLI: minibrain worker
+- **Replicas per deployment** · shipped · engineer, admin
+  Keep several replicas, one per machine in the pool.
+  UI: Models › model › Deploy › Replicas, Models › model › Settings › Deployment › Replicas · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote, GET /api/models/{name}/placement
+- **Rolling pool moves** · shipped · engineer, admin
+  Move a live model to another pool without dropping requests.
+  UI: Models › model › Deploy › Pool, Models › model › Overview · API: POST /api/models/{name}/deploy, GET /api/models/{name}/placement, GET /api/models/{name}/overview
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
   UI: Models › model › Deploy · API: POST /api/models/{name}/deploy

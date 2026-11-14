@@ -185,6 +185,7 @@ def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
     chosen = automatic(options)
     return Placement(
         pool=(model.pool or LOCAL_POOL) if model.deployed else None,
+        moving_from=model.moving_from if model.deployed else None,
         automatic=chosen.name if chosen is not None else None,
         pools=[
             PoolPlacement(
@@ -193,6 +194,7 @@ def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
                 fit=FitInfo(**option.fit),
                 machines=option.machines,
                 free_bytes=option.free_bytes,
+                room=option.room,
             )
             for option in options
         ],

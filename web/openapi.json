@@ -16133,6 +16133,30 @@
             "title": "Waiting",
             "description": "No machine in its pool is online to start it on.",
             "default": false
+          },
+          "moving_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moving To",
+            "description": "The pool it is moving to; pool keeps serving until that pool's engines are ready."
+          },
+          "move_failure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Move Failure",
+            "description": "Why the last move to another pool was rolled back, until it is deployed again."
           }
         },
         "type": "object",
@@ -23400,6 +23424,18 @@
             "title": "Pool",
             "description": "The pool it is deployed on, or null when not deployed."
           },
+          "moving_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moving From",
+            "description": "The pool that serves it until the move to pool ends."
+          },
           "automatic": {
             "anyOf": [
               {
@@ -23915,6 +23951,12 @@
               }
             ],
             "title": "Free Bytes"
+          },
+          "room": {
+            "type": "integer",
+            "title": "Room",
+            "description": "Replicas it can keep there: one per online machine where it fits.",
+            "default": 1
           }
         },
         "type": "object",
@@ -24255,6 +24297,20 @@
             ],
             "title": "Pool",
             "description": "A compute pool, or auto for the pool where it fits (this machine first). Left out, it keeps the deployed pool."
+          },
+          "replicas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 16.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replicas",
+            "description": "Engine replicas to keep in the pool."
           }
         },
         "type": "object",

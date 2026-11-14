@@ -321,6 +321,9 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   pool with most memory left) and a replica count; a pool where the model does not fit is refused. Workers in that pool
   start and stop the engines to match, gateways route the deployed name only to that pool, and the model says where
   it runs or that it waits for a machine. Details: `docs/serving.md`, Deployments on a pool.
+- [x] Rolling pool moves (2026-11-14): moving a live deployment keeps the old pool serving until the new pool's
+  engines are ready, then switches the route and stops the old ones; a failed engine or no machine for 5 minutes
+  rolls it back and the model says why.
 - [ ] Pool use: each pool says what it runs, **Serving**, **Jobs** or **Both** (default Both, so one machine works
   out of the box). The job scheduler only places jobs, and engine placement only places engines, on pools that allow
   them, so a production pool set to Serving can never be starved by training. Pools stay one concept (capacity, like

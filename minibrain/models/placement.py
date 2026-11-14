@@ -1,6 +1,6 @@
 import hashlib
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 from typing import Any
 
@@ -29,6 +29,7 @@ class PoolOption:
     fit: dict[str, Any]
     free_bytes: int | None
     machines: int
+    room: int = 1
 
     @property
     def runs(self) -> bool:
@@ -46,11 +47,17 @@ def weights_of(session: Session, key: str) -> tuple[int, dict[str, Any]]:
     return (variant.weights_bytes, dict(variant.requires)) if variant is not None else (0, {})
 
 
+def pools_of(row: Model | BaseModel) -> set[str]:
+    return {row.pool or LOCAL_POOL} | ({row.moving_from} if row.moving_from else set())
+
+
 def deployments(session: Session) -> Iterable[tuple[str, str, str]]:
     for model in session.scalars(select(Model).where(Model.deployed.is_(True))):
-        yield f"model:{model.id}", serving_base(model), model.pool or LOCAL_POOL
+        for pool in pools_of(model):
+            yield f"model:{model.id}", serving_base(model), pool
     for base in session.scalars(select(BaseModel).where(BaseModel.deployed.is_(True))):
-        yield f"base:{base.id}", base.id, base.pool or LOCAL_POOL
+        for pool in pools_of(base):
+            yield f"base:{base.id}", base.id, pool
 
 
 def placed_bytes(session: Session, skip: str) -> dict[str, int]:
@@ -71,7 +78,12 @@ def option_of(pool: Pool, weights: int, requires: dict[str, Any], placed: int) -
 def pool_options(session: Session, local: NodeReport, key: str, owner: str) -> list[PoolOption]:
     weights, requires = weights_of(session, key)
     placed = placed_bytes(session, owner)
-    return [option_of(pool, weights, requires, placed.get(pool.name, 0)) for pool in pools(session, local)]
+    return [
+        replace(
+            option_of(pool, weights, requires, placed.get(pool.name, 0)), room=replica_room(session, pool.name, key)
+        )
+        for pool in pools(session, local)
+    ]
 
 
 def automatic(options: list[PoolOption]) -> PoolOption | None:
@@ -140,6 +152,20 @@ def assigned(session: Session, pool: str, key: str, replicas: int) -> list[str]:
     hosts = sorted(engine_hosts(session, pool))
     usable = fitting_hosts(session, pool, hosts, key)
     return sorted(usable, key=lambda host: rank(key, host))[:replicas]
+
+
+def replica_room(session: Session, pool: str, key: str) -> int:
+    if pool == LOCAL_POOL:
+        return 1
+    return max(1, len(fitting_hosts(session, pool, sorted(engine_hosts(session, pool)), key)))
+
+
+def replica_count(session: Session, pool: str, key: str, name: str, asked: int | None, kept: int) -> int:
+    room = replica_room(session, pool, key)
+    if asked is not None and asked > room:
+        noun = "replica" if room == 1 else "replicas"
+        raise PlacementError(f"Pool {pool} has room for {room} {noun} of {name}: one per online machine where it fits")
+    return asked if asked is not None else min(kept, room)
 
 
 def desired_engines(

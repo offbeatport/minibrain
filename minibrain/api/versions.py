@@ -330,7 +330,8 @@ def promote_version(
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number
     model.deployed_base = model.deployed_base if was_deployed else model.base_model
-    facts = place_custom(session, model, node, Asked(body.pool if body is not None else None))
+    asked = Asked(body.pool, body.replicas) if body is not None else Asked()
+    facts = place_custom(session, model, node, asked)
     version.live_at = version.live_at or now()
     model.first_live_at = model.first_live_at or version.live_at
     if (previous, was_deployed) != (number, True):

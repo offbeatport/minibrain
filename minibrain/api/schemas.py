@@ -1288,6 +1288,12 @@ class Deployment(BaseModel):
     pool: str | None = Field(default=None, description="The compute pool it runs on while deployed.")
     replicas: int = Field(default=1, description="Engine replicas the deployment keeps running in its pool.")
     waiting: bool = Field(default=False, description="No machine in its pool is online to start it on.")
+    moving_to: str | None = Field(
+        default=None, description="The pool it is moving to; pool keeps serving until that pool's engines are ready."
+    )
+    move_failure: str | None = Field(
+        default=None, description="Why the last move to another pool was rolled back, until it is deployed again."
+    )
 
 
 class Usage(BaseModel):
@@ -1560,6 +1566,7 @@ class DeployRequest(BaseModel):
 
 class PromoteRequest(BaseModel):
     pool: str | None = Field(default=None, description=f"{AUTO_HELP} Left out, it keeps the deployed pool.")
+    replicas: int | None = Field(default=None, ge=1, le=16, description="Engine replicas to keep in the pool.")
 
 
 class TestRequest(BaseModel):
@@ -1588,10 +1595,12 @@ class PoolPlacement(BaseModel):
     fit: FitInfo
     machines: int
     free_bytes: int | None
+    room: int = Field(default=1, description="Replicas it can keep there: one per online machine where it fits.")
 
 
 class Placement(BaseModel):
     pool: str | None = Field(description="The pool it is deployed on, or null when not deployed.")
+    moving_from: str | None = Field(default=None, description="The pool that serves it until the move to pool ends.")
     automatic: str | None = Field(description="The pool auto picks now, or null when it fits nowhere.")
     pools: list[PoolPlacement]
 

@@ -226,6 +226,9 @@ class Model(Base):
     avatar: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     pool: Mapped[str | None] = mapped_column(default=None)
     replicas: Mapped[int] = mapped_column(server_default="1")
+    moving_from: Mapped[str | None] = mapped_column(default=None)
+    moving_since: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    move_failure: Mapped[str | None] = mapped_column(default=None)
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
@@ -618,6 +621,9 @@ class BaseModel(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     pool: Mapped[str | None] = mapped_column(default=None)
     replicas: Mapped[int] = mapped_column(server_default="1")
+    moving_from: Mapped[str | None] = mapped_column(default=None)
+    moving_since: Mapped[datetime | None] = mapped_column(UtcDateTime, default=None)
+    move_failure: Mapped[str | None] = mapped_column(default=None)
 
     variant: Mapped[CatalogVariant | None] = relationship()
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)

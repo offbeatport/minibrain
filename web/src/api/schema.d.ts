@@ -4798,6 +4798,16 @@ export interface components {
              * @default false
              */
             waiting?: boolean;
+            /**
+             * Moving To
+             * @description The pool it is moving to; pool keeps serving until that pool's engines are ready.
+             */
+            moving_to?: string | null;
+            /**
+             * Move Failure
+             * @description Why the last move to another pool was rolled back, until it is deployed again.
+             */
+            move_failure?: string | null;
         };
         /** DeviceInfo */
         DeviceInfo: {
@@ -7160,6 +7170,11 @@ export interface components {
              */
             pool: string | null;
             /**
+             * Moving From
+             * @description The pool that serves it until the move to pool ends.
+             */
+            moving_from?: string | null;
+            /**
              * Automatic
              * @description The pool auto picks now, or null when it fits nowhere.
              */
@@ -7341,6 +7356,12 @@ export interface components {
             machines: number;
             /** Free Bytes */
             free_bytes: number | null;
+            /**
+             * Room
+             * @description Replicas it can keep there: one per online machine where it fits.
+             * @default 1
+             */
+            room?: number;
         };
         /** PoolPrice */
         PoolPrice: {
@@ -7446,6 +7467,11 @@ export interface components {
              * @description A compute pool, or auto for the pool where it fits (this machine first). Left out, it keeps the deployed pool.
              */
             pool?: string | null;
+            /**
+             * Replicas
+             * @description Engine replicas to keep in the pool.
+             */
+            replicas?: number | null;
         };
         /** PromotionInfo */
         PromotionInfo: {
