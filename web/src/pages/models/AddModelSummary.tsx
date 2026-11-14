@@ -1,4 +1,13 @@
-import { Download, ExternalLink, GraduationCap, HardDrive, Play } from "lucide-react";
+import {
+    Archive,
+    Download,
+    ExternalLink,
+    GraduationCap,
+    HardDrive,
+    type LucideIcon,
+    MemoryStick,
+    Play,
+} from "lucide-react";
 import {
     Button,
     Checkbox,
@@ -78,6 +87,15 @@ export function Formats({
     );
 }
 
+function Amount({ icon: Icon, value }: { icon: LucideIcon; value: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5">
+            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            {value}
+        </span>
+    );
+}
+
 function Requirements({
     fit,
     trainFit,
@@ -91,25 +109,27 @@ function Requirements({
     storage: number | null;
     download: number | null;
 }) {
-    const train = servesOnly
-        ? "Can't be trained"
-        : trainFit?.qlora_bytes
-          ? `${bytes(trainFit.qlora_bytes)} (QLoRA)`
-          : "Unknown";
+    const train = servesOnly ? (
+        "Can't be trained"
+    ) : trainFit?.qlora_bytes ? (
+        <Amount icon={MemoryStick} value={`${bytes(trainFit.qlora_bytes)} (QLoRA)`} />
+    ) : (
+        "Unknown"
+    );
     return (
         <SummaryFacts>
             <SummaryFact icon={Play} label="Run">
-                {fit ? bytes(fit.needed_bytes) : "Unknown"}
+                {fit ? <Amount icon={MemoryStick} value={bytes(fit.needed_bytes)} /> : "Unknown"}
             </SummaryFact>
             <SummaryFact icon={GraduationCap} label="Train">
                 {train}
             </SummaryFact>
-            <SummaryFact icon={HardDrive} label="Storage">
-                {storage ? bytes(storage) : "Unknown"}
+            <SummaryFact icon={Archive} label="Storage">
+                {storage ? <Amount icon={HardDrive} value={bytes(storage)} /> : "Unknown"}
             </SummaryFact>
             {download !== null && (
                 <SummaryFact icon={Download} label="Download">
-                    {bytes(download)}
+                    <Amount icon={HardDrive} value={bytes(download)} />
                 </SummaryFact>
             )}
         </SummaryFacts>
