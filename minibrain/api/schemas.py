@@ -1281,6 +1281,9 @@ class Deployment(BaseModel):
     state: DeploymentState
     label: str
     versions: list[int] = Field(default_factory=list)
+    pool: str | None = Field(default=None, description="The compute pool it runs on while deployed.")
+    replicas: int = Field(default=1, description="Engine replicas the deployment keeps running in its pool.")
+    waiting: bool = Field(default=False, description="No machine in its pool is online to start it on.")
 
 
 class Usage(BaseModel):
@@ -1540,8 +1543,19 @@ class ImportCheck(BaseModel):
     train_fit: "TrainFitInfo | None" = None
 
 
+AUTO_HELP = "A compute pool, or auto for the pool where it fits (this machine first)."
+
+
 class DeployRequest(BaseModel):
     deployed: bool
+    pool: str | None = Field(
+        default=None, description=f"{AUTO_HELP} Left out, a deployed model stays on its pool and a new one is auto."
+    )
+    replicas: int | None = Field(default=None, ge=1, le=16, description="Engine replicas to keep in the pool.")
+
+
+class PromoteRequest(BaseModel):
+    pool: str | None = Field(default=None, description=f"{AUTO_HELP} Left out, it keeps the deployed pool.")
 
 
 class TestRequest(BaseModel):
@@ -1562,6 +1576,20 @@ class FitInfo(BaseModel):
     needed_bytes: int
     available_bytes: int | None
     basis: str
+
+
+class PoolPlacement(BaseModel):
+    name: str
+    label: str
+    fit: FitInfo
+    machines: int
+    free_bytes: int | None
+
+
+class Placement(BaseModel):
+    pool: str | None = Field(description="The pool it is deployed on, or null when not deployed.")
+    automatic: str | None = Field(description="The pool auto picks now, or null when it fits nowhere.")
+    pools: list[PoolPlacement]
 
 
 class TrainFitInfo(BaseModel):

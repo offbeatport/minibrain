@@ -342,6 +342,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Deploy and roll back** · shipped · product, engineer
   Deploy a passing version, or an earlier one again.
   UI: Models › model › Deploy, Models › model › version › Deploy, Evaluations › Deploy, Models › model › Settings › Undeploy · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote
+- **Deploy to a pool** · shipped · engineer, admin
+  Pick the pool a model serves from; workers there run it.
+  UI: Models › model › Deploy › Pool, Models › model › version › Deploy › Pool · API: POST /api/models/{name}/deploy, POST /api/models/{name}/versions/{number}/promote, GET /api/models/{name}/placement · CLI: minibrain worker
 - **Serve base models** · shipped · engineer
   Serve a downloaded base model by name through the gateway.
   UI: Models › model › Deploy · API: POST /api/models/{name}/deploy
@@ -452,7 +455,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Infrastructure › Overview, Infrastructure › Machines · API: GET /api/compute/pools, GET /api/system/infrastructure, GET /api/system
 - **Pool links** · shipped · product, ml, admin
   Where things run or are stored is named by pool, with details.
-  UI: Models › Add model, Models › model › Train, Models › model › Overview, Jobs › job · API: GET /api/compute/pools
+  UI: Models › Add model, Models › model › Train, Models › model › Deploy, Models › model › Overview, Models, Jobs › job · API: GET /api/compute/pools
 - **Remote workers** · shipped · admin
   Join GPU machines that run training and scoring jobs.
   CLI: minibrain worker · Config: MINIBRAIN_MAIN_URL, MINIBRAIN_WORKER_TOKEN

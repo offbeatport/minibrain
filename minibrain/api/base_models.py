@@ -1,4 +1,5 @@
 import time
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -15,6 +16,7 @@ from minibrain.api.deps import (
 )
 from minibrain.api.model_health import HealthContext, health_context
 from minibrain.api.model_rows import EngineHealth, all_rows, base_row, model_job
+from minibrain.api.placing import place_base
 from minibrain.api.schemas import (
     BaseModelDetail,
     FileState,
@@ -34,9 +36,10 @@ from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.ml.context import FinalError
 from minibrain.models.copies import BUCKET
-from minibrain.models.hardware import pool_fit
+from minibrain.models.hardware import LOCAL_POOL, NodeReport, pool_fit
 from minibrain.models.health import CORRUPT, LOAD_PROBLEMS, content_hash, file_states, set_health
 from minibrain.models.inspect import inspect_location, source_type_of
+from minibrain.models.placement import Asked, PoolEngines, pool_engines
 from minibrain.models.registry import (
     missing_files,
     model_folder,
@@ -64,10 +67,25 @@ router = APIRouter(prefix="/api")
 
 
 def health_for(request: Request) -> EngineHealth:
+    local = local_health(request)
+    remote: dict[str, PoolEngines] = {}
+    sessions = request.app.state.sessions
+
+    def health(key: str, pool: str) -> str | None:
+        if pool == LOCAL_POOL:
+            return local(key)
+        if pool not in remote:
+            with sessions() as session:
+                remote[pool] = pool_engines(session, pool)
+        return remote[pool].health(key)
+
+    return health
+
+
+def local_health(request: Request) -> Callable[[str], str | None]:
     if request.app.state.engines is None:
         return lambda _key: "running"
-    backend = request.app.state.backend
-    return lambda key: backend.health(key)
+    return request.app.state.backend.health
 
 
 def get_base_model(session: Session, key: str) -> BaseModel:
@@ -300,16 +318,16 @@ def retry_base(name: str, request: Request, session: SessionDep, settings: Setti
     return detail_of(session, settings, request, model)
 
 
-def deploy_base(session: Session, settings: Settings, model: BaseModel, deployed: bool) -> bool:
+def deploy_base(
+    session: Session, settings: Settings, model: BaseModel, deployed: bool, local: NodeReport, asked: Asked
+) -> bool:
     if not deployed:
         return undeploy_base(session, model, current_actor()) is not None
     if model.status != BaseModelStatus.AVAILABLE:
         raise ConflictError(f"{model.name} is {model.status}; deploy it once its files are available")
     require_usable(session, settings, model.id)
     cancel_stop(session, model.teardown, model.name)
-    if not model.deployed:
-        audit(session, "model.deploy", model)
-    model.deployed = True
+    place_base(session, model, local, asked)
     model.updated_at = now()
     return False
 

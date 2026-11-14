@@ -312,6 +312,10 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
 - The main process leases GPUs: training and engines share them on one box, so a job states its needs and waits.
 - Compute pools: workers and engines join a named pool and report GPUs, memory, CPU, platform and installed engines.
   Discover judges fit against the selected pool; the Compute page lists pools, machines and engines.
+- [x] Deploy to a pool (2026-11-14): Deploy and Promote take a pool (or auto: this machine when it fits, else the
+  pool with most memory left) and a replica count; a pool where the model does not fit is refused. Workers in that pool
+  start and stop the engines to match, gateways route the deployed name only to that pool, and the model says where
+  it runs or that it waits for a machine. Details: `docs/serving.md`, Deployments on a pool.
 - [ ] Pool use: each pool says what it runs, **Serving**, **Jobs** or **Both** (default Both, so one machine works
   out of the box). The job scheduler only places jobs, and engine placement only places engines, on pools that allow
   them, so a production pool set to Serving can never be starved by training. Pools stay one concept (capacity, like
@@ -328,8 +332,8 @@ a laptop install is onboarding. A local main can drive remote GPU workers and en
   checks and failover. HAProxy, Envoy or a cloud load balancer in front; sgl-router or llm-d under the gateway later.
 - Several mains on Postgres: an advisory lock picks the leader for lease expiry, catalogue sync and log purge. No
   ZooKeeper; consensus is Postgres HA's or Kubernetes'. SQLite stays a single main.
-- Orchestration: workers and engines started by hand or by the customer's tooling in v1, a Kubernetes launcher in v2,
-  a cloud VM launcher later.
+- Orchestration: workers started by hand or by the customer's tooling in v1, and they start the engines of the
+  deployments on their pool; a Kubernetes launcher in v2, a cloud VM launcher later.
 - Children die with the parent and restart with backoff. A launcher starts work: a local subprocess now, a remote
   worker or a Kubernetes Job later.
 - Module boundaries (registry, data, train, serve, gateway) are the future service boundaries; no in-memory state

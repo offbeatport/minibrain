@@ -27,7 +27,7 @@ from minibrain.api.schemas import (
 )
 from minibrain.api.views import avatar_of, cost_info, refusal_of, serve_only_info, teardown_info
 from minibrain.artifacts import ArtifactStore
-from minibrain.models.hardware import needed_bytes
+from minibrain.models.hardware import LOCAL_POOL, needed_bytes
 from minibrain.models.health import content_hash
 from minibrain.models.registry import base_publisher, files_present
 from minibrain.registry.compute import engines_by_base, replica_host
@@ -84,12 +84,14 @@ STATE_LABELS = {
 }
 FETCHING = "fetching"
 FETCHING_LABEL = "Fetching weights"
+WAITING = "waiting"
+WAITING_LABEL = "Waiting for a machine"
 SAFETENSORS = "safetensors"
 USAGE_DAYS = 7
 FAILED_STATUS = 500
 
 
-EngineHealth = Callable[[str], str | None]
+EngineHealth = Callable[[str, str], str | None]
 
 
 def running_progress(job: Job) -> float | None:
@@ -301,8 +303,23 @@ def stopping(teardown: Teardown | None) -> DeploymentState | None:
     return None
 
 
+@dataclass(frozen=True)
+class Placed:
+    pool: str
+    replicas: int
+
+
+def placed(pool: str | None, replicas: int) -> Placed:
+    return Placed(pool or LOCAL_POOL, replicas)
+
+
 def deployment(
-    label_prefix: str, deployed: bool, health: str | None, versions: list[int], teardown: Teardown | None = None
+    label_prefix: str,
+    deployed: bool,
+    health: str | None,
+    versions: list[int],
+    teardown: Teardown | None = None,
+    where: Placed | None = None,
 ) -> Deployment:
     halted = stopping(teardown)
     if halted is not None:
@@ -311,8 +328,16 @@ def deployment(
     if not deployed:
         return Deployment(state="not_deployed", label="Not deployed")
     state: DeploymentState = "running" if health == "running" else "unhealthy" if health == "unhealthy" else "starting"
-    label = FETCHING_LABEL if health == FETCHING else STATE_LABELS[state]
-    return Deployment(state=state, label=f"{label_prefix} · {label}" if label_prefix else label, versions=versions)
+    label = {FETCHING: FETCHING_LABEL, WAITING: WAITING_LABEL}.get(health or "", STATE_LABELS[state])
+    where = where or Placed(LOCAL_POOL, 1)
+    return Deployment(
+        state=state,
+        label=f"{label_prefix} · {label}" if label_prefix else label,
+        versions=versions,
+        pool=where.pool,
+        replicas=where.replicas,
+        waiting=health == WAITING,
+    )
 
 
 def latest_moment(*moments: datetime | None) -> datetime:
@@ -363,9 +388,10 @@ def custom_row(
         deployment=deployment(
             f"v{current}" if current is not None else "Base model",
             model.deployed,
-            health(serving_base(model)) if model.deployed else None,
+            health(serving_base(model), model.pool or LOCAL_POOL) if model.deployed else None,
             [current] if model.deployed and current is not None else [],
             found,
+            placed(model.pool, model.replicas),
         ),
         updated_at=updated,
         can_test=any(v.status == VersionStatus.READY for v in model.versions),
@@ -440,7 +466,14 @@ def base_row(
         base_model=None,
         availability=availability,
         activity=activity,
-        deployment=deployment("", model.deployed, health(model.id) if model.deployed else None, [], teardown),
+        deployment=deployment(
+            "",
+            model.deployed,
+            health(model.id, model.pool or LOCAL_POOL) if model.deployed else None,
+            [],
+            teardown,
+            placed(model.pool, model.replicas),
+        ),
         updated_at=updated,
         can_test=availability.state == "available" and problem is None,
         update_available=latest is not None and model.revision is not None and latest != model.revision,
@@ -493,9 +526,15 @@ def variant_label(base: BaseModel, limit: ServeOnly | None) -> str | None:
     return precision if variant.format == SAFETENSORS else f"{variant.format.upper()} {precision}"
 
 
-def replicas_of(engines: dict[str, list[EngineReplica]], key: str | None) -> list[ServingReplica]:
+def replicas_of(
+    engines: dict[str, list[EngineReplica]], key: str | None, pool: str | None = None
+) -> list[ServingReplica]:
     found = engines.get(key, []) if key is not None else []
-    return [ServingReplica(host=replica_host(item), pool=item.pool, state=item.state) for item in found]
+    return [
+        ServingReplica(host=replica_host(item), pool=item.pool, state=item.state)
+        for item in found
+        if pool is None or item.pool == pool
+    ]
 
 
 def catalog_names(session: Session, bases: list[BaseModel]) -> dict[str, str]:
@@ -512,14 +551,14 @@ def serving_facts(
     limits = {key: serve_only(session, settings, key) for key in {m.base_model for m in models} | {b.id for b in bases}}
     facts: dict[str, dict[str, Any]] = {
         f"custom:{model.slug}": {
-            "replicas": replicas_of(engines, serving_base(model) if model.deployed else None),
+            "replicas": replicas_of(engines, serving_base(model) if model.deployed else None, model.pool or LOCAL_POOL),
             "serve_only": serve_only_info(limits.get(model.base_model)),
         }
         for model in models
     }
     for base in bases:
         facts[f"base:{base.id}"] = {
-            "replicas": replicas_of(engines, base.id),
+            "replicas": replicas_of(engines, base.id, (base.pool or LOCAL_POOL) if base.deployed else None),
             "serve_only": serve_only_info(limits.get(base.id)),
             "catalog_name": names.get(base.catalog_id or ""),
             "variant_label": variant_label(base, limits.get(base.id)),

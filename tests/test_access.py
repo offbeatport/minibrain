@@ -35,6 +35,7 @@ ROUTE_ROLES = {
     ("POST", "/api/models/{name}/base"): "builder",
     ("GET", "/api/models/{name}/base-options"): "viewer",
     ("POST", "/api/models/{name}/deploy"): "builder",
+    ("GET", "/api/models/{name}/placement"): "viewer",
     ("POST", "/api/models/sample"): "builder",
     ("GET", "/api/models/name"): "viewer",
     ("GET", "/api/reserved-names/{name}"): "viewer",

@@ -269,7 +269,7 @@ def announce(harness: Harness, number: int, base: str) -> None:
     assert response.status_code == 204
 
 
-def test_a_deployed_model_lists_the_engines_serving_its_base(harness: Harness) -> None:
+def test_a_deployed_model_lists_the_engines_serving_it_in_its_pool(harness: Harness) -> None:
     create_on_data(harness)
     finish(harness, "eval", accuracy=0.8)
     base = custom_row(harness, SLUG)["base_model"]
@@ -277,6 +277,9 @@ def test_a_deployed_model_lists_the_engines_serving_its_base(harness: Harness) -
     announce(harness, 2, base)
     assert custom_row(harness, SLUG)["replicas"] == []
     deploy(harness)
+    assert custom_row(harness, SLUG)["replicas"] == []
+    promoted = harness.client.post(f"/api/models/{SLUG}/versions/0/promote", json={"pool": "rack"})
+    assert promoted.status_code == 200, promoted.text
     replicas = custom_row(harness, SLUG)["replicas"]
     assert [(item["host"], item["pool"], item["state"]) for item in replicas] == [
         ("gpu-1", "rack", "ready"),

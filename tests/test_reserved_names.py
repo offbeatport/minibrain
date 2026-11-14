@@ -199,16 +199,16 @@ def test_the_migration_reserves_names_that_history_still_mentions(tmp_path: Path
     seen = now() - timedelta(days=5)
     sessions = sessionmaker(create_engine(url))
     with sessions() as session:
-        kept = Model(slug="kept", name="Kept", preset="general", base_model="tiny")
-        session.add(kept)
-        session.flush()
+        kept = session.scalar(
+            insert(Model).values(slug="kept", name="Kept", preset="general", base_model="tiny").returning(Model.id)
+        )
         done = {"kind": "train", "status": "succeeded"}
         session.execute(
             insert(Job),
             [
                 done | {"created_at": seen, "model_slug": "gone", "model_name": "Gone"},
                 done | {"kind": "download", "created_at": seen, "base_model_key": "tiny"},
-                done | {"model_id": kept.id, "model_slug": "kept", "model_name": "Kept"},
+                done | {"model_id": kept, "model_slug": "kept", "model_name": "Kept"},
             ],
         )
         session.add_all(

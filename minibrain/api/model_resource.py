@@ -15,16 +15,28 @@ from minibrain.api.base_models import (
     update_base,
     wake_teardowns,
 )
-from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import LocalNodeDep, QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.jobs import canceller
 from minibrain.api.model_rows import all_rows
 from minibrain.api.models import deploy_custom, read_custom, update_custom
-from minibrain.api.schemas import BaseModelDetail, DeployRequest, ModelDetail, ModelRow, ModelUpdate
+from minibrain.api.schemas import (
+    BaseModelDetail,
+    DeployRequest,
+    FitInfo,
+    ModelDetail,
+    ModelRow,
+    ModelUpdate,
+    Placement,
+    PoolPlacement,
+)
 from minibrain.auth.identity import current_actor, current_role
 from minibrain.auth.roles import LABELS, Role, allows
+from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.placement import Asked, automatic, pool_options
 from minibrain.registry.models import BaseModel, Model
 from minibrain.registry.service import no_model
 from minibrain.settings import Settings
+from minibrain.tasks.service import serving_base
 from minibrain.teardown import delete_base, delete_custom
 
 router = APIRouter(prefix="/api/models")
@@ -130,19 +142,58 @@ def delete_model(
     "/{name}/deploy",
     dependencies=[Depends(builder)],
     summary="Deploy or undeploy a model",
-    description="Deploying serves the model on /v1 under its API name. Undeploying answers 202 while it stops.",
+    description="Deploying serves the model on /v1 under its API name from a compute pool: the one given, or auto "
+    "for the pool where it fits, this machine first. Deploying a deployed model with another pool moves it there. "
+    "A pool where it does not fit answers 422. Undeploying answers 202 while it stops.",
 )
 def deploy_model(
-    name: str, body: DeployRequest, request: Request, response: Response, session: SessionDep, settings: SettingsDep
+    name: str,
+    body: DeployRequest,
+    request: Request,
+    response: Response,
+    session: SessionDep,
+    settings: SettingsDep,
+    node: LocalNodeDep,
 ) -> AnyModelDetail:
     model = find(session, name)
+    asked = Asked(body.pool, body.replicas)
     if isinstance(model, Model):
-        stopping = deploy_custom(session, model, body.deployed)
+        stopping = deploy_custom(session, model, body.deployed, node, asked)
     else:
-        stopping = deploy_base(session, settings, model, body.deployed)
+        stopping = deploy_base(session, settings, model, body.deployed, node, asked)
     if stopping:
         response.status_code = 202
     session.commit()
     if not body.deployed:
         wake_teardowns(request)
     return detail_for(session, settings, request, model)
+
+
+@router.get(
+    "/{name}/placement",
+    dependencies=[Depends(viewer)],
+    summary="Where a model can run",
+    description="Each compute pool with how the model fits there, and the pool auto would pick. " + NAME_HELP,
+)
+def placement(name: str, session: SessionDep, node: LocalNodeDep) -> Placement:
+    model = find(session, name)
+    if isinstance(model, Model):
+        key, owner = serving_base(model) if model.deployed else model.base_model, f"model:{model.id}"
+    else:
+        key, owner = model.id, f"base:{model.id}"
+    options = pool_options(session, node, key, owner)
+    chosen = automatic(options)
+    return Placement(
+        pool=(model.pool or LOCAL_POOL) if model.deployed else None,
+        automatic=chosen.name if chosen is not None else None,
+        pools=[
+            PoolPlacement(
+                name=option.name,
+                label=option.label,
+                fit=FitInfo(**option.fit),
+                machines=option.machines,
+                free_bytes=option.free_bytes,
+            )
+            for option in options
+        ],
+    )

@@ -232,10 +232,13 @@ def gateway(main_url: str, host: str, port: int) -> None:
     uvicorn.run(create_gateway_app(main_url, token, settings.home / "gateway"), host=host, port=port)
 
 
-def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None, pool: str) -> None:
-    from minibrain.models.hardware import report
+def worker(args: argparse.Namespace) -> None:
+    from minibrain.models.hardware import LOCAL_POOL, report
+    from minibrain.serve.host import EngineHost
     from minibrain.settings import load_settings
-    from minibrain.worker import REMOTE_KINDS, Worker, WorkerConfig
+    from minibrain.worker import REMOTE_KINDS, MainClient, Worker, WorkerConfig
+
+    api_url, kinds, gpus, parent, pool = args.api_url, args.kinds, args.gpus, args.parent, args.pool
 
     settings = load_settings()
     token = os.environ.get("MINIBRAIN_WORKER_TOKEN") or settings.secret("worker_token")
@@ -254,7 +257,18 @@ def worker(api_url: str, kinds: list[str] | None, gpus: int, parent: int | None,
     threading.Thread(target=watch_parent, args=(parent, stop), daemon=True).start()
     signal.signal(signal.SIGTERM, exit_quietly)
     signal.signal(signal.SIGINT, exit_quietly)
-    Worker(config).run_forever(stop)
+    host = None
+    if pool != LOCAL_POOL and not args.no_serve:
+        client = MainClient(config)
+        client.stop = stop
+        host = EngineHost(config, client, advertise=args.advertise, bind=args.engine_bind)
+        threading.Thread(target=host.forever, args=(stop,), daemon=True).start()
+    try:
+        Worker(config).run_forever(stop)
+    finally:
+        stop.set()
+        if host is not None:
+            host.stop_all()
 
 
 def check_outbound(url: str) -> None:
@@ -493,6 +507,15 @@ def main() -> None:
     worker_command.add_argument("--kinds", nargs="*", default=None)
     worker_command.add_argument("--gpus", type=int, default=1)
     worker_command.add_argument("--pool", default="local", help="compute pool this machine joins")
+    worker_command.add_argument(
+        "--advertise", default=None, help="address gateways reach this machine's engines at (default: its name)"
+    )
+    worker_command.add_argument(
+        "--engine-bind", default=None, help="interface engines listen on (default: the --advertise address)"
+    )
+    worker_command.add_argument(
+        "--no-serve", action="store_true", help="run jobs only; never start engines for models deployed to the pool"
+    )
     worker_command.add_argument("--parent", type=int, default=None, help=argparse.SUPPRESS)
     gateway_command = commands.add_parser("gateway", help="run a standalone gateway against a main process")
     gateway_command.add_argument("--main-url", default="http://127.0.0.1:8000")
@@ -564,7 +587,7 @@ def main() -> None:
     if args.command == "serve":
         serve(args.host, args.port, not args.no_worker, not args.no_browser)
     elif args.command == "worker":
-        worker(args.api_url, args.kinds, args.gpus, args.parent, args.pool)
+        worker(args)
     elif args.command == "gateway":
         gateway(args.main_url, args.host, args.port)
     elif args.command == "engine":

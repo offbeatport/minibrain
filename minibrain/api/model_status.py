@@ -11,6 +11,7 @@ from minibrain.api.model_rows import model_job
 from minibrain.api.model_traffic import Subject, overall, subject_of, usual_error_rate
 from minibrain.api.request_logs import aware
 from minibrain.api.views import teardown_label
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.registry.compute import live_engines
 from minibrain.registry.models import (
     ACTIVE_JOB_STATUSES,
@@ -29,7 +30,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly
-from minibrain.tasks.service import decision, held_out_score, live_version
+from minibrain.tasks.service import decision, held_out_score, live_version, serving_base
 
 StatusKind = Literal[
     "promote",
@@ -100,8 +101,13 @@ def replicas_text(count: int) -> str:
     return f"{count} {'replica' if count == 1 else 'replicas'}"
 
 
-def replica_count(session: Session, base: str) -> int:
-    return sum(1 for replica in live_engines(session) if replica.base_model == base)
+def replica_count(session: Session, base: str, pool: str | None) -> int:
+    where = pool or LOCAL_POOL
+    return sum(1 for replica in live_engines(session) if replica.base_model == base and replica.pool == where)
+
+
+def pool_part(pool: str | None) -> str:
+    return f" on {pool}" if pool and pool != LOCAL_POOL else ""
 
 
 def errors_status(session: Session, subject: Subject) -> ModelStatus | None:
@@ -208,9 +214,9 @@ def trained(model: Model) -> bool:
 
 def settled(session: Session, model: Model) -> ModelStatus:
     live = live_version(model)
-    serving = replicas_text(replica_count(session, model.deployed_base or model.base_model))
+    serving = replicas_text(replica_count(session, serving_base(model), model.pool))
     where = f"v{live.number}" if live is not None else "base weights"
-    return ModelStatus(tone="success", text=f"Live: {where} · {serving}", action=None)
+    return ModelStatus(tone="success", text=f"Live: {where}{pool_part(model.pool)} · {serving}", action=None)
 
 
 def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly | None) -> ModelStatus:
@@ -263,9 +269,9 @@ def base_status(session: Session, settings: Settings, base: BaseRow) -> ModelSta
         return neutral("Not ready", None)
     if not base.deployed:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))
-    count = replica_count(session, base.id)
+    count = replica_count(session, base.id, base.pool)
     return ModelStatus(
         tone="success",
-        text=f"Live · {replicas_text(count)}",
+        text=f"Live{pool_part(base.pool)} · {replicas_text(count)}",
         action=StatusAction(kind="create_custom", label="Add a model on it"),
     )

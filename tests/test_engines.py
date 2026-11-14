@@ -167,7 +167,7 @@ def test_registered_engines_join_the_config_and_stop_local_spawns(harness: Harne
     with harness.sessions() as session:
         model = session.get(BaseModel, "tiny")
         assert model is not None
-        model.deployed = True
+        model.deployed, model.pool = True, "rack"
         session.commit()
     seen: list[dict] = []
 

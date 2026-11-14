@@ -65,6 +65,7 @@ def text_plan(
         adapter=adapter,
         max_tokens=body.token_budget,
         route=route.name,
+        pool=route.pool,
         sampling=sampling_of(body, route),
         prompt=prompt,
     )

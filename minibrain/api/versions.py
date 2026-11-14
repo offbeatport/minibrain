@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.deps import BackendDep, LocalNodeDep, QueueDep, SessionDep, SettingsDep, StoreDep
 from minibrain.api.jobs import canceller
+from minibrain.api.placing import audit_deploy, place_custom
 from minibrain.api.schemas import (
     AnswerSide,
     ExampleAnswer,
     ModelDetail,
     PackedFileInfo,
+    PromoteRequest,
     ScoreInfo,
     TurnInfo,
     VersionAnswers,
@@ -34,6 +36,7 @@ from minibrain.jobs.specs import eval_params, train_params
 from minibrain.ml.completion import Completion
 from minibrain.ml.planner import Plan
 from minibrain.models.health import base_changed
+from minibrain.models.placement import Asked
 from minibrain.models.registry import base_hash, base_readiness, require_usable
 from minibrain.models.usage import touch
 from minibrain.presets import presets
@@ -292,8 +295,20 @@ def deleting(model: Model, version: Version) -> JSONResponse:
     return JSONResponse(status_code=202, content=version_info(model, version).model_dump(mode="json"))
 
 
-@router.post("/models/{name}/versions/{number}/promote", dependencies=[Depends(builder)], summary="Make a version live")
-def promote_version(name: str, number: int, session: SessionDep, settings: SettingsDep) -> ModelDetail:
+@router.post(
+    "/models/{name}/versions/{number}/promote",
+    dependencies=[Depends(builder)],
+    summary="Make a version live",
+    description="Deploys the version on the model's pool, or on the pool given (auto picks where it fits).",
+)
+def promote_version(
+    name: str,
+    number: int,
+    session: SessionDep,
+    settings: SettingsDep,
+    node: LocalNodeDep,
+    body: PromoteRequest | None = None,
+) -> ModelDetail:
     model = get_model(session, name)
     version = get_version(model, number)
     already = model.deployed and model.current_version == number
@@ -315,13 +330,22 @@ def promote_version(name: str, number: int, session: SessionDep, settings: Setti
     cancel_stop(session, model.teardown, model.name)
     model.current_version = version.number
     model.deployed_base = model.deployed_base if was_deployed else model.base_model
-    model.deployed = True
+    facts = place_custom(session, model, node, Asked(body.pool if body is not None else None))
     version.live_at = version.live_at or now()
     model.first_live_at = model.first_live_at or version.live_at
     if (previous, was_deployed) != (number, True):
+        placed = facts or {"pool": model.pool}
         audit_version(
-            session, model, number=number, action="version.promote", previous=previous, was_deployed=was_deployed
+            session,
+            model,
+            number=number,
+            action="version.promote",
+            previous=previous,
+            was_deployed=was_deployed,
+            **placed,
         )
+    elif facts is not None:
+        audit_deploy(session, model, facts)
     session.commit()
     return detail(settings, model)
 

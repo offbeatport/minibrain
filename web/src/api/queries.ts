@@ -37,6 +37,7 @@ export const keys = {
     answers: (slug: string, number: number) => ["model", slug, "answers", number] as const,
     versionFiles: (slug: string, number: number) => ["model", slug, "files", number] as const,
     modelPage: (name: string) => ["all-models", "page", name] as const,
+    placement: (name: string) => ["all-models", "placement", name] as const,
 };
 
 const MOVING_MODEL = new Set(["downloading", "importing"]);
@@ -342,6 +343,15 @@ export function useVersionFiles(slug: string, number: number | null | undefined)
             ),
         enabled: number !== null && number !== undefined,
         staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
+export function usePlacement(name: string, enabled: boolean) {
+    return useQuery({
+        queryKey: keys.placement(name),
+        queryFn: () => unwrap(api.GET("/api/models/{name}/placement", modelPath(name))),
+        enabled,
+        refetchInterval: enabled ? 10000 : false,
     });
 }
 

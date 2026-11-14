@@ -23,7 +23,7 @@ Endpoints: [`web/openapi.json`](../web/openapi.json). Tables: [migrations](../mi
 |---|---|---|---|---|---|
 | main | Control | The parent process | Its own service; two or more with Postgres | Copies behind a load balancer | The only reader and writer |
 | gateway | Serving | Inside main | `minibrain gateway` | Copies behind a load balancer | Cached config snapshot |
-| engine | Serving | A supervised child per model | `minibrain engine --pool …` on each GPU box | Copies per model, across boxes | HTTP to main |
+| engine | Serving | A supervised child per model | A child of a worker in the deployment's pool, or `minibrain engine --pool …` | Replicas per deployment, across boxes | HTTP to main |
 | worker | Batch | A supervised child | `minibrain worker --pool …` on each GPU box | More boxes per pool | HTTP to main |
 | training / eval | Batch | A child of the worker | Same, on the worker's box | One per job | None |
 

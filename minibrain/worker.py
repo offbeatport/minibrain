@@ -154,6 +154,9 @@ class MainClient:
         response = self.call("POST", "/internal/worker/claim", json={"worker": self.worker_body(), "wait": wait})
         return None if response.status_code == 204 else response.json()
 
+    def engines(self) -> dict[str, Any]:
+        return dict(self.call("POST", "/internal/worker/engines", json={"worker": self.worker_body()}).json())
+
     def heartbeat(self, job_id: int, token: str) -> dict[str, Any]:
         return self.call("POST", f"/internal/worker/jobs/{job_id}/heartbeat", json={"token": token}).json()
 

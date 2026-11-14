@@ -240,12 +240,45 @@ hardware and the model's weight format:
   longer than the links' 15 minutes still completes. A request to a model that is still fetching waits up to 60 s,
   then gets a 503 that says how far the fetch is; the 600 s startup window starts only when loading starts. A fetch
   that fails says so and loads nothing.
-- `main` starts a local engine for a deployed model only when no live replica serves it elsewhere, and starts one
-  again when the remote replicas go away.
+- `main` starts a local engine for a model deployed on this machine's pool (`local`) only when no live replica in
+  that pool serves it, and starts one again when they go away. A model with versions but no deployment, or a safety
+  model, starts one when no live replica serves it anywhere. A model deployed on another pool never starts on `main`.
 - Scale is horizontal: more replicas of the same model, on Kubernetes autoscaled. Heavy engines are optional extras;
   SGLang and vLLM pin their own torch and CUDA, so each runs from its own environment (`MINIBRAIN_SGLANG_PYTHON`,
   `MINIBRAIN_VLLM_PYTHON`). The vLLM engine shares SGLang's request path (an OpenAI-compatible server per base model)
   and has not been run on a GPU yet.
+
+## Deployments on a pool
+
+A deployment is a model's live version on one compute pool with N replicas (1 by default), kept true continuously.
+Deploy and Promote take `pool`: a pool name, or `auto` (the default for a model not deployed yet) for the pool where
+it fits, this machine first when it fits, then the pool with the most memory left after the deployments already on
+it. A pool that does not exist, or where the model does not fit, is a 422 with the reason. Deploying a deployed model
+with another pool moves it; left out, it stays where it is. `GET /api/models/{name}/placement` lists each pool's fit
+for the model and the pool `auto` would pick; the Deploy dialog's Pool row reads it ("Automatic · gpu-a10", then each
+pool with "Runs · 2.2 of 24 GB" or "Too small"). The `model.deploy` audit event records the pool, the replicas and,
+on a move, `from_pool`.
+
+| Pool | Who starts the engine |
+|---|---|
+| `local` (this machine) | `main`, as a supervised child, as before |
+| Any other | A worker in that pool (`minibrain worker --pool NAME`) runs `minibrain engine` as its child |
+
+- Each worker in a pool other than `local` asks `main` every 10 s which engines to run (`POST
+  /internal/worker/engines`, worker token) and starts or stops children to match. The answer carries the gateway
+  token the engines announce with, so a worker needs only its own token.
+- `main` places replicas on the pool's machines with a worker seen in the last 30 s, one worker per machine, skipping
+  machines too small for the model, by rendezvous hashing on the model and machine name: a model stays on the same
+  machines as long as they stay up, and moves when one goes away.
+- The engine binds and announces the worker's `--advertise` address (the machine's name by default; `--engine-bind`
+  sets another interface) on a free port. It pulls weights and adapters from `main` like any remote engine and dies
+  with the worker. `--no-serve` keeps a worker to jobs only.
+- Gateways route a deployed name only to that deployment's pool (`pool` on the route in the config snapshot), ready
+  replicas first; a pinned version (`name@N`) and the Playground's versions use any replica. Moving a deployment
+  routes to the new pool at once; the old engines stop within about 10 s.
+- Status: the header, Overview, Models list and Monitoring say where it runs ("Deployed · v2 on gpu-a10"). While
+  the engine fetches and loads it shows "Deploying" or "Fetching weights"; with no worker of the pool online it shows
+  "Waiting for a machine in gpu-a10".
 
 ## Routing
 

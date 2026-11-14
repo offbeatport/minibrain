@@ -21,6 +21,7 @@ from minibrain.jobs.queue import EventIn, WorkerInfo
 from minibrain.lifecycle import STOPPING
 from minibrain.models.bucket import WEIGHTS, stored_files, writes_bucket
 from minibrain.models.hardware import LOCAL_POOL
+from minibrain.models.placement import desired_engines
 from minibrain.models.registry import check_job
 from minibrain.policy import PolicyError
 from minibrain.registry.compute import record_node
@@ -68,6 +69,19 @@ class ClaimResponse(pydantic.BaseModel):
     params: dict[str, Any]
     lease_seconds: int
     env: dict[str, str] = Field(default_factory=dict)
+
+
+class HostedEngine(pydantic.BaseModel):
+    model: str
+
+
+class EnginesRequest(pydantic.BaseModel):
+    worker: WorkerBody
+
+
+class EnginesResponse(pydantic.BaseModel):
+    engines: list[HostedEngine]
+    gateway_token: str
 
 
 class TokenBody(pydantic.BaseModel):
@@ -169,6 +183,21 @@ def claim(body: ClaimRequest, queue: QueueDep, session: SessionDep, settings: Se
         if STOPPING.is_set() or time.monotonic() >= deadline:
             return Response(status_code=204)
         STOPPING.wait(CLAIM_POLL_SECONDS)
+
+
+@router.post("/engines")
+def hosted_engines(
+    body: EnginesRequest, request: Request, queue: QueueDep, session: SessionDep, settings: SettingsDep
+) -> EnginesResponse:
+    worker = body.worker
+    queue.register(worker.info())
+    report_worker(session, worker)
+    config = request.app.state.gateway_config.current()
+    placements = {key: found for key, found in config.placements.items() if key not in config.problems}
+    wanted = desired_engines(session, placements, worker.pool, worker.host, worker.id)
+    return EnginesResponse(
+        engines=[HostedEngine(model=key) for key in wanted], gateway_token=settings.secret("gateway_token")
+    )
 
 
 @router.post("/jobs/{job_id}/heartbeat")

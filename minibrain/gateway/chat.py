@@ -357,6 +357,7 @@ def plan(
         max_tokens=body.token_budget,
         constraint=requested or task_constraint(route),
         route=route.name,
+        pool=route.pool,
         sampling=sampling_of(body, route),
         tools=use,
         reasoning=reasoning_of(body, route, base),
@@ -451,6 +452,7 @@ def run(
         max_tokens=max_tokens,
         constraint=task_constraint(route),
         route=route.name,
+        pool=route.pool,
         sampling=Sampling().or_greedy(),
     )
     return completed(backend, request, False)

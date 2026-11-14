@@ -4348,7 +4348,7 @@
           "Models"
         ],
         "summary": "Deploy or undeploy a model",
-        "description": "Deploying serves the model on /v1 under its API name. Undeploying answers 202 while it stops.",
+        "description": "Deploying serves the model on /v1 under its API name from a compute pool: the one given, or auto for the pool where it fits, this machine first. Deploying a deployed model with another pool moves it there. A pool where it does not fit answers 422. Undeploying answers 202 while it stops.",
         "operationId": "deploy_model_api_models__name__deploy_post",
         "parameters": [
           {
@@ -4393,6 +4393,49 @@
                     }
                   },
                   "title": "Response Deploy Model Api Models  Name  Deploy Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/models/{name}/placement": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "summary": "Where a model can run",
+        "description": "Each compute pool with how the model fits there, and the pool auto would pick. Custom and base models share one namespace of API names, so a name finds either kind.",
+        "operationId": "placement_api_models__name__placement_get",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Placement"
                 }
               }
             }
@@ -5702,6 +5745,7 @@
           "Versions"
         ],
         "summary": "Make a version live",
+        "description": "Deploys the version on the model's pool, or on the pool given (auto picks where it fits).",
         "operationId": "promote_version_api_models__name__versions__number__promote_post",
         "parameters": [
           {
@@ -5723,6 +5767,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PromoteRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -15669,6 +15730,32 @@
           "deployed": {
             "type": "boolean",
             "title": "Deployed"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "A compute pool, or auto for the pool where it fits (this machine first). Left out, a deployed model stays on its pool and a new one is auto."
+          },
+          "replicas": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 16.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replicas",
+            "description": "Engine replicas to keep in the pool."
           }
         },
         "type": "object",
@@ -15701,6 +15788,30 @@
             },
             "type": "array",
             "title": "Versions"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "The compute pool it runs on while deployed."
+          },
+          "replicas": {
+            "type": "integer",
+            "title": "Replicas",
+            "description": "Engine replicas the deployment keeps running in its pool.",
+            "default": 1
+          },
+          "waiting": {
+            "type": "boolean",
+            "title": "Waiting",
+            "description": "No machine in its pool is online to start it on.",
+            "default": false
           }
         },
         "type": "object",
@@ -22942,6 +23053,48 @@
         ],
         "title": "PersonInfo"
       },
+      "Placement": {
+        "properties": {
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "The pool it is deployed on, or null when not deployed."
+          },
+          "automatic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Automatic",
+            "description": "The pool auto picks now, or null when it fits nowhere."
+          },
+          "pools": {
+            "items": {
+              "$ref": "#/components/schemas/PoolPlacement"
+            },
+            "type": "array",
+            "title": "Pools"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pool",
+          "automatic",
+          "pools"
+        ],
+        "title": "Placement"
+      },
       "PlannedPresetInfo": {
         "properties": {
           "key": {
@@ -23402,6 +23555,45 @@
         ],
         "title": "PoolInfo"
       },
+      "PoolPlacement": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "fit": {
+            "$ref": "#/components/schemas/FitInfo"
+          },
+          "machines": {
+            "type": "integer",
+            "title": "Machines"
+          },
+          "free_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "fit",
+          "machines",
+          "free_bytes"
+        ],
+        "title": "PoolPlacement"
+      },
       "PoolPrice": {
         "properties": {
           "pool": {
@@ -23716,6 +23908,24 @@
           "version"
         ],
         "title": "PreviousTraining"
+      },
+      "PromoteRequest": {
+        "properties": {
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pool",
+            "description": "A compute pool, or auto for the pool where it fits (this machine first). Left out, it keeps the deployed pool."
+          }
+        },
+        "type": "object",
+        "title": "PromoteRequest"
       },
       "PromotionInfo": {
         "properties": {

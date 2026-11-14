@@ -15,6 +15,7 @@ import httpx
 from minibrain.base_models import BaseModelSpec
 from minibrain.gateway.balance import Balancer, sticky_key
 from minibrain.ml.completion import Completion, Piece
+from minibrain.models.hardware import LOCAL_POOL
 from minibrain.serve.backend import CompletionRequest, EngineUnavailableError, Event, OutputFormatError
 from minibrain.serve.sampling import UnsupportedParameterError
 from minibrain.settings import Settings
@@ -145,7 +146,18 @@ class EngineManager:
 
 
 Engines = Callable[[], dict[str, list[dict[str, str]]]]
+Placements = Callable[[], dict[str, dict[str, int]]]
 DRAIN_TIMEOUT = httpx.Timeout(10.0, connect=3.0)
+
+
+def in_pool(entry: dict[str, str], pool: str) -> bool:
+    return entry.get("pool", LOCAL_POOL) == pool
+
+
+def nothing_serves(base: str, pool: str | None) -> str:
+    if pool is None or pool == LOCAL_POOL:
+        return f"no engine serves {base}"
+    return f"no engine serves {base} in pool {pool} yet; it starts on a machine in that pool"
 
 
 def drain_engine(http: HttpClient, url: str, routes: list[str], adapters: list[str]) -> dict[str, Any]:
@@ -198,8 +210,9 @@ class EngineBackend:
         self.probe: HttpClient = httpx.Client(timeout=httpx.Timeout(1.0))
         self.balancer = balancer or Balancer()
 
-    def replicas(self, base: str) -> list[dict[str, str]]:
-        return self.engines().get(base, [])
+    def replicas(self, base: str, pool: str | None = None) -> list[dict[str, str]]:
+        found = self.engines().get(base, [])
+        return found if pool is None else [entry for entry in found if in_pool(entry, pool)]
 
     def body_of(self, request: CompletionRequest) -> dict[str, Any]:
         adapter = (
@@ -248,9 +261,9 @@ class EngineBackend:
         tried: set[str] = set()
         waiting: str | None = None
         while True:
-            replicas = self.replicas(base)
+            replicas = self.replicas(base, request.pool)
             if not replicas:
-                raise EngineUnavailableError(f"no engine serves {base}")
+                raise EngineUnavailableError(nothing_serves(base, request.pool))
             url = self.balancer.choose(replicas, key, tried)
             if url is None:
                 if waiting is not None and time.monotonic() - started > FETCH_WAIT_SECONDS:
@@ -328,16 +341,29 @@ class EngineBackend:
 
 
 class ManagedEngineBackend(EngineBackend):
-    def __init__(self, manager: EngineManager, engines: Engines, http: HttpClient | None = None) -> None:
+    def __init__(
+        self,
+        manager: EngineManager,
+        engines: Engines,
+        http: HttpClient | None = None,
+        placements: Placements = dict,
+    ) -> None:
         super().__init__(engines, http)
         self.manager = manager
+        self.placements = placements
 
-    def replicas(self, base: str) -> list[dict[str, str]]:
-        found = self.engines().get(base, [])
+    def replicas(self, base: str, pool: str | None = None) -> list[dict[str, str]]:
+        found = super().replicas(base, pool)
         local = self.manager.url(base)
-        if local is not None and all(entry["url"] != local for entry in found):
-            found = [{"url": local, "state": "loading"}, *found]
+        if pool in (None, LOCAL_POOL) and local is not None and all(entry["url"] != local for entry in found):
+            found = [{"url": local, "state": "loading", "pool": LOCAL_POOL}, *found]
         return found
+
+    def serves_here(self, base: str, pool: str | None) -> bool:
+        if pool is not None:
+            return pool == LOCAL_POOL
+        found = self.placements().get(base)
+        return not found or LOCAL_POOL in found
 
     def complete(self, request: CompletionRequest) -> Completion:
         self.started(request)
@@ -348,12 +374,16 @@ class ManagedEngineBackend(EngineBackend):
         return super().stream(request)
 
     def started(self, request: CompletionRequest) -> None:
-        if not self.engines().get(request.base.key):
+        key = request.base.key
+        if not self.serves_here(key, request.pool):
+            return
+        if not super().replicas(key, request.pool):
             self.manager.ensure_one(request.base)
-        self.manager.touch(request.base.key)
+        self.manager.touch(key)
 
     def health(self, key: str) -> str | None:
-        if any(self.balancer.state(entry) == "ready" for entry in self.engines().get(key, [])):
+        local = super().replicas(key, LOCAL_POOL)
+        if any(self.balancer.state(entry) == "ready" for entry in local):
             return "running"
         return self.manager.health(key, self.probe)
 

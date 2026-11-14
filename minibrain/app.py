@@ -83,6 +83,7 @@ from minibrain.maintenance import purge_forever, seal_forever
 from minibrain.models import hub
 from minibrain.models.catalog import seed
 from minibrain.models.health import report_problems
+from minibrain.models.placement import PlacementError
 from minibrain.models.registry import missing_files
 from minibrain.object_store import apply as apply_storage
 from minibrain.policy import LockedError, PolicyError
@@ -127,6 +128,7 @@ ERROR_STATUS: dict[type[Exception], int] = {
     ArtifactError: 422,
     EngineUnavailableError: 503,
     PolicyError: 403,
+    PlacementError: 422,
     LockedError: 409,
     ConnectionProblem: 422,
     AccountError: 422,
@@ -269,7 +271,11 @@ def create_app(
     if backend is None:
         main_url = os.environ.get("MINIBRAIN_MAIN_URL", "http://127.0.0.1:8000")
         engines = EngineManager(settings, main_url, hub_allowed=lambda: hub_allowed(sessions))
-        backend = ManagedEngineBackend(engines, lambda: app.state.gateway_config.current().engines)
+        backend = ManagedEngineBackend(
+            engines,
+            lambda: app.state.gateway_config.current().engines,
+            placements=lambda: app.state.gateway_config.current().placements,
+        )
     app.state.engines = engines
     app.state.backend = backend
     app.state.gateway_config = LocalConfig(

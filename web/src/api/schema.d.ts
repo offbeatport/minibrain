@@ -1388,9 +1388,29 @@ export interface paths {
         put?: never;
         /**
          * Deploy or undeploy a model
-         * @description Deploying serves the model on /v1 under its API name. Undeploying answers 202 while it stops.
+         * @description Deploying serves the model on /v1 under its API name from a compute pool: the one given, or auto for the pool where it fits, this machine first. Deploying a deployed model with another pool moves it there. A pool where it does not fit answers 422. Undeploying answers 202 while it stops.
          */
         post: operations["deploy_model_api_models__name__deploy_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/models/{name}/placement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where a model can run
+         * @description Each compute pool with how the model fits there, and the pool auto would pick. Custom and base models share one namespace of API names, so a name finds either kind.
+         */
+        get: operations["placement_api_models__name__placement_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1784,7 +1804,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Make a version live */
+        /**
+         * Make a version live
+         * @description Deploys the version on the model's pool, or on the pool given (auto picks where it fits).
+         */
         post: operations["promote_version_api_models__name__versions__number__promote_post"];
         delete?: never;
         options?: never;
@@ -4640,6 +4663,16 @@ export interface components {
         DeployRequest: {
             /** Deployed */
             deployed: boolean;
+            /**
+             * Pool
+             * @description A compute pool, or auto for the pool where it fits (this machine first). Left out, a deployed model stays on its pool and a new one is auto.
+             */
+            pool?: string | null;
+            /**
+             * Replicas
+             * @description Engine replicas to keep in the pool.
+             */
+            replicas?: number | null;
         };
         /** Deployment */
         Deployment: {
@@ -4652,6 +4685,23 @@ export interface components {
             label: string;
             /** Versions */
             versions?: number[];
+            /**
+             * Pool
+             * @description The compute pool it runs on while deployed.
+             */
+            pool?: string | null;
+            /**
+             * Replicas
+             * @description Engine replicas the deployment keeps running in its pool.
+             * @default 1
+             */
+            replicas?: number;
+            /**
+             * Waiting
+             * @description No machine in its pool is online to start it on.
+             * @default false
+             */
+            waiting?: boolean;
         };
         /** DeviceInfo */
         DeviceInfo: {
@@ -7001,6 +7051,21 @@ export interface components {
             /** Role Locked */
             role_locked: boolean;
         };
+        /** Placement */
+        Placement: {
+            /**
+             * Pool
+             * @description The pool it is deployed on, or null when not deployed.
+             */
+            pool: string | null;
+            /**
+             * Automatic
+             * @description The pool auto picks now, or null when it fits nowhere.
+             */
+            automatic: string | null;
+            /** Pools */
+            pools: components["schemas"]["PoolPlacement"][];
+        };
         /** PlannedPresetInfo */
         PlannedPresetInfo: {
             /** Key */
@@ -7164,6 +7229,18 @@ export interface components {
             /** Engines */
             engines: components["schemas"]["ReplicaInfo"][];
         };
+        /** PoolPlacement */
+        PoolPlacement: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            fit: components["schemas"]["FitInfo"];
+            /** Machines */
+            machines: number;
+            /** Free Bytes */
+            free_bytes: number | null;
+        };
         /** PoolPrice */
         PoolPrice: {
             /** Pool */
@@ -7260,6 +7337,14 @@ export interface components {
             job_id: number;
             /** Version */
             version: number | null;
+        };
+        /** PromoteRequest */
+        PromoteRequest: {
+            /**
+             * Pool
+             * @description A compute pool, or auto for the pool where it fits (this machine first). Left out, it keeps the deployed pool.
+             */
+            pool?: string | null;
         };
         /** PromotionInfo */
         PromotionInfo: {
@@ -12379,6 +12464,37 @@ export interface operations {
             };
         };
     };
+    placement_api_models__name__placement_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Placement"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     catalogue_api_catalog_get: {
         parameters: {
             query?: {
@@ -13159,7 +13275,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PromoteRequest"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

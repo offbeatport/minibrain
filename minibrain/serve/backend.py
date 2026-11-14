@@ -60,6 +60,7 @@ class CompletionRequest:
     reasoning: str | None = None
     template_extra: dict[str, Any] = field(default_factory=dict)
     prompt: str | None = None
+    pool: str | None = None
 
     @property
     def raw(self) -> bool:

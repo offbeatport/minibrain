@@ -57,6 +57,7 @@ class Route:
     preset: str = ""
     request_bodies: bool = False
     safety: dict[str, Any] | None = None
+    pool: str | None = None
 
 
 @dataclass(frozen=True)
@@ -101,6 +102,7 @@ class GatewayConfig:
     problems: dict[str, str] = field(default_factory=dict)
     guards: dict[str, dict[str, Any]] = field(default_factory=dict)
     deleted: dict[str, str] = field(default_factory=dict)
+    placements: dict[str, dict[str, int]] = field(default_factory=dict)
 
     def to_json(self) -> str:
         return json.dumps(asdict(self), sort_keys=True)
@@ -118,6 +120,7 @@ class GatewayConfig:
             problems=dict(data.get("problems", {})),
             guards=dict(data.get("guards", {})),
             deleted=dict(data.get("deleted", {})),
+            placements={base: dict(found) for base, found in data.get("placements", {}).items()},
         )
 
 
@@ -164,7 +167,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
         )
         routes.append(route)
         if model.deployed and version.number == model.current_version:
-            routes.append(replace(route, name=model.slug))
+            routes.append(replace(route, name=model.slug, pool=model.pool or LOCAL_POOL))
     if model.deployed and not any(route.name == model.slug for route in routes):
         routes.append(
             replace(
@@ -175,6 +178,7 @@ def model_routes(session: Session, model: Model, bodies: bool) -> list[Route]:
                 base_model_id=None,
                 slug=model.slug,
                 request_bodies=bodies,
+                pool=model.pool or LOCAL_POOL,
             )
         )
     return routes
@@ -212,11 +216,13 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
     deployed = select(BaseModel).where(BaseModel.deployed.is_(True), BaseModel.status == BaseModelStatus.AVAILABLE)
     default = bool(policy["request_bodies"])
     guarded = install_safety(session).as_route()
+    deployed_bases = [base for base in session.scalars(deployed) if base.id not in dropped]
     routes |= {
-        base.id: replace(base_route(base), request_bodies=default, safety=guarded)
-        for base in session.scalars(deployed)
-        if base.id not in dropped
+        base.id: replace(base_route(base), request_bodies=default, safety=guarded, pool=base.pool or LOCAL_POOL)
+        for base in deployed_bases
     }
+    wanted = {base.id: base.replicas for base in deployed_bases}
+    wanted |= {model.slug: model.replicas for model in session.scalars(select(Model).where(Model.deployed.is_(True)))}
     bases: dict[str, dict[str, Any]] = {}
     problems: dict[str, str] = {}
     guards = {str(route.safety["model"]) for route in routes.values() if route.safety}
@@ -230,6 +236,12 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         problem = problem_of(base, missing_files(settings, base)) if base is not None else None
         if problem is not None:
             problems[key] = problem
+    placements: dict[str, dict[str, int]] = {}
+    for name, count in wanted.items():
+        route = routes.get(name)
+        if route is not None and route.pool is not None:
+            pools_of = placements.setdefault(route.base_model, {})
+            pools_of[route.pool] = max(pools_of.get(route.pool, 0), count)
     models: dict[str, list[str]] = {}
     for route in routes.values():
         models.setdefault(route.owner, []).append(route.name)
@@ -253,6 +265,7 @@ def build_config(session: Session, store: ArtifactStore, settings: Settings, eng
         problems=problems,
         guards=guard_specs(session, settings),
         deleted={reserved.name: deleted_on(reserved) for reserved in session.scalars(select(ReservedName))},
+        placements=placements,
     )
     return replace(config, version=hash_of(config.to_json()))
 
@@ -275,6 +288,18 @@ def merge_replicas(managed: dict[str, str], registered: Replicas) -> Replicas:
         known = {entry["url"] for entry in merged.get(base, [])}
         merged.setdefault(base, []).extend(entry for entry in entries if entry["url"] not in known)
     return merged
+
+
+def remote_only(config: GatewayConfig) -> frozenset[str]:
+    return frozenset(key for key, found in config.placements.items() if found and LOCAL_POOL not in found)
+
+
+def local_replicas(config: GatewayConfig, registered: Replicas) -> Replicas:
+    placed = {key for key, found in config.placements.items() if LOCAL_POOL in found}
+    return {
+        key: [entry for entry in entries if key not in placed or entry.get("pool", LOCAL_POOL) == LOCAL_POOL]
+        for key, entries in registered.items()
+    }
 
 
 def hash_of(payload: str) -> str:
@@ -337,7 +362,10 @@ class LocalConfig:
                 key: BaseModelSpec.from_dict(spec) for key, spec in draft.bases.items() if key not in draft.problems
             }
             registered = registered_replicas(session, specs)
-            managed = self.engines(specs, registered, releasing_bases(session))
+            elsewhere = remote_only(draft)
+            local = {key: spec for key, spec in specs.items() if key not in elsewhere}
+            counted = local_replicas(draft, registered)
+            managed = self.engines(local, counted, releasing_bases(session) | elsewhere)
             replicas = merge_replicas(managed, registered)
             config = build_config(session, self.store, self.settings, replicas) if replicas else draft
             self.report(session, config)

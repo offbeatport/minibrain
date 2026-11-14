@@ -7,6 +7,7 @@ from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
 from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.placing import audit_deploy, place_custom
 from minibrain.api.reserved_names import reserved_info
 from minibrain.api.schemas import (
     ContractChange,
@@ -51,6 +52,8 @@ from minibrain.data.shared import (
     sources_in,
     tables_of,
 )
+from minibrain.models.hardware import NodeReport
+from minibrain.models.placement import Asked
 from minibrain.models.registry import ACTIVE_STATUSES, base_readiness, start_download
 from minibrain.policy import LockedError, PolicyError, bodies_choice
 from minibrain.presets import Preset, preset, preset_for
@@ -279,15 +282,15 @@ SAMPLE_FILE = "demo_travel_intents.jsonl"
 SAMPLE_PRESET = "general"
 
 
-def deploy_custom(session: Session, model: Model, deployed: bool) -> bool:
+def deploy_custom(session: Session, model: Model, deployed: bool, local: NodeReport, asked: Asked) -> bool:
     if not deployed:
         return undeploy_custom(session, model, current_actor()) is not None
     cancel_stop(session, model.teardown, model.name)
     if not model.deployed:
-        facts = {"name": model.name, "version": model.current_version}
-        session.add(AuditEvent(actor=current_actor(), action="model.deploy", target=model.slug, detail=facts))
         model.deployed_base = model.base_model
-    model.deployed = True
+    facts = place_custom(session, model, local, asked)
+    if facts is not None:
+        audit_deploy(session, model, facts)
     model.updated_at = now()
     return False
 

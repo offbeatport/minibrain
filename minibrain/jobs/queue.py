@@ -199,6 +199,7 @@ class SqlJobQueue:
             record.host = worker.host
             record.kinds = worker.kinds
             record.gpus = worker.gpus
+            record.pool = worker.pool
             record.seen_at = self.clock()
             session.add(record)
             session.commit()

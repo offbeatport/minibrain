@@ -224,6 +224,8 @@ class Model(Base):
     safety: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
     deployed_base: Mapped[str | None] = mapped_column(default=None)
     avatar: Mapped[dict[str, Any] | None] = mapped_column(JSON, default=None)
+    pool: Mapped[str | None] = mapped_column(default=None)
+    replicas: Mapped[int] = mapped_column(server_default="1")
 
     dataset: Mapped["Dataset | None"] = relationship(back_populates="models")
     versions: Mapped[list["Version"]] = relationship(back_populates="model", cascade="all, delete-orphan")
@@ -305,6 +307,7 @@ class Worker(Base):
     gpus: Mapped[int] = mapped_column(default=0)
     started_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     seen_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    pool: Mapped[str] = mapped_column(default="local", server_default="local")
 
 
 class Job(Base):
@@ -613,6 +616,8 @@ class BaseModel(Base):
     last_used_at: Mapped[datetime | None] = mapped_column(UtcDateTime, default=now)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime, default=now)
+    pool: Mapped[str | None] = mapped_column(default=None)
+    replicas: Mapped[int] = mapped_column(server_default="1")
 
     variant: Mapped[CatalogVariant | None] = relationship()
     teardown: Mapped["Teardown | None"] = relationship(viewonly=True)
