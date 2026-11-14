@@ -85,9 +85,18 @@ def passing_candidate(model: Model) -> int | None:
         and v.base_model == model.base_model
         and not baseline(v)
     ]
-    passing = [v for v in ready if v.live_at is not None or decision(model, v).passed]
+    passing = [v for v in ready if decision(model, v).passed or (v.live_at is not None and beats_live(model, v))]
     best = max(passing, key=lambda v: v.number, default=None)
     return best.number if best is not None else None
+
+
+def beats_live(model: Model, version: Version) -> bool:
+    live = live_version(model)
+    live_score = held_out_score(live) if live is not None else None
+    if live_score is None:
+        return True
+    score = held_out_score(version)
+    return score is not None and score > live_score
 
 
 def rows_text(count: int) -> str:
