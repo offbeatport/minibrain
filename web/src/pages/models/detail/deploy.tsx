@@ -31,6 +31,7 @@ import { DeployVersionDialog, ModelCard, deployable } from "./makeLive";
 import {
     PoolRow,
     ReplicasRow,
+    askedReplicas,
     initialPool,
     replicasText,
     resolvedPool,
@@ -82,7 +83,13 @@ export function DeployBaseDialog({
         setReplicas(null);
     };
     const deploy = useMutation({
-        mutationFn: () => setDeployed(row, true, poolValue, replicaValue),
+        mutationFn: () =>
+            setDeployed(
+                row,
+                true,
+                poolValue,
+                askedReplicas(placement.data, target, replicas, replicaValue),
+            ),
         onSuccess: async () => {
             await after();
             close(false);

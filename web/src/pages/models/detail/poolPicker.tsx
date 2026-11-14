@@ -118,13 +118,25 @@ export function replicaRoom(placement: Placement | undefined, target: string | n
     return placement?.pools.find((pool) => pool.name === target)?.room ?? 1;
 }
 
+function staying(placement: Placement | undefined, target: string | null): boolean {
+    return Boolean(placement?.pool && placement.pool === target);
+}
+
 export function startingReplicas(
     placement: Placement | undefined,
     target: string | null,
     current: number | undefined,
 ): number {
-    const kept = placement?.pool && placement.pool === target ? (current ?? 1) : 1;
-    return Math.min(kept, Math.max(replicaRoom(placement, target), 1));
+    return staying(placement, target) ? (current ?? 1) : 1;
+}
+
+export function askedReplicas(
+    placement: Placement | undefined,
+    target: string | null,
+    picked: number | null,
+    value: number,
+): number | undefined {
+    return picked ?? (staying(placement, target) ? undefined : value);
 }
 
 function replicaOptions(room: number, value: number): PickOption[] {

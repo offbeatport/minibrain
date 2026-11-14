@@ -19,7 +19,14 @@ import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
-import { PoolRow, ReplicasRow, initialPool, resolvedPool, startingReplicas } from "./poolPicker";
+import {
+    PoolRow,
+    ReplicasRow,
+    askedReplicas,
+    initialPool,
+    resolvedPool,
+    startingReplicas,
+} from "./poolPicker";
 
 export function points(delta: number): string {
     const value = Math.abs(delta * 100).toFixed(1);
@@ -166,11 +173,14 @@ export function DeployVersionDialog({
         setReplicas(null);
     };
     const promote = useMutation({
-        mutationFn: (target: number) =>
+        mutationFn: (number: number) =>
             unwrap(
                 api.POST("/api/models/{name}/versions/{number}/promote", {
-                    params: { path: { name: row.key, number: target } },
-                    body: { pool: poolValue, replicas: replicaValue },
+                    params: { path: { name: row.key, number } },
+                    body: {
+                        pool: poolValue,
+                        replicas: askedReplicas(placement.data, target, replicas, replicaValue),
+                    },
                 }),
             ),
         onSuccess: async (_, number) => {
