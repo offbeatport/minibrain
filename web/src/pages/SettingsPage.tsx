@@ -16,7 +16,6 @@ import { api, unwrap } from "~/api/client";
 import { keys, useAllModels, useCatalog, useInstallSettings, useJudgeSetting } from "~/api/queries";
 import type { components } from "~/api/schema";
 import { NumberSettingRow } from "~/components/NumberSettingRow";
-import { InstallSafety } from "~/components/SafetySettings";
 import { ErrorLine, PanelSection, PanelSections, Stat, errorMessage } from "~/components/Section";
 import { SettingsLayout } from "~/components/SettingsLayout";
 import { SourceBadge } from "~/components/SourceBadge";
@@ -317,7 +316,6 @@ export function SettingsPage() {
                 {can.admin && <ModelCatalogue />}
                 {can.admin && <ComputePrices />}
                 {can.admin && <JudgeModel />}
-                {can.admin && <InstallSafety />}
                 <PanelSection
                     icon={GraduationCap}
                     anchor={GENERAL.recipe.anchor}

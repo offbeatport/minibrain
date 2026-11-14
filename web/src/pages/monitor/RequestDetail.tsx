@@ -104,8 +104,8 @@ function NotKept({ detail }: { detail: RequestDetail }) {
     if (!can.build) {
         return (
             <Note>
-                Not kept for this model. A Builder can turn on Keep request inputs and answers on
-                its model page.
+                Not kept for this model. A Builder can turn on Keep request inputs and answers in
+                its Settings.
             </Note>
         );
     }
@@ -118,7 +118,7 @@ function NotKept({ detail }: { detail: RequestDetail }) {
             >
                 Keep request inputs and answers
             </Link>
-            {" on its model page to keep them with each request log."}
+            {" in its Settings to keep them with each request log."}
         </Note>
     );
 }

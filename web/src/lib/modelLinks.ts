@@ -41,7 +41,7 @@ export const API_REFERENCE_PATH = "/developers";
 export const MANAGEMENT_REFERENCE_PATH = "/developers/management";
 
 export function deploymentPageHref(slug: string): string {
-    return modelPageHref(slug, "api");
+    return modelPageHref(slug, "settings");
 }
 
 export function modelCardHref(slug: string, number: number): string {

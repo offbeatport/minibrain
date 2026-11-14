@@ -1063,7 +1063,9 @@ Switch base (per model, shipped) is the one-model form, and the way off a serve-
   override, a per-request `safety` field that can add but not remove); a block is an OpenAI refusal with
   `finish_reason: content_filter` and the categories, kept in the request log and audited as `safety.block`. The
   catalogue carries Llama Guard 3, ShieldGemma, Qwen3Guard and gpt-oss-safeguard. Built 2026-11-06;
-  `docs/serving.md`, Safety model.
+  `docs/serving.md`, Safety model. Hidden from the UI for v1 (2026-11-14): running a guard means deploying and
+  keeping a second model, too much to manage at first; the API and settings stay and the UI returns as an advanced
+  option.
 - Upstream routes: the gateway forwards a model name to the teacher (local by default, an API only by opt-in) and
   logs the calls. Apps switch to the model by changing the model name.
 - Private frontier endpoint: the teacher model exposed by name through the gateway, with scoped keys, audit and

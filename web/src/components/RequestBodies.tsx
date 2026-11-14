@@ -86,16 +86,15 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
     return (
         <PanelSection
             icon={Logs}
-            title="Request logs"
+            anchor="request-content"
+            title="Request content"
             tip={
                 <>
-                    {
-                        "Every call's time, version, key, status, latency, tokens and response ID are logged, never its content. See them under "
-                    }
+                    {"Every call is logged without its content; see them in "}
                     <Link href={requests} className="text-primary hover:underline">
-                        Monitor, Requests
+                        Monitoring, Requests
                     </Link>
-                    .
+                    {". This decides whether the content is kept too."}
                 </>
             }
         >
@@ -105,7 +104,7 @@ export function RequestBodies({ detail }: { detail: ModelDetail }) {
                     toggle={reason === undefined}
                     disabled={reason !== undefined}
                     label="Keep request inputs and answers"
-                    description="Stores each request's last user message and the model's answer with its log, so apps can send feedback with the response ID alone, distillation can learn from real traffic, and Builders can read them on the Requests tab. They are deleted with the request logs."
+                    description="Stores each request's last user message and the model's answer with its log, so you can read real conversations, apps can send feedback with the response ID alone, and training can learn from real traffic. Deleted with the request logs."
                     error={errorMessage(change.error)}
                     control={
                         <>

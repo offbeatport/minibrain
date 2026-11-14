@@ -302,7 +302,7 @@ function Loaded({ row }: { row: ModelRow }) {
                     <EvaluationTab row={row} detail={modelDetail} versions={list} />
                 )}
                 {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
-                {tab === "api" && <KeysTab row={row} detail={modelDetail} />}
+                {tab === "api" && <KeysTab row={row} />}
                 {tab === "settings" && <SettingsTab row={row} detail={modelDetail} />}
             </div>
             <Files row={row} open={tab === "files"} base={base.data} versions={list} />

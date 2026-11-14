@@ -6,6 +6,7 @@ import { useState } from "react";
 import { type ModelDetail, type ModelRow, api, unwrap } from "~/api/client";
 import { useAllModels } from "~/api/queries";
 import { FormRow, FormRows } from "~/components/FormRows";
+import { RequestBodies } from "~/components/RequestBodies";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { ModelAvatar as AvatarImage } from "~/components/avatar/ModelAvatar";
@@ -261,6 +262,7 @@ export function SettingsTab({ row, detail }: { row: ModelRow; detail: ModelDetai
         <PanelSections>
             {(custom || can.admin) && <General key={row.updated_at} row={row} />}
             {isDeployed(row) && <Deployment row={row} />}
+            {detail && <RequestBodies detail={detail} />}
             <Danger row={row} detail={detail} />
         </PanelSections>
     );

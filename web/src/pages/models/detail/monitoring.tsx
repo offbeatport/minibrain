@@ -14,12 +14,17 @@ import {
 import type { ReactNode } from "react";
 import { type ModelRow, type VersionInfo, api, unwrap } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
-import { useModelPage } from "~/api/queries";
+import { useModel, useModelPage } from "~/api/queries";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
 import { StatusText } from "~/components/models/StatusText";
 import { count } from "~/lib/format";
-import { modelVersionHref, requestLogHref } from "~/lib/modelLinks";
+import {
+    REQUEST_BODIES_ID,
+    deploymentPageHref,
+    modelVersionHref,
+    requestLogHref,
+} from "~/lib/modelLinks";
 import { STATUS_TONES, clockTime, modelLabel } from "~/lib/requests";
 import {
     PERIOD,
@@ -390,11 +395,26 @@ function useLatestRequests(slug: string) {
 function RequestLogSection({ row }: { row: ModelRow }) {
     const latest = useLatestRequests(row.key);
     const items = latest.data?.items ?? [];
+    const detail = useModel(row.kind === "custom" ? row.key : "");
+    const kept = detail.data?.request_bodies.kept ?? true;
     return (
         <PanelSection
             icon={Logs}
             title="Request log"
             tip="Prompts and answers stay on this install."
+            description={
+                kept ? undefined : (
+                    <>
+                        {"Inputs and answers are not kept · "}
+                        <Link
+                            href={`${deploymentPageHref(row.key)}#${REQUEST_BODIES_ID}`}
+                            className="text-primary hover:underline"
+                        >
+                            Change in Settings
+                        </Link>
+                    </>
+                )
+            }
             actions={
                 <Link
                     href={requestLogHref({ model: row.key })}

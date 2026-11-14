@@ -360,9 +360,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Reasoning** · shipped · engineer
   Turn reasoning off or set its effort, returned apart.
   API: POST /v1/chat/completions
-- **Safety model** · shipped · engineer, admin
+- **Safety model** · partial · engineer, admin
   Block unsafe requests and answers with a guard model, audited.
-  UI: Settings › General › Safety model, Models › model › API, Monitoring › Requests · API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{name}/safety, POST /v1/chat/completions, POST /v1/completions
+  API: GET /api/settings/safety, PUT /api/settings/safety, PUT /api/models/{name}/safety, POST /v1/chat/completions, POST /v1/completions · Roadmap: API and access
 - **Structured output** · partial · engineer
   Hold answers to the model's contract or a requested JSON schema.
   API: POST /v1/chat/completions · Roadmap: API and access
@@ -508,7 +508,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Settings › Security › Models · Policy: model_sources, licence_mode, licences, safetensors_only
 - **Request inputs and answers** · shipped · admin, engineer
   Keep or drop prompts and answers per model, lockable install-wide.
-  UI: Models › model › API, Settings › Security › Request logs and API keys · API: PUT /api/models/{name}/request-bodies · Policy: request_bodies, request_bodies_locked
+  UI: Models › model › Settings › Request content, Settings › Security › Request logs and API keys · API: PUT /api/models/{name}/request-bodies · Policy: request_bodies, request_bodies_locked
 - **Audit log** · shipped · admin
   Search, filter, inspect and export every audited change, linked to its target.
   UI: Settings › Audit log · API: GET /api/audit, GET /api/audit/facets, GET /api/audit/{event_id}, GET /api/audit/export · Policy: audit_retention_days
