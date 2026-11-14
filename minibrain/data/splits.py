@@ -42,8 +42,9 @@ def clean(rows: Sequence[Row]) -> list[Example]:
     seen: set[str] = set()
     for messages, text, expected in rows:
         example = example_of(messages, text, expected)
-        if example is not None and example.input not in seen:
-            seen.add(example.input)
+        key = example.input.strip() if example is not None else ""
+        if example is not None and key not in seen:
+            seen.add(key)
             examples.append(example)
     return examples
 

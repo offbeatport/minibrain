@@ -63,6 +63,13 @@ def test_balance_uses_the_configured_limits() -> None:
     assert loose.status == "ok"
 
 
+def test_training_keeps_the_first_of_inputs_that_differ_only_in_surrounding_spaces() -> None:
+    rows = [*labelled(120), ("\nmessage number 3", "label 3"), ("message number 4  ", "label 0")]
+    found = by_check(run_checks(rows, None, CheckLimits()))["duplicates"]
+    assert found.count == 2
+    assert len(clean(examples_of(rows))) == 120
+
+
 def test_balance_names_the_majority_label_as_written() -> None:
     rows = [(f"spam {index}", "Spam") for index in range(95)] + [(f"ham {index}", "Ham") for index in range(5)]
     detail = by_check(run_checks(rows, None, CheckLimits()))["balance"].detail
