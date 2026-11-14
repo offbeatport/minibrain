@@ -284,20 +284,24 @@ function Loaded({ row }: { row: ModelRow }) {
                 }))}
             />
             <Notices row={row} />
-            <div>
-                {(tab === "overview" || tab === "files") && (
-                    <Overview row={row} detail={modelDetail} base={base.data} versions={list} />
-                )}
-                {tab === "versions" && (
-                    <VersionsTab row={row} detail={modelDetail} versions={list} />
-                )}
-                {tab === "evaluation" && (
-                    <EvaluationTab row={row} detail={modelDetail} versions={list} />
-                )}
-                {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
-                {tab === "api" && <KeysTab row={row} />}
-                {tab === "settings" && <SettingsTab row={row} detail={modelDetail} />}
-            </div>
+            {custom && versions.error && !versions.data ? (
+                <QueryError error={versions.error} retry={versions.refetch} />
+            ) : (
+                <div>
+                    {(tab === "overview" || tab === "files") && (
+                        <Overview row={row} detail={modelDetail} base={base.data} versions={list} />
+                    )}
+                    {tab === "versions" && (
+                        <VersionsTab row={row} detail={modelDetail} versions={list} />
+                    )}
+                    {tab === "evaluation" && (
+                        <EvaluationTab row={row} detail={modelDetail} versions={list} />
+                    )}
+                    {tab === "monitoring" && <MonitoringTab row={row} versions={list} />}
+                    {tab === "api" && <KeysTab row={row} />}
+                    {tab === "settings" && <SettingsTab row={row} detail={modelDetail} />}
+                </div>
+            )}
             <Files row={row} open={tab === "files"} base={base.data} versions={list} />
         </Page>
     );
