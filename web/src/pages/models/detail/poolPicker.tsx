@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { Placement, PoolPlacement } from "~/api/client";
 import { FormRow } from "~/components/FormRows";
 import { type PickOption, PickSelect } from "~/components/PickSelect";
@@ -104,6 +105,80 @@ export function PoolRow({
                         </>
                     )}
                 </span>
+            )}
+        </FormRow>
+    );
+}
+
+export function replicasText(count: number): string {
+    return `${count} ${count === 1 ? "replica" : "replicas"}`;
+}
+
+export function replicaRoom(placement: Placement | undefined, target: string | null): number {
+    return placement?.pools.find((pool) => pool.name === target)?.room ?? 1;
+}
+
+export function startingReplicas(
+    placement: Placement | undefined,
+    target: string | null,
+    current: number | undefined,
+): number {
+    const kept = placement?.pool && placement.pool === target ? (current ?? 1) : 1;
+    return Math.min(kept, Math.max(replicaRoom(placement, target), 1));
+}
+
+function replicaOptions(room: number, value: number): PickOption[] {
+    return Array.from({ length: Math.max(room, value) }, (_, index) => ({
+        value: String(index + 1),
+        label: replicasText(index + 1),
+        disabled: index + 1 > room,
+    }));
+}
+
+export function ReplicasRow({
+    placement,
+    target,
+    value,
+    onChange,
+    disabled = false,
+    note,
+    selectClassName,
+    children,
+}: {
+    placement: Placement | undefined;
+    target: string | null;
+    value: number;
+    onChange: (value: number) => void;
+    disabled?: boolean;
+    note?: ReactNode;
+    selectClassName?: string;
+    children?: ReactNode;
+}) {
+    const room = replicaRoom(placement, target);
+    return (
+        <FormRow id="deploy-replicas" label="Replicas" align="start">
+            <div className={selectClassName ?? "w-full"}>
+                <PickSelect
+                    id="deploy-replicas"
+                    compact
+                    value={placement && target ? String(value) : null}
+                    placeholder="Pick a pool first"
+                    disabled={disabled || !placement || !target || room <= 1}
+                    options={replicaOptions(room, value)}
+                    onChange={(next) => onChange(Number(next))}
+                />
+            </div>
+            {children}
+            {note ? (
+                <span className="text-sm text-muted-foreground">{note}</span>
+            ) : (
+                target && (
+                    <span className="text-sm text-muted-foreground">
+                        {"One per machine where it fits: "}
+                        <PoolLink name={target} />
+                        {` has room for ${room}`}
+                    </span>
+                )
             )}
         </FormRow>
     );

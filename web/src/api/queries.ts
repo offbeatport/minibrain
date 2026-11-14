@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import {
     type BaseModelDetail,
     type JobInfo,
@@ -352,6 +352,17 @@ export function usePlacement(name: string, enabled: boolean) {
         queryFn: () => unwrap(api.GET("/api/models/{name}/placement", modelPath(name))),
         enabled,
         refetchInterval: enabled ? 10000 : false,
+    });
+}
+
+export function usePlacements(names: string[], enabled: boolean) {
+    return useQueries({
+        queries: names.map((name) => ({
+            queryKey: keys.placement(name),
+            queryFn: () => unwrap(api.GET("/api/models/{name}/placement", modelPath(name))),
+            enabled,
+            refetchInterval: enabled ? 10000 : (false as const),
+        })),
     });
 }
 

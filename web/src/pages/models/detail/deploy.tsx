@@ -28,7 +28,14 @@ import { useModelsRefresh } from "../dialogs";
 import { ConnectDialog } from "./connect";
 import { DeploymentStatus, Tip, deployBlock, isDeployed, trainBlock } from "./header";
 import { DeployVersionDialog, ModelCard, deployable } from "./makeLive";
-import { PoolRow, initialPool, resolvedPool } from "./poolPicker";
+import {
+    PoolRow,
+    ReplicasRow,
+    initialPool,
+    replicasText,
+    resolvedPool,
+    startingReplicas,
+} from "./poolPicker";
 
 function startingVersion(row: ModelRow, versions: VersionInfo[]): number | null {
     const ready = deployable(versions);
@@ -41,7 +48,7 @@ function startingVersion(row: ModelRow, versions: VersionInfo[]): number | null 
     return (best ?? ready[0])?.number ?? null;
 }
 
-function DeployBaseDialog({
+export function DeployBaseDialog({
     row,
     open,
     onOpenChange,
@@ -55,18 +62,27 @@ function DeployBaseDialog({
     const toast = useToast();
     const placement = usePlacement(row.key, open);
     const [pool, setPool] = useState<string | null>(null);
+    const [replicas, setReplicas] = useState<number | null>(null);
     const poolValue = pool ?? initialPool(placement.data);
     const target = resolvedPool(placement.data, poolValue);
+    const replicaValue =
+        replicas ?? startingReplicas(placement.data, target, row.deployment.replicas);
     const deployed = isDeployed(row);
     const moving = Boolean(deployed && target && target !== placement.data?.pool);
+    const rescaling = deployed && !moving && replicaValue !== (row.deployment.replicas ?? 1);
     const close = (next: boolean) => {
         if (!next) {
             setPool(null);
+            setReplicas(null);
         }
         onOpenChange(next);
     };
+    const choosePool = (next: string) => {
+        setPool(next);
+        setReplicas(null);
+    };
     const deploy = useMutation({
-        mutationFn: () => setDeployed(row, true, poolValue),
+        mutationFn: () => setDeployed(row, true, poolValue, replicaValue),
         onSuccess: async () => {
             await after();
             close(false);
@@ -96,7 +112,13 @@ function DeployBaseDialog({
                     </p>
                 )}
                 <FormRows labels="narrow">
-                    <PoolRow placement={placement.data} value={poolValue} onChange={setPool} />
+                    <PoolRow placement={placement.data} value={poolValue} onChange={choosePool} />
+                    <ReplicasRow
+                        placement={placement.data}
+                        target={target}
+                        value={replicaValue}
+                        onChange={setReplicas}
+                    />
                 </FormRows>
                 <ErrorLine error={deploy.error ?? placement.error} />
                 <DialogFooter>
@@ -114,14 +136,18 @@ function DeployBaseDialog({
                             Cancel
                         </Button>
                     )}
-                    {deployed && !moving ? (
+                    {deployed && !moving && !rescaling ? (
                         <Button onClick={() => close(false)}>Done</Button>
                     ) : (
                         <Button
                             disabled={!target || deploy.isPending}
                             onClick={() => deploy.mutate()}
                         >
-                            {moving ? `Move to ${target}` : `Deploy ${row.name}`}
+                            {moving
+                                ? `Move to ${target}`
+                                : rescaling
+                                  ? `Run ${replicasText(replicaValue)}`
+                                  : `Deploy ${row.name}`}
                         </Button>
                     )}
                 </DialogFooter>

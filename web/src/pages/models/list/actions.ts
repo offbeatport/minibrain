@@ -22,9 +22,13 @@ export function retryDownload(row: ModelRow) {
     return unwrap(api.POST("/api/models/{name}/retry", { params: { path: { name: row.key } } }));
 }
 
-export async function deployRows(rows: ModelRow[], deployed: boolean): Promise<void> {
+export async function deployRows(
+    rows: ModelRow[],
+    deployed: boolean,
+    pool?: string,
+): Promise<void> {
     for (const row of rows) {
-        await setDeployed(row, deployed);
+        await setDeployed(row, deployed, pool);
     }
 }
 

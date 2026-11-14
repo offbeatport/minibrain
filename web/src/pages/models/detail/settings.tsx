@@ -4,7 +4,7 @@ import { Layers, Power, Settings2, TriangleAlert } from "lucide-react";
 import { Button, Input, Textarea, useToast } from "obp-ui";
 import { useState } from "react";
 import { type ModelDetail, type ModelRow, api, unwrap } from "~/api/client";
-import { useAllModels } from "~/api/queries";
+import { useAllModels, usePlacement } from "~/api/queries";
 import { FormRow, FormRows } from "~/components/FormRows";
 import { RequestBodies } from "~/components/RequestBodies";
 import { ErrorLine, PanelSection, PanelSections } from "~/components/Section";
@@ -12,7 +12,7 @@ import { TAGS_HINT, editableTags } from "~/components/Tags";
 import { ModelAvatar as AvatarImage } from "~/components/avatar/ModelAvatar";
 import { useCan } from "~/lib/access";
 import { modelsHref } from "~/lib/modelsSearch";
-import { beingDeleted, busyTearingDown, deleteModel, rowId } from "~/lib/teardown";
+import { beingDeleted, busyTearingDown, deleteModel, rowId, setDeployed } from "~/lib/teardown";
 import { ChangeAvatarDialog } from "../ChangeAvatarDialog";
 import { DeleteModelsDialog } from "../DeleteModelsDialog";
 import { DuplicateModelDialog } from "../DuplicateModelDialog";
@@ -20,6 +20,7 @@ import { SwitchBaseDialog } from "../SwitchBaseDialog";
 import { ConfirmAction, type Confirmation, splitTags, useModelsRefresh } from "../dialogs";
 import type { Entry } from "../entries";
 import { DeploymentStatus, Tip, baseNameOf, deployConfirmation, isDeployed } from "./header";
+import { ReplicasRow, replicasText } from "./poolPicker";
 
 export function useReload(row: ModelRow) {
     const refresh = useModelsRefresh();
@@ -131,6 +132,50 @@ function General({ row }: { row: ModelRow }) {
     );
 }
 
+function ReplicasSetting({ row, busy }: { row: ModelRow; busy: string | null }) {
+    const reload = useReload(row);
+    const toast = useToast();
+    const placement = usePlacement(row.key, true);
+    const target = placement.data?.pool ?? null;
+    const current = row.deployment.replicas ?? 1;
+    const [picked, setPicked] = useState<number | null>(null);
+    const chosen = picked ?? current;
+    const moving = row.deployment.moving_to
+        ? `It is moving to ${row.deployment.moving_to}: change replicas once that ends.`
+        : null;
+    const blocked = busy ?? moving;
+    const save = useMutation({
+        mutationFn: () => setDeployed(row, true, undefined, chosen),
+        onSuccess: async () => {
+            await reload();
+            setPicked(null);
+            toast({ title: `${row.name} keeps ${replicasText(chosen)}`, tone: "success" });
+        },
+    });
+    return (
+        <ReplicasRow
+            placement={placement.data}
+            target={target}
+            value={chosen}
+            onChange={setPicked}
+            disabled={Boolean(blocked) || save.isPending}
+            note={blocked}
+            selectClassName="w-48"
+        >
+            <Tip tip={blocked}>
+                <Button
+                    variant="outline"
+                    disabled={Boolean(blocked) || chosen === current || save.isPending}
+                    onClick={() => save.mutate()}
+                >
+                    Save
+                </Button>
+            </Tip>
+            <ErrorLine error={save.error ?? placement.error} />
+        </ReplicasRow>
+    );
+}
+
 function Deployment({ row }: { row: ModelRow }) {
     const reload = useReload(row);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -138,7 +183,8 @@ function Deployment({ row }: { row: ModelRow }) {
     return (
         <PanelSection icon={Power} anchor="deployment" title="Deployment">
             <FormRows>
-                <FormRow label="Undeploy" detail={<DeploymentStatus row={row} />}>
+                <ReplicasSetting row={row} busy={busy} />
+                <FormRow label="Undeploy" detail={<DeploymentStatus row={row} brief />}>
                     <Tip tip={busy}>
                         <Button
                             variant="outline"

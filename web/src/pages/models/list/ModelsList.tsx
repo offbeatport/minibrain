@@ -29,6 +29,7 @@ import {
 } from "../dialogs";
 import type { Entry } from "../entries";
 import { useHealthActions } from "../healthActions";
+import { DeployRowsDialog } from "./DeployRowsDialog";
 import { QuickLook } from "./QuickLook";
 import { FilterChips, ViewOptions } from "./ViewOptions";
 import { deleteEntries, deployRows, promoteVersion, retryDownload } from "./actions";
@@ -225,6 +226,7 @@ export function ModelsList() {
     } | null>(null);
     const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
     const [deleting, setDeleting] = useState<Entry[] | null>(null);
+    const [deploying, setDeploying] = useState<ModelRow[] | null>(null);
     const [editing, setEditing] = useState<ModelRow | null>(null);
     const [duplicating, setDuplicating] = useState<ModelRow | null>(null);
     const [switching, setSwitching] = useState<{ row: ModelRow; preferred: string | null } | null>(
@@ -304,20 +306,7 @@ export function ModelsList() {
         duplicate: setDuplicating,
         switchBase: (row, preferred) => setSwitching({ row, preferred }),
         createFrom: (row) => router.history.push(`/models/new?base=${encodeURIComponent(row.key)}`),
-        deploy: (chosen) =>
-            confirm({
-                title:
-                    chosen.length === 1
-                        ? `Deploy ${chosen[0].name}?`
-                        : `Deploy ${plural(chosen.length, "variant")}?`,
-                description: (
-                    <p>
-                        {`${chosen.map((row) => row.key).join(", ")} ${chosen.length === 1 ? "becomes" : "become"} callable on the OpenAI-compatible API with ${chosen.length === 1 ? "its" : "their"} own keys.`}
-                    </p>
-                ),
-                confirmLabel: "Deploy",
-                run: () => deployRows(chosen, true),
-            }),
+        deploy: setDeploying,
         undeploy: (chosen) =>
             confirm({
                 title:
@@ -640,6 +629,11 @@ export function ModelsList() {
                     await deleteEntries(deleting ?? [], rows, cascade, cancelJobs);
                     await done();
                 }}
+            />
+            <DeployRowsDialog
+                rows={deploying}
+                onOpenChange={(open) => !open && setDeploying(null)}
+                after={done}
             />
             <EditModelDialog row={editing} onOpenChange={(open) => !open && setEditing(null)} />
             <DuplicateModelDialog

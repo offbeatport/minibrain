@@ -188,20 +188,28 @@ function plural(value: number, noun: string): string {
     return `${count(value)} ${noun}${value === 1 ? "" : "s"}`;
 }
 
+function replicaCount(running: number, wanted: number | undefined): string {
+    const target = wanted ?? running;
+    const noun = target === 1 ? "replica" : "replicas";
+    return running === target ? `${running} ${noun}` : `${running} of ${target} ${noun}`;
+}
+
 function Deployment({
     replicas,
     href,
     pool,
+    wanted,
 }: {
     replicas: Place[];
     href: string;
     pool: string | null | undefined;
+    wanted?: number;
 }) {
     const here = pool ? replicas.filter((replica) => replica.pool === pool) : replicas;
     return (
         <span className="flex min-w-0 items-baseline gap-1">
             <Clipped
-                text={`${here.length} ${here.length === 1 ? "replica" : "replicas"}`}
+                text={replicaCount(here.length, pool ? wanted : undefined)}
                 href={href}
                 className="shrink-0"
             />
@@ -305,6 +313,7 @@ export function About({
                         replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
                         pool={row.deployment.pool}
+                        wanted={row.deployment.replicas}
                     />
                 ) : (
                     <Muted>Not deployed</Muted>
@@ -543,6 +552,7 @@ export function BaseAbout({ row, base }: { row: ModelRow; base: BaseModelDetail 
                         replicas={traffic.data?.replicas ?? []}
                         href={modelPageHref(row.key, "monitoring")}
                         pool={row.deployment.pool}
+                        wanted={row.deployment.replicas}
                     />
                 ) : (
                     <Muted>Not deployed</Muted>

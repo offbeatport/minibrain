@@ -26,8 +26,8 @@ export function isLiveRow(row: ModelRow): boolean {
     return row.deployment.state !== "not_deployed";
 }
 
-export function setDeployed(row: ModelRow, deployed: boolean, pool?: string) {
-    const body = { deployed, pool };
+export function setDeployed(row: ModelRow, deployed: boolean, pool?: string, replicas?: number) {
+    const body = { deployed, pool, replicas };
     return unwrap(
         api.POST("/api/models/{name}/deploy", { params: { path: { name: row.key } }, body }),
     );

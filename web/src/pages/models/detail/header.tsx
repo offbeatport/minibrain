@@ -154,7 +154,7 @@ const STATUS_ICONS: Record<Tone, { icon: LucideIcon; className: string }> = {
     neutral: { icon: CircleDashed, className: "text-muted-foreground" },
 };
 
-export function DeploymentStatus({ row }: { row: ModelRow }) {
+export function DeploymentStatus({ row, brief = false }: { row: ModelRow; brief?: boolean }) {
     const shown = deploymentShown(row);
     const { icon: Icon, className } = STATUS_ICONS[shown.tone];
     const text = (
@@ -176,6 +176,15 @@ export function DeploymentStatus({ row }: { row: ModelRow }) {
                         {shown.joiner}
                         <PoolLink name={shown.pool} />
                     </>
+                )}
+                {!brief && shown.pool && row.deployment.moving_to && (
+                    <>
+                        {" · moving to "}
+                        <PoolLink name={row.deployment.moving_to} />
+                    </>
+                )}
+                {!brief && shown.pool && (row.deployment.replicas ?? 1) > 1 && (
+                    <span className="tabular-nums">{` · ${row.deployment.replicas} replicas`}</span>
                 )}
             </span>
         </span>

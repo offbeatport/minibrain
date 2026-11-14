@@ -19,7 +19,7 @@ import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
 import { ModelAvatar, isDeployed } from "./header";
-import { PoolRow, initialPool, resolvedPool } from "./poolPicker";
+import { PoolRow, ReplicasRow, initialPool, resolvedPool, startingReplicas } from "./poolPicker";
 
 export function points(delta: number): string {
     const value = Math.abs(delta * 100).toFixed(1);
@@ -138,29 +138,39 @@ export function DeployVersionDialog({
     const placement = usePlacement(row.key, open);
     const [picked, setPicked] = useState<number | null>(null);
     const [pool, setPool] = useState<string | null>(null);
+    const [replicas, setReplicas] = useState<number | null>(null);
     const chosen = picked ?? number;
     const poolValue = pool ?? initialPool(placement.data);
     const target = resolvedPool(placement.data, poolValue);
+    const replicaValue =
+        replicas ?? startingReplicas(placement.data, target, row.deployment.replicas);
     const version = versions.find((item) => item.number === chosen);
     const deployed = isDeployed(row);
     const live = deployed ? liveOf(versions) : undefined;
     const moving = Boolean(
         deployed && target && placement.data?.pool && target !== placement.data.pool,
     );
-    const already = Boolean(version && live && live.number === version.number) && !moving;
+    const rescaling = deployed && !moving && replicaValue !== (row.deployment.replicas ?? 1);
+    const already =
+        Boolean(version && live && live.number === version.number) && !moving && !rescaling;
     const close = (next: boolean) => {
         if (!next) {
             setPicked(null);
             setPool(null);
+            setReplicas(null);
         }
         onOpenChange(next);
+    };
+    const choosePool = (next: string) => {
+        setPool(next);
+        setReplicas(null);
     };
     const promote = useMutation({
         mutationFn: (target: number) =>
             unwrap(
                 api.POST("/api/models/{name}/versions/{number}/promote", {
                     params: { path: { name: row.key, number: target } },
-                    body: { pool: poolValue },
+                    body: { pool: poolValue, replicas: replicaValue },
                 }),
             ),
         onSuccess: async (_, number) => {
@@ -212,7 +222,13 @@ export function DeployVersionDialog({
                             />
                         </FormRow>
                     )}
-                    <PoolRow placement={placement.data} value={poolValue} onChange={setPool} />
+                    <PoolRow placement={placement.data} value={poolValue} onChange={choosePool} />
+                    <ReplicasRow
+                        placement={placement.data}
+                        target={target}
+                        value={replicaValue}
+                        onChange={setReplicas}
+                    />
                 </FormRows>
                 {already && version && (
                     <p className="rounded-md border bg-muted px-3 py-2">
