@@ -1,6 +1,6 @@
 import { useParams, useRouter, useRouterState } from "@tanstack/react-router";
 import { GraduationCap, ScrollText } from "lucide-react";
-import { ConfirmDialog, Textarea } from "obp-ui";
+import { ConfirmDialog, Textarea, cn } from "obp-ui";
 import { type KeyboardEvent, useState } from "react";
 import type { ModelDetail, ModelRow, VersionInfo } from "~/api/client";
 import { useAllModels, useModel, useVersions } from "~/api/queries";
@@ -27,6 +27,57 @@ import { TrainingCard } from "./training";
 import { type TrainRun, type TrainStart, useTrainRun } from "./useTrainRun";
 
 const INSTRUCTIONS_ANCHOR = "instructions";
+
+const MAX_INSTRUCTIONS = 8000;
+
+const COUNTER_FROM = 0.9;
+
+type Field = "data" | "compute" | "rank" | "seqLen" | "instructions";
+
+type FieldProblems = Partial<Record<Field, string>>;
+
+const FIELD_ORDER: Field[] = ["data", "compute", "rank", "seqLen", "instructions"];
+
+const FIELD_IDS: Record<Field, string> = {
+    data: "train-data",
+    compute: "train-compute",
+    rank: "train-rank",
+    seqLen: "train-seq",
+    instructions: "train-instructions",
+};
+
+const PARAMETER_FIELDS: Field[] = ["rank", "seqLen"];
+
+function FieldError({ text }: { text: string | undefined }) {
+    return text ? <p className="text-sm text-destructive">{text}</p> : null;
+}
+
+function fieldProblems(run: TrainRun, text: string): FieldProblems {
+    const found: FieldProblems = {};
+    if (run.training) {
+        if (!run.chosen) {
+            found.data = "Add training data first: training needs examples.";
+        }
+        const own = run.issues.filter((issue) => issue.field !== "compute");
+        for (const issue of own.length > 0 ? own : run.issues) {
+            if (issue.field === "compute" || issue.field === "rank" || issue.field === "seqLen") {
+                found[issue.field] ??= issue.text;
+            }
+        }
+    }
+    if (text.length > MAX_INSTRUCTIONS) {
+        found.instructions = `Shorten the instructions to ${count(MAX_INSTRUCTIONS)} characters; they have ${count(text.length)}.`;
+    }
+    return found;
+}
+
+function focusField(field: Field) {
+    window.requestAnimationFrame(() => {
+        const element = document.getElementById(FIELD_IDS[field]);
+        element?.scrollIntoView({ block: "center" });
+        element?.focus({ preventScroll: true });
+    });
+}
 
 function submitsOnEnter(target: HTMLElement): boolean {
     if (target.getAttribute("role") === "radio") {
@@ -85,7 +136,7 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
     if (!chosen) {
         return (
             <FormRow label="Data">
-                <p className="text-destructive">
+                <p id={FIELD_IDS.data} tabIndex={-1} className="text-destructive outline-none">
                     Add training data first: training needs examples.
                 </p>
             </FormRow>
@@ -115,13 +166,31 @@ function DataRow({ row, detail, run }: { row: ModelRow; detail: ModelDetail; run
     );
 }
 
+function InstructionsCount({ length }: { length: number }) {
+    if (length < MAX_INSTRUCTIONS * COUNTER_FROM) {
+        return null;
+    }
+    return (
+        <span
+            className={cn(
+                "ml-auto text-sm tabular-nums",
+                length >= MAX_INSTRUCTIONS ? "text-destructive" : "text-muted-foreground",
+            )}
+        >
+            {`${count(length)} / ${count(MAX_INSTRUCTIONS)}`}
+        </span>
+    );
+}
+
 function InstructionsRow({
     detail,
     text,
+    error,
     onText,
 }: {
     detail: ModelDetail;
     text: string;
+    error: string | undefined;
     onText: (text: string) => void;
 }) {
     const changed = text.trim() !== detail.instructions.trim();
@@ -136,41 +205,55 @@ function InstructionsRow({
                 <div id={INSTRUCTIONS_ANCHOR} className="flex scroll-my-24 flex-col gap-1.5">
                     <Textarea
                         id="train-instructions"
-                        className="max-h-[calc(12lh+0.875rem)] min-h-[calc(4lh+0.875rem)]"
+                        className="max-h-[calc(10lh+0.875rem)] min-h-[calc(4lh+0.875rem)] overflow-y-auto"
                         value={text}
+                        maxLength={MAX_INSTRUCTIONS}
+                        aria-invalid={error ? true : undefined}
                         placeholder={detail.default_instructions}
                         onChange={(event) => onText(event.target.value)}
                     />
-                    {changed && (
-                        <button
-                            type="button"
-                            className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                            onClick={() => onText(detail.instructions)}
-                        >
-                            Reset to current
-                        </button>
+                    {(changed || text.length >= MAX_INSTRUCTIONS * COUNTER_FROM) && (
+                        <div className="flex items-center gap-3">
+                            {changed && (
+                                <button
+                                    type="button"
+                                    className="w-fit rounded-sm text-sm text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                    onClick={() => onText(detail.instructions)}
+                                >
+                                    Reset to current
+                                </button>
+                            )}
+                            <InstructionsCount length={text.length} />
+                        </div>
                     )}
+                    <FieldError text={error} />
                 </div>
             </FormControl>
         </FormRow>
     );
 }
 
-function ComputeRow({ run }: { run: TrainRun }) {
+function automaticMeta(run: TrainRun): string {
+    if (run.pools.length === 0) {
+        return "the worker that takes it plans it";
+    }
+    return run.pools.some((item) => item.best) ? "any pool that fits" : "too large for every pool";
+}
+
+function ComputeRow({ run, error }: { run: TrainRun; error: string | undefined }) {
     return (
         <FormRow id="train-compute" label="Pool">
             <FormControl>
                 <PickSelect
                     id="train-compute"
                     value={run.compute}
+                    invalid={Boolean(error)}
                     onChange={run.setCompute}
                     options={[
                         {
                             value: AUTO,
                             label: "Automatic",
-                            meta: run.pools.some((item) => item.best)
-                                ? "any pool that fits"
-                                : "too large for every pool",
+                            meta: automaticMeta(run),
                         },
                         ...run.pools.map((item, index) => ({
                             value: item.name,
@@ -183,6 +266,7 @@ function ComputeRow({ run }: { run: TrainRun }) {
                         })),
                     ]}
                 />
+                <FieldError text={error} />
             </FormControl>
         </FormRow>
     );
@@ -264,15 +348,44 @@ function TrainForm({
         instructions: changed ? text : null,
         onDone: back,
     });
+    const [attempted, setAttempted] = useState(false);
+    const problems = fieldProblems(run, text);
+    const marked = FIELD_ORDER.filter((field) => problems[field]);
+    const shownFor = (field: Field) => (attempted ? problems[field] : undefined);
+    const attempt = () => {
+        if (run.create.isPending) {
+            return;
+        }
+        const first = marked[0];
+        if (blocked || first) {
+            setAttempted(true);
+        }
+        if (first) {
+            if (PARAMETER_FIELDS.includes(first)) {
+                run.setOpen(true);
+            }
+            focusField(first);
+            return;
+        }
+        run.submit();
+    };
     const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
             return;
         }
         if (submitsOnEnter(event.target as HTMLElement)) {
             event.preventDefault();
-            run.submit();
+            attempt();
         }
     };
+    const instructionsRow = (
+        <InstructionsRow
+            detail={detail}
+            text={text}
+            error={shownFor("instructions")}
+            onText={setText}
+        />
+    );
     const training = method === "sft";
     const SubmitIcon = training ? GraduationCap : ScrollText;
     const serveOnly = detail.serve_only ?? row.serve_only;
@@ -304,18 +417,16 @@ function TrainForm({
                     </FormRow>
                     <DataRow row={row} detail={detail} run={run} />
                     {training ? (
-                        <ComputeRow run={run} />
+                        <ComputeRow run={run} error={shownFor("compute")} />
                     ) : (
-                        <InstructionsRow detail={detail} text={text} onText={setText} />
+                        instructionsRow
                     )}
                 </FormGroup>
             </FormCard>
             {training && <TrainingCard run={run} />}
             {training && (
                 <FormCard>
-                    <FormGroup>
-                        <InstructionsRow detail={detail} text={text} onText={setText} />
-                    </FormGroup>
+                    <FormGroup>{instructionsRow}</FormGroup>
                 </FormCard>
             )}
         </>
@@ -337,10 +448,14 @@ function TrainForm({
                         {training ? `Train v${run.number}` : `Create v${run.number}`}
                     </>
                 }
-                disabled={!run.ready || run.create.isPending}
-                status={statusOf(run, blocked)}
-                problem={problemsOf(run, blocked).length > 0}
-                onSubmit={run.submit}
+                disabled={run.create.isPending}
+                status={
+                    attempted && marked.length > 1
+                        ? `Fix the ${marked.length} fields marked in red`
+                        : (shownFor("instructions") ?? statusOf(run, blocked))
+                }
+                problem={problemsOf(run, blocked).length > 0 || (attempted && marked.length > 0)}
+                onSubmit={attempt}
                 onCancel={back}
                 onKeyDown={onKeyDown}
             />

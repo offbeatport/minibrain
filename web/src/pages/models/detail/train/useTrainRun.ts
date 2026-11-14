@@ -15,7 +15,7 @@ import { errorMessage } from "~/components/Section";
 import { jobSeconds } from "~/lib/jobs";
 import { type TrainMethod, jobHref, modelVersionHref } from "~/lib/modelLinks";
 import { nextVersion } from "../header";
-import { AUTO } from "./parts";
+import { AUTO, type PresetTime } from "./parts";
 import { poolsOf } from "./pools";
 import {
     type Level,
@@ -49,6 +49,19 @@ function trainRows(version: DatasetVersionInfo | undefined): number {
 }
 
 export type TrainStart = Start & { data: number | null };
+
+function presetTime(failed: boolean, plan: PlanInfo | undefined): PresetTime {
+    if (failed) {
+        return null;
+    }
+    if (!plan) {
+        return undefined;
+    }
+    if (plan.chosen) {
+        return plan.minutes ?? null;
+    }
+    return plan.level === "unknown" ? "unplanned" : null;
+}
 
 function scoreSeconds(versions: VersionInfo[], heldOut: number): number | null {
     const timed = versions
@@ -135,16 +148,9 @@ export function useTrainRun({
     const minutes = Object.fromEntries(
         QUALITIES.map((item, index) => {
             const found = presets[index];
-            const value = found.isError
-                ? null
-                : found.data
-                  ? found.data.chosen
-                      ? (found.data.minutes ?? null)
-                      : null
-                  : undefined;
-            return [item.id, value];
+            return [item.id, presetTime(found.isError, found.data)];
         }),
-    ) as Record<Quality, number | null | undefined>;
+    ) as Record<Quality, PresetTime>;
     const info: PlanInfo | undefined = plan.data;
     const pools = poolsOf(info);
     const poolMachines =
@@ -165,7 +171,7 @@ export function useTrainRun({
         ? !blocked &&
           Boolean(chosen) &&
           issues.length === 0 &&
-          Boolean(info?.chosen) &&
+          (Boolean(info?.chosen) || info?.level === "unknown") &&
           !plan.isFetching
         : !blocked;
 

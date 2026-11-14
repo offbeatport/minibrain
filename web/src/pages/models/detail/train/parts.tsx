@@ -31,12 +31,16 @@ export function Meta({ children, className }: { children: ReactNode; className?:
     );
 }
 
-export function timeText(time: number | null | undefined): string {
-    return time === undefined
-        ? "Estimating…"
-        : time === null
-          ? "Does not fit"
-          : `≈ ${duration(time)}`;
+export type PresetTime = number | null | undefined | "unplanned";
+
+export function timeText(time: PresetTime): string {
+    if (time === undefined) {
+        return "Estimating…";
+    }
+    if (time === "unplanned") {
+        return "planned by the worker";
+    }
+    return time === null ? "Does not fit" : `≈ ${duration(time)}`;
 }
 
 const SEGMENTS = [

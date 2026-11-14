@@ -1339,7 +1339,11 @@ keys, and `/v1` stays key-only.
     planner's time, or Custom) and Compute (Automatic, then every training machine by pool, one that does not fit
     disabled with the reason); under them Parameters in two columns (adapter, optimisation, sequence, memory,
     evaluation, seed), locked unless Custom, with a reset, re-planned live; then Train vN and Cancel, with the first
-    problem beside a disabled Train vN. On the right a sticky run summary without buttons: the time, machine and pool,
+    problem beside Train vN. Train vN stays enabled (2026-11-14): clicking it with a problem marks the fields in red
+    (data, pool, rank, sequence length, instructions), opens Parameters when one is there, and scrolls to and focuses
+    the first. Instructions grow to about ten lines and then scroll, capped at the API's 8,000 characters with a count
+    from 90%. When no training machine has reported its memory, the plan is "planned by the worker" and Train vN
+    still starts the run. On the right a sticky run summary without buttons: the time, machine and pool,
     GPU-hours, the queue, the memory bar, rows, held out, the version it creates and planner errors in red. Narrow
     screens stack it and keep the buttons in a bottom bar. The plan comes from the real planner (`/training-plan`
     returns every machine, the time and the queue). Instructions only hides Training, Compute and Parameters, makes a

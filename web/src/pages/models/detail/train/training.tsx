@@ -78,12 +78,12 @@ export function TrainingCard({ run }: { run: TrainRun }) {
                         <div className="w-full sm:w-64">
                             <PresetSelect run={run} />
                         </div>
-                        <div className="flex min-w-0 flex-1 items-center justify-end gap-3">
+                        <div className="ml-auto flex items-center gap-3">
                             <Status run={run} />
                             <CollapsibleTrigger
                                 chevron={false}
                                 aria-label={run.open ? "Hide parameters" : "Show parameters"}
-                                className="flex h-8 min-w-0 cursor-pointer items-center gap-2 rounded-md px-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                className="flex h-8 shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap rounded-md px-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                             >
                                 <span className="text-sm">
                                     {run.open ? "Hide parameters" : "Show parameters"}
