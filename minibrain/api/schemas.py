@@ -204,6 +204,7 @@ class DemoDataInfo(BaseModel):
     labels: int
     description: str
     credit: str
+    large: bool
 
 
 class SourceRef(BaseModel):

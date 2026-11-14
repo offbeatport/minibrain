@@ -13,6 +13,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Demo data** · shipped · product
   Try the whole flow on bundled demo data in minutes.
   UI: Home › Get started, Models › Try with demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
+- **Large demo data** · shipped · ml
+  Build 630,000- and 4,000,000-row demo sets for realistic runs.
+  UI: Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
   UI: Data › Add › Folder on the server · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders

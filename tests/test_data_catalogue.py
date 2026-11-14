@@ -1,3 +1,8 @@
+from pathlib import Path
+
+import pytest
+
+from minibrain.settings import demo_file
 from tests.conftest import Harness, blank_dataset, tickets_csv
 from tests.test_shared_data import dataset_version_hash, upload
 
@@ -95,12 +100,22 @@ def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     assert harness.client.get("/api/datasets/tickets").json()["splits"] is None
 
 
-def test_demo_data_is_listed_and_can_be_added_again_after_a_delete(harness: Harness) -> None:
+def large_built_in(monkeypatch: pytest.MonkeyPatch, folder: Path) -> None:
+    def located(name: str) -> Path:
+        return folder / name if name.startswith("large/") else demo_file(name)
+
+    monkeypatch.setattr("minibrain.data.demo_data.demo_file", located)
+
+
+def test_demo_data_is_listed_and_can_be_added_again_after_a_delete(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    large_built_in(monkeypatch, tmp_path)
     demos = harness.client.get("/api/demo-data").json()
-    assert [demo["file"] for demo in demos] == [
-        "demo_travel_intents.jsonl",
-        "demo_banking77.csv",
-        "demo_clinc150.parquet",
+    assert [(demo["file"], demo["large"]) for demo in demos] == [
+        ("demo_travel_intents.jsonl", False),
+        ("demo_banking77.csv", False),
+        ("demo_clinc150.parquet", False),
     ]
     first = harness.client.post("/api/demo-data/demo_banking77.csv").json()
     assert first["filename"] == "demo_banking77.csv"
@@ -114,6 +129,23 @@ def test_demo_data_is_listed_and_can_be_added_again_after_a_delete(harness: Harn
 
 def test_unknown_demo_data_is_not_found(harness: Harness) -> None:
     assert harness.client.post("/api/demo-data/other.csv").status_code == 404
+
+
+def test_large_demo_data_is_listed_and_added_once_built(
+    harness: Harness, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    large_built_in(monkeypatch, tmp_path)
+    missing = harness.client.post("/api/demo-data/demo_dbpedia14.parquet")
+    assert missing.status_code == 404
+    assert "demo_data/build.py --large" in missing.json()["detail"]
+    (tmp_path / "large").mkdir()
+    (tmp_path / "large" / "demo_dbpedia14.parquet").write_bytes(demo_file("demo_clinc150.parquet").read_bytes())
+    listed = harness.client.get("/api/demo-data").json()
+    assert [(demo["name"], demo["rows"], demo["large"]) for demo in listed if demo["large"]] == [
+        ("Demo DBpedia-14", 630_000, True)
+    ]
+    added = harness.client.post("/api/demo-data/demo_dbpedia14.parquet").json()
+    assert (added["filename"], added["tags"]) == ("demo_dbpedia14.parquet", ["minibrain:demo"])
 
 
 def test_a_new_file_never_reads_a_deleted_file_staging(harness: Harness) -> None:

@@ -59,7 +59,7 @@ from minibrain.data.dataset_versions import (
     versions_of,
 )
 from minibrain.data.delta import DELTA
-from minibrain.data.demo_data import DEMO_DATA, add_demo
+from minibrain.data.demo_data import add_demo, available_demos
 from minibrain.data.diff import compare
 from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
@@ -447,7 +447,7 @@ def add_delta_source(
 
 @router.get("/demo-data", dependencies=[Depends(builder)], summary="List demo data files")
 def list_demo_data() -> list[DemoDataInfo]:
-    return [DemoDataInfo(**vars(demo)) for demo in DEMO_DATA]
+    return [DemoDataInfo(**asdict(demo)) for demo in available_demos()]
 
 
 @router.post(

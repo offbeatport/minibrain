@@ -1,13 +1,41 @@
+import argparse
 import csv
 import json
 import random
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from datasets import ClassLabel, Dataset, DatasetDict, load_dataset
+from datasets import ClassLabel, Dataset, DatasetDict, concatenate_datasets, load_dataset
 
 OUT = Path(__file__).parent
+LARGE = OUT / "large"
 SEED = 7
 TRAVEL_INTENTS = {"book_flight", "book_hotel", "car_rental", "flight_status", "lost_luggage"}
+
+
+@dataclass(frozen=True)
+class LargeSource:
+    repo: str
+    revision: str
+    file: str
+    columns: tuple[str, str]
+
+
+LARGE_SOURCES = (
+    LargeSource(
+        "fancyzhx/dbpedia_14",
+        "9abd46cf7fc8b4c64290f26993c540b92aa145ac",
+        "demo_dbpedia14.parquet",
+        ("text", "category"),
+    ),
+    LargeSource(
+        "fancyzhx/amazon_polarity",
+        "9d9c45c18f8c3cf1b23a3c27917b60cbf28f3289",
+        "demo_amazon_polarity.parquet",
+        ("review", "sentiment"),
+    ),
+)
 
 
 def load_rows(repo: str, config: str | None, revision: str, label_column: str) -> list[tuple[str, str]]:
@@ -41,7 +69,30 @@ def write_parquet(path: Path, keys: tuple[str, str], rows: list[tuple[str, str]]
     Dataset.from_list([dict(zip(keys, row, strict=True)) for row in rows]).to_parquet(str(path))
 
 
+def build_large(source: LargeSource) -> int:
+    splits = load_dataset(source.repo, revision=source.revision)
+    if not isinstance(splits, DatasetDict):
+        raise TypeError(f"expected splits for {source.repo}")
+    merged = concatenate_datasets(list(splits.values()))
+    feature = merged.features["label"]
+    if not isinstance(feature, ClassLabel):
+        raise TypeError(f"expected ClassLabel for {source.repo}.label")
+    text, label = source.columns
+
+    def renamed(batch: dict[str, list[Any]]) -> dict[str, list[str]]:
+        return {text: batch["content"], label: [feature.names[value] for value in batch["label"]]}
+
+    shuffled = merged.shuffle(seed=SEED).flatten_indices()
+    rows = shuffled.map(renamed, batched=True, remove_columns=shuffled.column_names)
+    LARGE.mkdir(exist_ok=True)
+    rows.to_parquet(str(LARGE / source.file))
+    return len(rows)
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Rebuild the demo data files")
+    parser.add_argument("--large", action="store_true", help="also build the large files into demo_data/large")
+    args = parser.parse_args()
     banking = load_rows("PolyAI/banking77", None, "1846984189f2bc0ac51c6fc3a600fa9e1714e0c6", "label")
     clinc = load_rows("clinc/clinc_oos", "plus", "155b9c710419136e17307b80d0a13e68cd46b4ec", "intent")
     travel = [row for row in clinc if row[1] in TRAVEL_INTENTS]
@@ -49,6 +100,9 @@ def main() -> None:
     write_parquet(OUT / "demo_clinc150.parquet", ("text", "intent"), clinc)
     write_jsonl(OUT / "demo_travel_intents.jsonl", ("message", "intent"), travel)
     print(f"banking77={len(banking)} clinc150={len(clinc)} travel_intents={len(travel)}")
+    if args.large:
+        for source in LARGE_SOURCES:
+            print(f"{source.file}={build_large(source)}")
 
 
 if __name__ == "__main__":

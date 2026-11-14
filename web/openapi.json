@@ -15754,6 +15754,10 @@
           "credit": {
             "type": "string",
             "title": "Credit"
+          },
+          "large": {
+            "type": "boolean",
+            "title": "Large"
           }
         },
         "type": "object",
@@ -15764,7 +15768,8 @@
           "rows",
           "labels",
           "description",
-          "credit"
+          "credit",
+          "large"
         ],
         "title": "DemoDataInfo"
       },

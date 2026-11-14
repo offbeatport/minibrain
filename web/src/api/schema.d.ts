@@ -4675,6 +4675,8 @@ export interface components {
             description: string;
             /** Credit */
             credit: string;
+            /** Large */
+            large: boolean;
         };
         /** DemoModelDetail */
         DemoModelDetail: {
