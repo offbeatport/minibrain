@@ -82,3 +82,9 @@ def migrate(url: str) -> None:
 
 def make_sessions(url: str) -> sessionmaker[Session]:
     return sessionmaker(make_engine(url), expire_on_commit=False)
+
+
+def close_sessions(sessions: sessionmaker[Session]) -> None:
+    engine = sessions.kw.get("bind")
+    if isinstance(engine, Engine):
+        engine.dispose()

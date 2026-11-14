@@ -2,6 +2,7 @@ import logging
 import os
 import threading
 import time
+import weakref
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -93,14 +94,23 @@ def own_sessions(url: str) -> sessionmaker[Session]:
 class Keys:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self.sessions: sessionmaker[Session] | None = None
+        self.attached: weakref.ref[sessionmaker[Session]] | None = None
+        self.own: sessionmaker[Session] | None = None
         self.lock = threading.RLock()
         self.instances: dict[tuple[str, tuple[tuple[str, str], ...]], KeyProvider] = {}
         self.loaded: tuple[float, dict[str, Any], list[dict[str, Any]]] | None = None
 
     def attach(self, sessions: sessionmaker[Session]) -> None:
-        self.sessions = sessions
+        self.attached = weakref.ref(sessions)
         self.invalidate()
+
+    def sessions(self) -> sessionmaker[Session]:
+        found = self.attached() if self.attached is not None else None
+        if found is not None:
+            return found
+        if self.own is None:
+            self.own = own_sessions(self.settings.database_url)
+        return self.own
 
     def invalidate(self) -> None:
         with self.lock:
@@ -110,9 +120,7 @@ class Keys:
         with self.lock:
             if self.loaded is not None and time.monotonic() - self.loaded[0] < TTL_SECONDS:
                 return self.loaded[1], self.loaded[2]
-            if self.sessions is None:
-                self.sessions = own_sessions(self.settings.database_url)
-            with self.sessions() as session:
+            with self.sessions()() as session:
                 try:
                     values = dict(load_policy(session).values)
                     records = records_of(session)

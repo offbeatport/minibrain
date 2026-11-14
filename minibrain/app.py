@@ -91,7 +91,7 @@ from minibrain.policy import load as load_policy
 from minibrain.provision import check_config
 from minibrain.recent_logs import capture
 from minibrain.registry.compute import forget_gateway
-from minibrain.registry.db import make_sessions, migrate
+from minibrain.registry.db import close_sessions, make_sessions, migrate
 from minibrain.registry.files import MissingArtifactError, store_for
 from minibrain.registry.models import SYSTEM_ACTOR
 from minibrain.registry.service import ConflictError, ModelNameError, NameTakenError, NotFoundError
@@ -224,6 +224,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.telemetry.shutdown()
     if app.state.engines is not None:
         app.state.engines.stop()
+    close_sessions(app.state.sessions)
 
 
 def create_app(
