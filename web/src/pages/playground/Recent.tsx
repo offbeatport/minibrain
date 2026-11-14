@@ -211,7 +211,7 @@ export function Recent({
                 )}
                 {chats.data && items.length === 0 && (
                     <p className="p-2 text-muted-foreground">
-                        Your chats appear here as you send them, for you alone.
+                        Your past chats appear here. Only you can see them.
                     </p>
                 )}
                 {items.length > 0 && shown.length === 0 && (

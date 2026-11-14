@@ -14,8 +14,8 @@ TITLE = "title"
 CONTENT = "content"
 TITLE_CHARS = 60
 UNTITLED = "New chat"
-LOCKED_OFF = "Not saved: request inputs and answers are off for every model (Settings, Security)."
-BASES_OFF = "Not saved: base models keep no request inputs and answers by default (Settings, Security)."
+LOCKED_OFF = "Chats are not saved: an admin turned off request content for every model (Settings, Security)."
+BASES_OFF = "Chats with base models are not saved: they keep no request content by default (Settings, Security)."
 
 
 def context_of(session_id: int, part: str) -> str:
@@ -59,7 +59,7 @@ def not_kept(policy: Policy, model: Model | None) -> str | None:
         return None
     if locked:
         return LOCKED_OFF
-    return f"Not saved: {model.name} does not keep request inputs and answers (Deployments, {model.name})."
+    return f"Chats with {model.name} are not saved: it does not keep request content ({model.name}, Settings)."
 
 
 def purge(session: Session, days: int) -> int:

@@ -78,7 +78,7 @@ def test_nothing_is_saved_when_request_inputs_and_answers_are_not_kept(harness: 
     refused = chat(harness)
     assert refused.status_code == 403 and refused.json()["detail"] == base["chats_note"]
     custom = target(harness, f"{SLUG}@0")
-    assert custom["chats_saved"] is False and "Support Triage does not keep" in custom["chats_note"]
+    assert custom["chats_saved"] is False and "Chats with Support Triage are not saved" in custom["chats_note"]
     assert harness.client.put(f"/api/models/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
     assert target(harness, f"{SLUG}@0")["chats_saved"] is True
     saved = chat(harness, f"{SLUG}@0", version=0)
