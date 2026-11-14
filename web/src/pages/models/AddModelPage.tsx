@@ -28,6 +28,15 @@ import { BasePicker, type PickerTab } from "./BasePicker";
 import { type ImportPick, useSourcePlan } from "./BaseSource";
 import { BaseSummary, diskBlocks, diskNeed } from "./BaseSummary";
 import {
+    BLANK_OUTPUT,
+    OUTPUT_DETAIL_ID,
+    OutputField,
+    outputBody,
+    outputProblem,
+    suggestedDraft,
+    useOutputSuggestion,
+} from "./OutputField";
+import {
     type BaseOption,
     baseOptionFor,
     catalogueOption,
@@ -41,15 +50,17 @@ import { isTaken, takenNames } from "./names";
 type Problems = {
     model?: string;
     dataset?: string;
+    output?: string;
     name?: string;
     licence?: string;
 };
 
-const PROBLEM_ORDER: (keyof Problems)[] = ["model", "dataset", "name", "licence"];
+const PROBLEM_ORDER: (keyof Problems)[] = ["model", "dataset", "output", "name", "licence"];
 
 const FIELD_IDS: Record<keyof Problems, string> = {
     model: "base-model",
     dataset: "create-dataset",
+    output: OUTPUT_DETAIL_ID,
     name: "create-name",
     licence: "create-licence",
 };
@@ -57,8 +68,6 @@ const FIELD_IDS: Record<keyof Problems, string> = {
 function FieldError({ text }: { text: string | undefined }) {
     return text ? <p className="text-sm text-destructive">{text}</p> : null;
 }
-
-const STARTING_PRESET = "general";
 
 const UPLOAD_NEW = "upload-new";
 
@@ -181,6 +190,14 @@ export function AddModelPage() {
     const rows = models.data ?? [];
     const datasetList = datasets.data ?? [];
     const chosenDataset = datasetList.find((item) => item.slug === dataset) ?? null;
+    const chosenSlug = chosenDataset?.slug ?? null;
+    const suggestion = useOutputSuggestion(chosenSlug);
+    const [output, setOutput] = useState(BLANK_OUTPUT);
+    useEffect(() => {
+        if (chosenSlug && suggestion.data && output.dataset !== chosenSlug) {
+            setOutput(suggestedDraft(chosenSlug, suggestion.data));
+        }
+    }, [chosenSlug, suggestion.data, output.dataset]);
     const picks = recommend(entries, rows, "general");
     const top = picks.here[0] ?? picks.unchecked[0] ?? picks.more[0];
     const fallback: Picked | null = top?.entry
@@ -239,7 +256,7 @@ export function AddModelPage() {
                     body: {
                         name: name.trim(),
                         base_model: baseModel || null,
-                        preset: STARTING_PRESET,
+                        ...outputBody(output),
                         dataset: slug,
                         avatar: avatarBody(identity.avatar),
                     },
@@ -294,6 +311,7 @@ export function AddModelPage() {
             : datasets.isSuccess && !chosenDataset
               ? `No dataset called ${dataset}. Pick another.`
               : undefined,
+        output: outputProblem(output),
         name: !finalName
             ? "Name the model."
             : !/[A-Za-z0-9]/.test(finalName)
@@ -386,6 +404,14 @@ export function AddModelPage() {
                         <FieldError text={shownFor("dataset")} />
                     </FormControl>
                 </FormRow>
+                {chosenDataset && (
+                    <OutputField
+                        draft={output}
+                        loading={suggestion.isLoading}
+                        error={shownFor("output")}
+                        onChange={setOutput}
+                    />
+                )}
                 <NameAvatarField
                     id="create-name"
                     labelled={false}

@@ -2650,6 +2650,48 @@
         }
       }
     },
+    "/api/datasets/{slug}/output": {
+      "get": {
+        "tags": [
+          "Data"
+        ],
+        "summary": "Suggest the output a model on a dataset gives",
+        "operationId": "dataset_output_api_datasets__slug__output_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutputSuggestion"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/datasets/{slug}/query": {
       "post": {
         "tags": [
@@ -23101,6 +23143,24 @@
           "error"
         ],
         "title": "OpenAIErrorBody"
+      },
+      "OutputSuggestion": {
+        "properties": {
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "description": "Why this output fits the dataset's answers."
+          }
+        },
+        "type": "object",
+        "required": [
+          "contract",
+          "basis"
+        ],
+        "title": "OutputSuggestion"
       },
       "OverviewBucket": {
         "properties": {

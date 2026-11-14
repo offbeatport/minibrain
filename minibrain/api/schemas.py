@@ -820,6 +820,11 @@ class RequestBodiesUpdate(BaseModel):
     kept: bool
 
 
+class OutputSuggestion(BaseModel):
+    contract: ContractInfo
+    basis: str = Field(description="Why this output fits the dataset's answers.")
+
+
 class LabelProposal(BaseModel):
     dataset_version_id: int
     dataset_version_number: int | None

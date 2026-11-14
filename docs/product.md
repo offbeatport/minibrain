@@ -174,6 +174,9 @@ Principles: any size, own hardware, air-gapped, gated on scores
 - **Custom models** · shipped · product, ml
   Base, dataset and name; v0 is scored on held-out rows at once.
   UI: Models › Add model, Data › Add · API: GET /api/models, POST /api/models, GET /api/datasets, GET /api/models/name, GET /api/models/{name}, PATCH /api/models/{name}, DELETE /api/models/{name}
+- **Suggested output** · shipped · product, ml
+  Labels, JSON or free text picked from the dataset's answers.
+  UI: Models › Add model › Output · API: GET /api/datasets/{slug}/output, POST /api/models
 - **Duplicate models** · shipped · product, ml
   Copy a custom model's settings, data and live version, sharing its files.
   UI: Models › Duplicate, Models › model › Settings › Duplicate · API: POST /api/models/{name}/duplicate

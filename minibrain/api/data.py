@@ -33,6 +33,7 @@ from minibrain.api.schemas import (
     LabelShiftInfo,
     MappingUpdate,
     NameTakenInfo,
+    OutputSuggestion,
     PreviewResponse,
     PreviewRow,
     QualityInfo,
@@ -45,7 +46,7 @@ from minibrain.api.schemas import (
     SourceStats,
     SourceSummary,
 )
-from minibrain.api.views import change_info, dataset_version_info, mapping_info
+from minibrain.api.views import change_info, contract_info, dataset_version_info, mapping_info
 from minibrain.artifacts import ArtifactStore
 from minibrain.auth.identity import current_actor
 from minibrain.connections.spec import ConnectionProblem
@@ -110,11 +111,13 @@ from minibrain.registry.models import AuditEvent, Dataset, DatasetVersion, Sourc
 from minibrain.registry.service import ConflictError, NotFoundError
 from minibrain.settings import Settings
 from minibrain.tags import merged_tags
+from minibrain.tasks.contracts import suggested_contract
 from minibrain.tasks.examples import turns_of
 
 router = APIRouter(prefix="/api")
 
 PREVIEW_ROWS = 20
+OUTPUT_ROWS = 200
 SOURCE_ROWS = "SELECT * FROM source"
 QUERY_ROWS = 50
 STATS_SAMPLE = 10_000
@@ -606,6 +609,27 @@ def update_dataset_mapping(
 @router.get("/datasets/{slug}/preview", dependencies=[Depends(builder)], summary="Preview a dataset's rows")
 def dataset_preview(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> PreviewResponse:
     return dataset_preview_of(settings, store, get_dataset(session, slug))
+
+
+def dataset_answers(settings: Settings, store: ArtifactStore, dataset: Dataset) -> list[str]:
+    if not dataset.sql or not dataset.sources:
+        return []
+    try:
+        tables, aliases = dataset_tables(settings, store, dataset)
+        rows = example_rows(tables, dataset_sql(dataset), aliases, OUTPUT_ROWS)
+    except (SourceError, ConnectionProblem, PolicyError):
+        return []
+    return [expected for _, _, expected in rows if expected]
+
+
+@router.get(
+    "/datasets/{slug}/output", dependencies=[Depends(builder)], summary="Suggest the output a model on a dataset gives"
+)
+def dataset_output(slug: str, session: SessionDep, settings: SettingsDep, store: StoreDep) -> OutputSuggestion:
+    dataset = get_dataset(session, slug)
+    latest = latest_of(dataset)
+    found = suggested_contract(latest.labels if latest else [], dataset_answers(settings, store, dataset))
+    return OutputSuggestion(contract=contract_info(found.contract), basis=found.basis)
 
 
 @router.post("/datasets/{slug}/query", dependencies=[Depends(builder)], summary="Run SQL over a dataset's sources")

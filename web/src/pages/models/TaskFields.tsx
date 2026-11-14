@@ -12,7 +12,7 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from "obp-ui";
-import type { PresetsResponse, PromotionInfo, ThresholdInfo } from "~/api/client";
+import type { ContractInfo, PresetsResponse, PromotionInfo, ThresholdInfo } from "~/api/client";
 import { metricName } from "~/lib/metrics";
 
 export const EXAMPLE_SCHEMA =
@@ -50,6 +50,69 @@ export function schemaProblem(text: string): string | undefined {
     } catch (error) {
         return `Not valid JSON: ${error instanceof Error ? error.message : String(error)}`;
     }
+}
+
+export type AnswerKind = "text" | "labels" | "json";
+
+export const ANSWER_KINDS: {
+    value: AnswerKind;
+    label: string;
+    short: string;
+    description: string;
+    noun: string;
+}[] = [
+    {
+        value: "text",
+        label: "Free text",
+        short: "Free text",
+        description: "Any answer, over a conversation. A chat assistant.",
+        noun: "a chat assistant",
+    },
+    {
+        value: "labels",
+        label: "One of these labels",
+        short: "Labels",
+        description: "Exactly one label from a set, scored by accuracy. A classifier.",
+        noun: "a classifier",
+    },
+    {
+        value: "json",
+        label: "A JSON schema",
+        short: "JSON",
+        description: "JSON held to a schema you paste, scored field by field. A custom model.",
+        noun: "a custom model",
+    },
+];
+
+export function answerKind(contract: ContractInfo): AnswerKind {
+    if (contract.labels) {
+        return "labels";
+    }
+    return contract.kind === "json" ? "json" : "text";
+}
+
+export function startingSchema(contract: ContractInfo): string {
+    return contract.kind === "json" && !contract.labels
+        ? JSON.stringify(contract.json_schema, null, 2)
+        : EXAMPLE_SCHEMA;
+}
+
+export function labelsProblem(text: string): string | undefined {
+    return splitLabels(text).length >= 2 ? undefined : "Add at least two labels.";
+}
+
+export function draftContract(
+    kind: AnswerKind,
+    labels: string,
+    schema: string,
+): ContractInfo | null {
+    if (kind === "text") {
+        return { kind: "text" };
+    }
+    if (kind === "labels") {
+        return labelsProblem(labels) ? null : { kind: "json", labels: splitLabels(labels) };
+    }
+    return schemaProblem(schema) ? null : { kind: "json", json_schema: JSON.parse(schema) };
 }
 
 export function metricsFor(presets: PresetsResponse | undefined, names: string[]): string[] {

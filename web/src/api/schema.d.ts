@@ -886,6 +886,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/datasets/{slug}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest the output a model on a dataset gives */
+        get: operations["dataset_output_api_datasets__slug__output_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/datasets/{slug}/query": {
         parameters: {
             query?: never;
@@ -7050,6 +7067,15 @@ export interface components {
         OpenAIErrorBody: {
             error: components["schemas"]["ErrorInfo"];
         };
+        /** OutputSuggestion */
+        OutputSuggestion: {
+            contract: components["schemas"]["ContractInfo"];
+            /**
+             * Basis
+             * @description Why this output fits the dataset's answers.
+             */
+            basis: string;
+        };
         /** OverviewBucket */
         OverviewBucket: {
             /**
@@ -11243,6 +11269,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    dataset_output_api_datasets__slug__output_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OutputSuggestion"];
                 };
             };
             /** @description Validation Error */

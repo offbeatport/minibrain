@@ -1,4 +1,4 @@
-from tests.conftest import Harness, tickets_csv
+from tests.conftest import Harness, blank_dataset, tickets_csv
 
 LABELS_CSV = b"label,team\nbilling,finance\nbug,engineering\naccount,support\nfeature,product\n"
 
@@ -69,6 +69,31 @@ def test_queries_must_be_one_select_over_known_sources(harness: Harness) -> None
         assert message in response.json()["detail"]
     ran = harness.client.post("/api/query", json={"sql": "SELECT category, count(*) AS n FROM tickets GROUP BY 1"})
     assert ran.status_code == 200 and len(ran.json()["rows"]) == 4
+
+
+def test_a_dataset_suggests_the_output_its_answers_hold(harness: Harness) -> None:
+    tickets = upload(harness, "tickets.csv", tickets_csv())
+    harness.client.post("/api/datasets", json={"name": "Tickets", "source_id": tickets["id"]})
+    labelled = harness.client.get("/api/datasets/tickets/output")
+    assert labelled.status_code == 200, labelled.text
+    assert labelled.json()["contract"]["labels"] == ["account", "billing", "bug", "feature"]
+    rows = "".join(
+        f'{{"input": "invoice {index}", "output": "{{\\"total\\": {index}, \\"currency\\": \\"EUR\\"}}"}}\n'
+        for index in range(120)
+    )
+    invoices = harness.client.post(
+        "/api/sources", files={"file": ("invoices.jsonl", rows.encode(), "application/x-ndjson")}
+    ).json()
+    harness.client.post("/api/datasets", json={"name": "Invoices", "source_id": invoices["id"]})
+    found = harness.client.get("/api/datasets/invoices/output").json()["contract"]
+    assert found["kind"] == "json" and found["labels"] is None
+    assert found["json_schema"]["properties"] == {"total": {"type": "integer"}, "currency": {"type": "string"}}
+    blank = blank_dataset(harness.client)
+    assert harness.client.get(f"/api/datasets/{blank}/output").json()["contract"] == {
+        "kind": "text",
+        "json_schema": None,
+        "labels": None,
+    }
 
 
 def test_a_single_source_dataset_can_say_from_source(harness: Harness) -> None:

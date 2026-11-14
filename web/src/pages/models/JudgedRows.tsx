@@ -16,7 +16,14 @@ import { FormRow } from "~/components/FormRows";
 import { ErrorLine, errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { contractSentence } from "~/lib/judging";
-import { EXAMPLE_SCHEMA, schemaProblem, splitLabels } from "./TaskFields";
+import {
+    ANSWER_KINDS,
+    type AnswerKind,
+    answerKind,
+    draftContract,
+    schemaProblem,
+    startingSchema,
+} from "./TaskFields";
 
 type Change = { path: string; detail: string; breaking: boolean };
 type Part = "answer" | "rubric";
@@ -41,56 +48,9 @@ function useSaved(title: string, onDone: () => void) {
     };
 }
 
-type AnswerKind = "text" | "labels" | "json";
-
-const ANSWER_KINDS: { value: AnswerKind; label: string; description: string; noun: string }[] = [
-    {
-        value: "text",
-        label: "Free text",
-        description: "Any answer, over a conversation. A chat assistant.",
-        noun: "a chat assistant",
-    },
-    {
-        value: "labels",
-        label: "One of these labels",
-        description: "Exactly one label from a set, scored by accuracy. A classifier.",
-        noun: "a classifier",
-    },
-    {
-        value: "json",
-        label: "A JSON schema",
-        description: "JSON held to a schema you paste, scored field by field. A custom model.",
-        noun: "a custom model",
-    },
-];
-
-function answerKind(contract: ContractInfo): AnswerKind {
-    if (contract.labels) {
-        return "labels";
-    }
-    return contract.kind === "json" ? "json" : "text";
-}
-
 function startingLabels(detail: ModelDetail): string {
     const found = detail.contract.labels ?? detail.dataset_version?.labels ?? [];
     return found.join(", ");
-}
-
-function startingSchema(contract: ContractInfo): string {
-    return contract.kind === "json" && !contract.labels
-        ? JSON.stringify(contract.json_schema, null, 2)
-        : EXAMPLE_SCHEMA;
-}
-
-function draftContract(kind: AnswerKind, labels: string, schema: string): ContractInfo | null {
-    if (kind === "text") {
-        return { kind: "text" };
-    }
-    if (kind === "labels") {
-        const found = splitLabels(labels);
-        return found.length >= 2 ? { kind: "json", labels: found } : null;
-    }
-    return schemaProblem(schema) ? null : { kind: "json", json_schema: JSON.parse(schema) };
 }
 
 function Actions({ children }: { children: ReactNode }) {

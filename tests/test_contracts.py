@@ -11,6 +11,7 @@ from minibrain.tasks.contracts import (
     json_contract,
     label_set,
     parse_label,
+    suggested_contract,
     with_labels,
 )
 from minibrain.tasks.examples import Turn, assistant_turns, from_chat, from_pair
@@ -133,3 +134,21 @@ def test_prompt_only_adds_instructions_and_shots_trained_only_instructions() -> 
     assert Prompting.from_dict(prompt.as_dict()) == prompt
     with pytest.raises(PromptError):
         prompt.messages([{"role": "assistant", "content": "x"}])
+
+
+def test_suggested_output_prefers_labels_then_json_then_free_text() -> None:
+    assert suggested_contract(["billing", "bug"], ["billing"]).contract.labels == ("billing", "bug")
+    answers = [
+        '{"total": 3, "due": "2026-01-01"}',
+        '{"total": 4.5, "lines": [{"sku": "a"}]}',
+        '```json\n{"total": 1, "due": null}\n```',
+    ]
+    line = {"type": "object", "properties": {"sku": {"type": "string"}}, "required": ["sku"]}
+    lines = {"type": "array", "items": line}
+    assert suggested_contract([], answers).contract.schema == {
+        "type": "object",
+        "properties": {"total": {"type": "number"}, "due": {"type": ["string", "null"]}, "lines": lines},
+        "required": ["total"],
+    }
+    assert suggested_contract([], ["Thanks, I have refunded it.", '{"a": 1}']).contract == FREE_TEXT
+    assert suggested_contract([], []).contract == FREE_TEXT

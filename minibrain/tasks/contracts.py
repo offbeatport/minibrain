@@ -210,3 +210,60 @@ def breaking_changes(old: Contract, new: Contract) -> list[Change]:
 
 def described(found: Sequence[Change]) -> str:
     return "; ".join(f"{change.path} {change.detail}" for change in found)
+
+
+JSON_SHARE = 0.9
+PYTHON_TYPES: tuple[tuple[type, str], ...] = (
+    (bool, "boolean"),
+    (int, "integer"),
+    (float, "number"),
+    (str, "string"),
+    (list, "array"),
+    (dict, "object"),
+)
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    contract: Contract
+    basis: str
+
+
+def json_type(value: Any) -> str:
+    if value is None:
+        return "null"
+    return next(name for kind, name in PYTHON_TYPES if isinstance(value, kind))
+
+
+def value_schema(values: Sequence[Any]) -> dict[str, Any]:
+    kinds = list(dict.fromkeys(json_type(value) for value in values))
+    if "number" in kinds and "integer" in kinds:
+        kinds.remove("integer")
+    if kinds == ["object"]:
+        return object_schema(values)
+    if kinds == ["array"]:
+        items = [item for value in values for item in value]
+        return {"type": "array", "items": value_schema(items)} if items else {"type": "array"}
+    if not kinds:
+        return {}
+    return {"type": kinds[0]} if len(kinds) == 1 else {"type": kinds}
+
+
+def object_schema(objects: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    names = list(dict.fromkeys(name for item in objects for name in item))
+    return {
+        "type": "object",
+        "properties": {name: value_schema([item[name] for item in objects if name in item]) for name in names},
+        "required": [name for name in names if all(name in item for item in objects)],
+    }
+
+
+def suggested_contract(labels: Sequence[str], answers: Sequence[str]) -> Suggestion:
+    if len(labels) >= 2:
+        return Suggestion(label_set(labels), f"{len(labels)} distinct answers in the data")
+    texts = [answer for answer in answers if answer.strip()]
+    parsed = (parse_json(text) for text in texts)
+    objects = [value for ok, value in parsed if ok and isinstance(value, dict)]
+    if objects and len(objects) >= JSON_SHARE * len(texts):
+        return Suggestion(json_contract(object_schema(objects)), "the answers in the data are JSON objects")
+    return Suggestion(FREE_TEXT, "the answers in the data are free text")

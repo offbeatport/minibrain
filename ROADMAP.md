@@ -63,8 +63,13 @@ Fireworks and Together expose only the parts; minibrain exposes both, on one eng
 
 - Two contracts: free text and a JSON schema. A label set is a JSON schema with one enum field (`label`) and is served
   as the bare label.
-- Add model asks for a base, a dataset and a name. Every model starts as a Chat assistant (`general`, the API's default
-  preset; `preset` stays in the API for scripts and tests) and narrows later, in two ways:
+- Add model asks for a base, a dataset, its output and a name (Output built 2026-11-14). Once a dataset is picked,
+  Output (Labels, JSON or Free text) is suggested from its answers by `GET /api/datasets/<slug>/output`: the latest
+  dataset version's label set when there is one, else JSON with a schema inferred from up to 200 answers when nine in
+  ten are JSON objects (property types, nested objects and arrays, required when every answer has the field), else
+  free text. Labels show as an editable list, JSON as an editable schema, and creating sends the contract with its
+  preset (Classify, Custom or Chat assistant), so v0 is scored the right way from the start. The API's default stays
+  `general`. A model made as a Chat assistant narrows later, in two ways:
   - From the dataset: if its latest dataset version's expected answers look like a label set (the check's rule:
     at most 256 short single-line values, each repeated on average), the model page proposes them ("Answers look like
     labels: billing, bug, refund (+2). Restrict answers to these?"). Accept switches the model to Classify with those
@@ -1368,10 +1373,11 @@ keys, and `/v1` stays key-only.
     kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
 - Add model (`/models/new`) asks for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
   one search over four tabs), a dataset (required; Create stays off until one is picked, with Upload new… opening the
-  Data page's Add menu) and a name; description and tags live in the model's Settings. It is the create-page pattern
+  Data page's Add menu), an output and a name; description and tags live in the model's Settings. It is the create-page pattern
   (2026-11-13): the form in one card with labels in a 9rem column, a sticky summary card on the right with the
   consequences and cost (memory and storage gauges, "v0 · untrained baseline, scored on N held-out rows", blocked
-  reasons), Create model and Cancel under the form, and below 48rem one column with a sticky bottom bar. Every model starts as a Chat assistant. The name row (built 2026-11-12) is the
+  reasons), Create model and Cancel under the form, and below 48rem one column with a sticky bottom bar. Output, under
+  the dataset, is suggested from its answers (see Task types). The name row (built 2026-11-12) is the
   avatar button, then the name, then a dice Shuffle (R): the name is prefilled and required, a generated adjective
   and noun ("Brisk Heron") never held by a base or custom model, with an inline error when a typed one is taken.
   Typing a name or picking an avatar keeps it ("Name kept · Undo"), and Shuffle then rerolls only the other. Under the picker, a base under 7B parameters gets a hint, never a block: "For a chat

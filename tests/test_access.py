@@ -80,6 +80,7 @@ ROUTE_ROLES = {
     ("PATCH", "/api/datasets/{slug}"): "builder",
     ("PUT", "/api/datasets/{slug}/mapping"): "builder",
     ("GET", "/api/datasets/{slug}/preview"): "builder",
+    ("GET", "/api/datasets/{slug}/output"): "builder",
     ("POST", "/api/datasets/{slug}/query"): "builder",
     ("DELETE", "/api/datasets/{slug}"): "builder",
     ("GET", "/api/datasets/{slug}/versions"): "builder",
