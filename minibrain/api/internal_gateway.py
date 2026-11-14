@@ -19,6 +19,8 @@ from minibrain.models.hardware import LOCAL_POOL
 from minibrain.models.health import record_load_failure, record_loaded
 from minibrain.models.usage import touch
 from minibrain.registry.compute import EngineReport, GatewayReport, record_engine, record_gateway
+from minibrain.registry.files import ArtifactKind
+from minibrain.registry.models import Artifact
 
 MAX_WAIT_SECONDS = 30.0
 
@@ -170,7 +172,9 @@ def feedback(body: FeedbackBody, session: SessionDep) -> FeedbackStored:
 
 
 @router.get("/artifacts/{artifact_id}")
-def artifact(artifact_id: str, store: StoreDep) -> StreamingResponse:
-    if not is_artifact_id(artifact_id) or not store.has(artifact_id):
+def artifact(artifact_id: str, store: StoreDep, session: SessionDep, pool: CallerPool) -> StreamingResponse:
+    found = session.get(Artifact, artifact_id) if pool is not None else None
+    hidden = pool is not None and (found is None or found.kind != ArtifactKind.ADAPTER)
+    if hidden or not is_artifact_id(artifact_id) or not store.has(artifact_id):
         raise HTTPException(status_code=404, detail=f"artifact {artifact_id} not found")
     return StreamingResponse(store.chunks(artifact_id), media_type="application/octet-stream")

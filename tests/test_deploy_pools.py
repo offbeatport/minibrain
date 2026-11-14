@@ -14,7 +14,7 @@ from minibrain.serve.engines import EngineBackend, EngineManager, ManagedEngineB
 from minibrain.serve.host import EngineHost
 from minibrain.settings import Settings
 from minibrain.worker import MainClient, WorkerConfig
-from tests.conftest import Harness
+from tests.conftest import Harness, fake_adapter
 from tests.test_compute import RACK
 from tests.test_flow import SLUG, create_model, create_on_data, finish
 from tests.test_routing import FakeEngines, replicas
@@ -212,6 +212,11 @@ def test_engine_token_reaches_only_what_engines_need(harness: Harness) -> None:
     for method, path in [("GET", "/config"), ("POST", "/logs"), ("POST", "/feedback"), ("POST", "/gateways")]:
         refused = harness.client.request(method, f"/internal/gateway{path}", headers=engine, json={})
         assert refused.status_code == 403 and "engine token" in refused.json()["detail"], path
+    adapter = harness.upload(fake_adapter(), "adapter", "tar", "adapter")
+    data = harness.upload(b"question,answer\n", "dataset_version", "file", "data.csv")
+    assert harness.client.get(f"/internal/gateway/artifacts/{adapter}", headers=engine).status_code == 200
+    assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=engine).status_code == 404
+    assert harness.client.get(f"/internal/gateway/artifacts/{data}", headers=harness.gateway_headers).status_code == 200
     forged = bearer(token.replace("engine.rack.", "engine.local."))
     assert harness.client.get("/internal/gateway/bases", headers=forged).status_code == 401
     assert harness.client.get("/internal/gateway/bases", headers=bearer("engine.rack.00")).status_code == 401
