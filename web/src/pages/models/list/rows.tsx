@@ -62,6 +62,7 @@ import {
     childCount,
     costOf,
     costShown,
+    deleteBlock,
     deployed,
     headlineOf,
     hrefOf,
@@ -718,6 +719,7 @@ function VersionMenu({
     const versus =
         live && !version.live && live.score != null && version.score != null ? live : undefined;
     const ready = version.status === "ready";
+    const blocked = deleteBlock(version);
     return (
         <DropdownMenu>
             <MenuTrigger label={`More actions for ${model.name} v${version.number}`} />
@@ -761,7 +763,7 @@ function VersionMenu({
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             variant="destructive"
-                            disabled={version.live || version.status === "deleting"}
+                            disabled={blocked !== null}
                             onSelect={() =>
                                 on.remove([
                                     {
@@ -773,9 +775,7 @@ function VersionMenu({
                             }
                         >
                             <Trash2 />
-                            {version.live
-                                ? `v${version.number} is live`
-                                : `Delete v${version.number}`}
+                            {blocked ?? `Delete v${version.number}`}
                         </DropdownMenuItem>
                     </>
                 )}

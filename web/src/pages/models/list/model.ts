@@ -238,6 +238,18 @@ export function isBaseline(version: Pick<ModelVersionRow, "number" | "kind">): b
     return version.kind === "prompt" && version.number === 0;
 }
 
+export function deleteBlock(
+    version: Pick<ModelVersionRow, "number" | "kind" | "live" | "status">,
+): string | null {
+    if (isBaseline(version)) {
+        return `v${version.number} is the baseline`;
+    }
+    if (version.live) {
+        return `v${version.number} is live`;
+    }
+    return version.status === "deleting" ? `v${version.number} is being deleted` : null;
+}
+
 export function versionName(version: Pick<ModelVersionRow, "number" | "kind">): string {
     return isBaseline(version) ? `v${version.number} · Baseline` : `v${version.number}`;
 }

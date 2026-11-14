@@ -22,6 +22,7 @@ import { Tip } from "./cells";
 import {
     type ListModel,
     canMakeLive,
+    deleteBlock,
     isDeployed,
     pct,
     plural,
@@ -73,7 +74,7 @@ function selectionText(versions: PickedVersion[], variants: PickedVariant[]): st
 export function deletable(versions: PickedVersion[], variants: PickedVariant[]): Entry[] {
     return [
         ...versions
-            .filter((item) => !item.version.live && item.version.status !== "deleting")
+            .filter((item) => deleteBlock(item.version) === null)
             .map((item) => ({
                 key: `custom:${item.model.key}@${item.version.number}`,
                 model: item.model.row,
@@ -99,13 +100,14 @@ export function SelectionBar({
     onClear: () => void;
 }) {
     const mixed = versions.length > 0 && variants.length > 0;
-    const live = [
+    const kept = [
         ...versions
-            .filter((item) => item.version.live)
-            .map((item) => `v${item.version.number} of ${item.model.name}`),
+            .map((item) => ({ item, block: deleteBlock(item.version) }))
+            .filter(({ block }) => block !== null)
+            .map(({ item, block }) => `${item.model.name} ${block}`),
         ...variants
             .filter((item) => isDeployed(item.row))
-            .map((item) => `${item.model.name} ${item.row.variant_label ?? item.row.key}`),
+            .map((item) => `${item.model.name} ${item.row.variant_label ?? item.row.key} is live`),
     ];
     const going = deletable(versions, variants);
     const blocked = compareBlock(versions);
@@ -122,9 +124,9 @@ export function SelectionBar({
                 <X aria-hidden="true" />
                 Clear selection
             </Button>
-            {can.build && live.length > 0 && (
+            {can.build && kept.length > 0 && (
                 <span className="text-sm text-muted-foreground">
-                    {`${live.join(", ")} ${live.length === 1 ? "is" : "are"} live and will not be deleted.`}
+                    {`${kept.join(", ")}: ${kept.length === 1 ? "it" : "they"} will not be deleted.`}
                 </span>
             )}
             <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -189,7 +191,13 @@ export function SelectionBar({
                             orientation="vertical"
                             className="mx-1 data-[orientation=vertical]:h-5"
                         />
-                        <Tip tip={going.length === 0 ? "Everything ticked is live." : null}>
+                        <Tip
+                            tip={
+                                going.length === 0
+                                    ? "Everything ticked is live, the baseline or already going."
+                                    : null
+                            }
+                        >
                             <Button
                                 variant="destructive"
                                 disabled={going.length === 0}
