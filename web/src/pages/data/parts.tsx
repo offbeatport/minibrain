@@ -36,8 +36,8 @@ export function useDataRefresh() {
     const client = useQueryClient();
     return () =>
         Promise.all([
-            client.invalidateQueries({ queryKey: keys.datasets, exact: true }),
-            client.invalidateQueries({ queryKey: keys.sources, exact: true }),
+            client.invalidateQueries({ queryKey: keys.datasets }),
+            client.invalidateQueries({ queryKey: keys.sources }),
             client.invalidateQueries({ queryKey: dataKeys.datasetFolders }),
             client.invalidateQueries({ queryKey: keys.allModels }),
             client.invalidateQueries({ queryKey: ["model"] }),
