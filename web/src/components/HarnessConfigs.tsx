@@ -128,25 +128,29 @@ export function HarnessConfigs({
     baseUrl,
     model,
     keyValue,
+    hint = true,
 }: {
     baseUrl: string;
     model: string;
     keyValue: string | null;
+    hint?: boolean;
 }) {
     const key = keyValue ?? "YOUR_KEY";
     const items = harnesses(baseUrl, model, key);
     return (
         <div className="flex min-w-0 flex-col gap-2">
             <CodeTabs items={items} title="Copy, paste and run." />
-            <p className="text-sm text-muted-foreground">
-                {!keyValue &&
-                    "Replace YOUR_KEY with one of the API keys; a key you create is filled in here once. "}
-                Every endpoint, its fields and a client to try calls are in the{" "}
-                <Link href={API_REFERENCE_PATH} className="text-primary hover:underline">
-                    API reference
-                </Link>
-                .
-            </p>
+            {hint && (
+                <p className="text-sm text-muted-foreground">
+                    {!keyValue &&
+                        "Replace YOUR_KEY with one of the API keys; a key you create is filled in here once. "}
+                    Every endpoint, its fields and a client to try calls are in the{" "}
+                    <Link href={API_REFERENCE_PATH} className="text-primary hover:underline">
+                        API reference
+                    </Link>
+                    .
+                </p>
+            )}
         </div>
     );
 }

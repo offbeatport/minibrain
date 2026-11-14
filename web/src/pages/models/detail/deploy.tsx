@@ -21,8 +21,8 @@ import { keys } from "~/api/queries";
 import { useCan } from "~/lib/access";
 import { modelPageHref, playgroundHref, trainHref } from "~/lib/modelLinks";
 import { ConfirmAction, type Confirmation, useModelsRefresh } from "../dialogs";
+import { ConnectDialog } from "./connect";
 import {
-    ConnectDialog,
     DeploymentStatus,
     Tip,
     deployBlock,

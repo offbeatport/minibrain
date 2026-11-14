@@ -5,25 +5,11 @@ import {
     LoaderCircle,
     type LucideIcon,
 } from "lucide-react";
-import {
-    Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Link,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
-    cn,
-} from "obp-ui";
+import { Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import { Fragment, type ReactElement, type ReactNode } from "react";
 import type { BaseModelDetail, ModelDetail, ModelRow } from "~/api/client";
 import type { Crumb } from "~/components/Breadcrumbs";
 import { CopyButton } from "~/components/CopyButton";
-import { HarnessConfigs } from "~/components/HarnessConfigs";
 import { PublisherLogo } from "~/components/PublisherLogo";
 import type { Tone } from "~/components/models/StatusText";
 import { modelPageHref } from "~/lib/modelLinks";
@@ -313,69 +299,4 @@ export function deployConfirmation(
         destructive: deployed,
         run: () => setDeployed(row, !deployed).then(after),
     };
-}
-
-function Copyable({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex min-w-0 flex-col gap-label">
-            <span className="text-sm text-muted-foreground">{label}</span>
-            <span className="flex h-8 min-w-0 items-center gap-1 rounded-md border bg-muted pr-0.5 pl-3">
-                <span className="flex-1 truncate font-mono text-sm">{value}</span>
-                <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
-            </span>
-        </div>
-    );
-}
-
-export function ConnectDialog({
-    row,
-    open,
-    onOpenChange,
-    keyValue = null,
-}: {
-    row: ModelRow;
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    keyValue?: string | null;
-}) {
-    const baseUrl = `${window.location.origin}/v1`;
-    const pinned = row.kind === "custom" ? (row.current_version ?? row.ready_version) : null;
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>{`Connect to ${row.name}`}</DialogTitle>
-                    <DialogDescription>
-                        {row.kind === "custom"
-                            ? `OpenAI-compatible. ${row.key} answers with the live version; ${row.key}@N calls one version, live or not.`
-                            : `OpenAI-compatible. Call it as ${row.key}.`}
-                    </DialogDescription>
-                </DialogHeader>
-                {!isDeployed(row) && (
-                    <p className="rounded-md border border-warning/40 bg-warning-soft px-3 py-2">
-                        {`${row.name} is not deployed, so these calls are refused until you deploy it.`}
-                    </p>
-                )}
-                <div className="grid gap-field sm:grid-cols-[3fr_2fr_2fr]">
-                    <Copyable label="Base URL" value={baseUrl} />
-                    <Copyable label="Model" value={row.key} />
-                    {pinned !== null && pinned !== undefined && (
-                        <Copyable label="One version" value={`${row.key}@${pinned}`} />
-                    )}
-                </div>
-                <HarnessConfigs baseUrl={baseUrl} model={row.key} keyValue={keyValue} />
-                <DialogFooter>
-                    <Button variant="outline" asChild>
-                        <Link
-                            href={modelPageHref(row.key, "api")}
-                            onClick={() => onOpenChange(false)}
-                        >
-                            API keys
-                        </Link>
-                    </Button>
-                    <Button onClick={() => onOpenChange(false)}>Done</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
 }

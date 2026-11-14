@@ -423,7 +423,7 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Improve
 - **Feedback API** · shipped · engineer
   Send thumbs and corrections from apps by response id.
-  UI: Models › model › API · API: POST /v1/feedback
+  UI: Models › model › Use › API Connect · API: POST /v1/feedback
 - **Playground feedback** · shipped · product
   Rate or correct any playground answer.
   UI: Playground · API: POST /api/models/{name}/feedback
