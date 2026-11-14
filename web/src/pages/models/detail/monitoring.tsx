@@ -521,7 +521,6 @@ export function MonitoringTab({ row, versions }: { row: ModelRow; versions: Vers
                             range={range}
                             onRange={setRange}
                             height={300}
-                            showHeadline={false}
                             emptyHint={emptyText(row, range)}
                         />
                     </div>

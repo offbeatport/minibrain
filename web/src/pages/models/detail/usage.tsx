@@ -1,18 +1,28 @@
 import { ChartLine } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "obp-ui";
+import {
+    CheckboxSelect,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "obp-ui";
 import { useState, useSyncExternalStore } from "react";
 import type { ModelRow, VersionInfo } from "~/api/client";
 import { useModelTraffic } from "~/api/modelPageQueries";
 import { PoolPlaces } from "~/components/PoolLink";
 import { ErrorLine, PanelSection } from "~/components/Section";
 import { LineChart } from "~/components/charts/LineChart";
+import { ChartLegend } from "~/components/charts/TimeChart";
 import {
+    EMPTY_DOMAIN,
     METRICS,
     RANGES,
     SPAN,
     type TrafficMetric,
     type TrafficRange,
     type TrafficReport,
+    axisFormatOf,
     formatOf,
     headline,
     markersOf,
@@ -23,10 +33,11 @@ import {
     usageOf,
     versionColors,
     xFormat,
+    zeroUsage,
 } from "~/lib/traffic";
 import { isDeployed } from "./header";
 
-let sharedRange: TrafficRange = "30d";
+let sharedRange: TrafficRange = "24h";
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
@@ -96,6 +107,115 @@ export function MetricSwitch({
     return <Choice label="Metric" options={METRICS} value={metric} onValue={onMetric} />;
 }
 
+function MetricChart({
+    row,
+    report,
+    range,
+    metric,
+    colors,
+    height,
+    title,
+}: {
+    row: ModelRow;
+    report: TrafficReport | undefined;
+    range: TrafficRange;
+    metric: TrafficMetric;
+    colors: Map<number, string>;
+    height: number;
+    title?: boolean;
+}) {
+    const custom = row.kind === "custom";
+    const label = METRICS.find((item) => item.key === metric)?.label ?? "";
+    const empty = !report || report.totals.requests === 0;
+    const usage =
+        report && !empty
+            ? usageOf(report, metric, colors, custom, row.name)
+            : zeroUsage(report, range, label);
+    return (
+        <div className="flex min-w-0 flex-col gap-2">
+            {title && (
+                <p className="flex items-baseline justify-between gap-3">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="tabular-nums">
+                        {!report
+                            ? "–"
+                            : metric === "p95"
+                              ? ms(report.totals.p95_ms)
+                              : headline(metric, report.totals)}
+                    </span>
+                </p>
+            )}
+            <LineChart
+                rows={usage.rows}
+                series={usage.series}
+                format={formatOf(metric)}
+                axisFormat={axisFormatOf(metric)}
+                integer={metric === "requests"}
+                label={`${label} for ${row.name} ${SPAN[range]}${custom ? ", by version" : ""}`}
+                height={height}
+                markers={report && !empty ? markersOf(report) : []}
+                yDomain={empty ? EMPTY_DOMAIN[metric] : undefined}
+                xFormat={xFormat(range)}
+                readoutTitle={report ? readoutTitle(report) : undefined}
+                readoutNotes={report && !empty ? readoutNotes(report) : undefined}
+                legend={false}
+            />
+        </div>
+    );
+}
+
+function VersionLegend({
+    row,
+    report,
+    colors,
+}: {
+    row: ModelRow;
+    report: TrafficReport | undefined;
+    colors: Map<number, string>;
+}) {
+    if (!report || report.totals.requests === 0 || row.kind !== "custom") {
+        return null;
+    }
+    const usage = usageOf(report, "requests", colors, true, row.name);
+    return <ChartLegend series={usage.legend} />;
+}
+
+export function TrafficCharts({
+    row,
+    versions,
+    report,
+    range,
+    metrics,
+}: {
+    row: ModelRow;
+    versions: VersionInfo[];
+    report: TrafficReport | undefined;
+    range: TrafficRange;
+    metrics: TrafficMetric[];
+}) {
+    const colors = versionColors(versions);
+    const single = metrics.length === 1;
+    return (
+        <div className="flex min-w-0 flex-col gap-4">
+            <VersionLegend row={row} report={report} colors={colors} />
+            <div className={single ? "flex flex-col" : "grid gap-x-8 gap-y-6 @2xl:grid-cols-2"}>
+                {metrics.map((metric) => (
+                    <MetricChart
+                        key={metric}
+                        row={row}
+                        report={report}
+                        range={range}
+                        metric={metric}
+                        colors={colors}
+                        height={single ? 200 : 140}
+                        title
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
 export function TrafficChart({
     row,
     versions,
@@ -103,10 +223,7 @@ export function TrafficChart({
     range,
     onRange,
     height = 200,
-    showHeadline = true,
     emptyHint,
-    metric: chosen,
-    onMetric,
 }: {
     row: ModelRow;
     versions: VersionInfo[];
@@ -114,56 +231,29 @@ export function TrafficChart({
     range: TrafficRange;
     onRange?: (range: TrafficRange) => void;
     height?: number;
-    showHeadline?: boolean;
     emptyHint?: string | null;
-    metric?: TrafficMetric;
-    onMetric?: (metric: TrafficMetric) => void;
 }) {
-    const [own, setOwn] = useState<TrafficMetric>("requests");
-    const metric = chosen ?? own;
-    const controls = !onMetric;
-    const custom = row.kind === "custom";
+    const [metric, setMetric] = useState<TrafficMetric>("requests");
     const colors = versionColors(versions);
-    const usage = report
-        ? usageOf(report, metric, colors, custom, row.name)
-        : { rows: [], series: [], legend: [] };
     const empty = !report || report.totals.requests === 0;
-    const label = METRICS.find((item) => item.key === metric)?.label ?? "";
-    const now = Date.now();
-    const rows = usage.rows.length > 0 ? usage.rows : [{ step: now - 86400000 }, { step: now }];
     return (
         <div className="flex min-w-0 flex-col gap-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-                {showHeadline && report && !empty ? (
-                    <p className="flex items-baseline gap-2">
-                        <span className="text-xl tabular-nums">
-                            {headline(metric, report.totals)}
-                        </span>
-                        <span className="text-base text-muted-foreground">{SPAN[range]}</span>
-                    </p>
-                ) : (
-                    <span />
-                )}
-                {controls && (
-                    <div className="flex items-center gap-2">
-                        <MetricSwitch metric={metric} onMetric={setOwn} />
-                        {onRange && <RangeSwitch range={range} onRange={onRange} />}
-                    </div>
-                )}
+                <VersionLegend row={row} report={report} colors={colors} />
+                <div className="ml-auto flex items-center gap-2">
+                    <MetricSwitch metric={metric} onMetric={setMetric} />
+                    {onRange && <RangeSwitch range={range} onRange={onRange} />}
+                </div>
             </div>
-            <LineChart
-                rows={rows}
-                series={usage.series}
-                legendSeries={usage.legend}
-                format={formatOf(metric)}
-                label={`${label} for ${row.name} ${SPAN[range]}${custom ? ", by version" : ""}`}
+            <MetricChart
+                row={row}
+                report={report}
+                range={range}
+                metric={metric}
+                colors={colors}
                 height={height}
-                markers={report ? markersOf(report) : []}
-                xFormat={xFormat(range)}
-                readoutTitle={report ? readoutTitle(report) : undefined}
-                readoutNotes={report ? readoutNotes(report) : undefined}
-                empty={empty ? { title: "No requests yet", hint: emptyHint } : null}
             />
+            {empty && emptyHint && <p className="text-muted-foreground">{emptyHint}</p>}
         </div>
     );
 }
@@ -172,7 +262,7 @@ function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefi
     const replicas = report?.replicas ?? [];
     const quiet = !report || report.totals.requests === 0;
     if (quiet && !isDeployed(row)) {
-        return "No traffic";
+        return "Not deployed yet · deploy it to start receiving requests";
     }
     const lead = quiet
         ? "No traffic"
@@ -190,10 +280,13 @@ function Footer({ row, report }: { row: ModelRow; report: TrafficReport | undefi
     );
 }
 
+const ALL_METRICS = METRICS.map((item) => item.key);
+
 export function UsagePanel({ row, versions }: { row: ModelRow; versions: VersionInfo[] }) {
     const [range, setRange] = useTrafficRange();
-    const [metric, setMetric] = useState<TrafficMetric>("requests");
+    const [metrics, setMetrics] = useState<TrafficMetric[]>(ALL_METRICS);
     const traffic = useModelTraffic(row.key, range);
+    const shown = ALL_METRICS.filter((metric) => metrics.includes(metric));
     return (
         <PanelSection
             icon={ChartLine}
@@ -205,20 +298,27 @@ export function UsagePanel({ row, versions }: { row: ModelRow; versions: Version
             }
             actions={
                 <>
-                    <MetricSwitch metric={metric} onMetric={setMetric} />
+                    <CheckboxSelect
+                        label="Metrics"
+                        allLabel="All metrics"
+                        noun="metrics"
+                        options={METRICS.map((item) => ({ value: item.key, label: item.label }))}
+                        value={metrics}
+                        onValueChange={(next) =>
+                            setMetrics(next.length > 0 ? (next as TrafficMetric[]) : ALL_METRICS)
+                        }
+                    />
                     <RangeSwitch range={range} onRange={setRange} />
                 </>
             }
         >
-            <div className="flex min-w-0 flex-col gap-4">
-                <TrafficChart
+            <div className="@container flex min-w-0 flex-col gap-4">
+                <TrafficCharts
                     row={row}
                     versions={versions}
                     report={traffic.data}
                     range={range}
-                    metric={metric}
-                    onMetric={setMetric}
-                    emptyHint={isDeployed(row) ? null : "Deploy it to start receiving requests"}
+                    metrics={shown}
                 />
                 <ErrorLine error={traffic.error} onRetry={traffic.refetch} />
                 <p className="text-sm text-muted-foreground tabular-nums">

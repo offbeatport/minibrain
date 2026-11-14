@@ -117,6 +117,28 @@ export function headline(metric: TrafficMetric, totals: TrafficStats): string {
     return gpu(totals.device_seconds);
 }
 
+const AXIS_NUMBER = new Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+});
+
+export function axisFormatOf(metric: TrafficMetric): (value: number) => string {
+    if (metric === "p95") {
+        return (value) => `${AXIS_NUMBER.format(value)} ms`;
+    }
+    if (metric === "errors") {
+        return (value) => `${Math.round(value * 100)}%`;
+    }
+    return (value) => AXIS_NUMBER.format(value);
+}
+
+export const EMPTY_DOMAIN: Record<TrafficMetric, [number, number]> = {
+    requests: [0, 4],
+    p95: [0, 400],
+    errors: [0, 1],
+    cost: [0, 4],
+};
+
 export function metricValue(stats: TrafficStats, metric: TrafficMetric): number | null {
     if (stats.requests <= 0) {
         return null;
@@ -133,7 +155,7 @@ export function metricValue(stats: TrafficStats, metric: TrafficMetric): number 
     return stats.device_seconds;
 }
 
-function bucketEnd(report: TrafficReport, index: number): number {
+export function bucketEnd(report: TrafficReport, index: number): number {
     const start = Date.parse(report.buckets[index].at);
     return Math.min(start + report.bucket_seconds * 1000, Date.parse(report.until));
 }
@@ -265,11 +287,32 @@ export function usageOf(
         const row: LineRow = { step: bucketEnd(report, index) };
         for (const item of series) {
             const found = groups.get(item.key)?.get(index);
-            row[item.key] = found ? metricValue(merged(found), metric) : null;
+            const empty = metric === "requests" || metric === "cost" ? 0 : null;
+            row[item.key] = found ? metricValue(merged(found), metric) : empty;
         }
         return row;
     });
     return { rows, series, legend: [...series].reverse() };
+}
+
+const RANGE_MS: Record<TrafficRange, number> = {
+    "24h": 86400000,
+    "7d": 7 * 86400000,
+    "30d": 30 * 86400000,
+};
+
+export function zeroUsage(
+    report: TrafficReport | undefined,
+    range: TrafficRange,
+    label: string,
+): Usage {
+    const series: LineSeries[] = [{ key: "zero", label, color: SERIES_COLORS[0] }];
+    const now = Date.now();
+    const steps =
+        report && report.buckets.length > 0
+            ? report.buckets.map((_, index) => bucketEnd(report, index))
+            : [now - RANGE_MS[range], now];
+    return { rows: steps.map((step) => ({ step, zero: 0 })), series, legend: series };
 }
 
 export function percentileLines(report: TrafficReport): Usage {

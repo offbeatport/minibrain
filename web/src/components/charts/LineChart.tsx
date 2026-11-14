@@ -46,6 +46,7 @@ export function LineChart({
     legendSeries,
     header,
     empty,
+    integer,
 }: {
     rows: StepRow[];
     series: StepSeries[];
@@ -64,6 +65,7 @@ export function LineChart({
     legendSeries?: StepSeries[];
     header?: ReactNode;
     empty?: { title: string; hint?: ReactNode } | null;
+    integer?: boolean;
 }) {
     const shown = legendSeries ?? series;
     return (
@@ -90,6 +92,7 @@ export function LineChart({
                     readoutTitle={readoutTitle}
                     readoutNotes={readoutNotes}
                     connectNulls={false}
+                    integer={integer}
                 />
                 {empty && <EmptyOverlay title={empty.title} hint={empty.hint} />}
             </div>

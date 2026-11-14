@@ -95,6 +95,7 @@ export function StepChart({
     readoutTitle = (value: number) => `Step ${STEPS.format(value)}`,
     readoutNotes,
     connectNulls = true,
+    integer = false,
 }: {
     rows: StepRow[];
     series: StepSeries[];
@@ -111,6 +112,7 @@ export function StepChart({
     readoutTitle?: (value: number) => string;
     readoutNotes?: (value: number) => string[];
     connectNulls?: boolean;
+    integer?: boolean;
 }) {
     const first = rows[0]?.step ?? 0;
     const last = rows.at(-1)?.step ?? first;
@@ -145,6 +147,8 @@ export function StepChart({
                         axisLine={false}
                         tickFormatter={axisFormat ?? format}
                         domain={yDomain ?? ["auto", "auto"]}
+                        allowDecimals={!integer}
+                        tickCount={height < 180 ? 3 : 5}
                     />
                     <Tooltip
                         cursor={{ stroke: "var(--input)", strokeWidth: 1 }}
