@@ -11132,6 +11132,18 @@
             ],
             "title": "Needed Bytes"
           },
+          "next_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Version",
+            "description": "The number the next version of a custom model gets."
+          },
           "publisher": {
             "anyOf": [
               {
@@ -22301,6 +22313,18 @@
               }
             ],
             "title": "Needed Bytes"
+          },
+          "next_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Version",
+            "description": "The number the next version of a custom model gets."
           },
           "publisher": {
             "anyOf": [

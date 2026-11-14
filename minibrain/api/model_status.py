@@ -31,7 +31,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly
-from minibrain.tasks.service import decision, held_out_score, live_version, serving_base
+from minibrain.tasks.service import decision, held_out_score, live_version, serving_base, upcoming_version_number
 
 StatusKind = Literal[
     "promote",
@@ -214,10 +214,6 @@ def neutral(text: str, action: StatusAction | None) -> ModelStatus:
     return ModelStatus(tone="neutral", text=text, action=action)
 
 
-def next_number(model: Model) -> int:
-    return max((v.number for v in model.versions), default=0) + 1
-
-
 def trained(model: Model) -> bool:
     return any(v.kind == VersionKind.LORA and v.status == VersionStatus.READY for v in model.versions)
 
@@ -261,7 +257,7 @@ def custom_status(session: Session, model: Model, pending: int, limit: ServeOnly
     if latest_dataset_version(model) is None:
         return neutral("No data yet", StatusAction(kind="add_data", label="Add data"))
     if limit is None and not trained(model):
-        upcoming = next_number(model)
+        upcoming = upcoming_version_number(model)
         return neutral("Ready to train", StatusAction(kind="train", label=f"Train v{upcoming}", version=upcoming))
     if not model.deployed:
         return neutral("Not deployed", StatusAction(kind="deploy", label="Deploy"))

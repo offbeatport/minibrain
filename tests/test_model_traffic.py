@@ -171,6 +171,18 @@ def test_a_better_version_is_put_against_live(harness: Harness) -> None:
     assert better["action"]["kind"] == "promote" and better["action"]["version"] == 1
 
 
+def test_the_next_version_number_skips_deleted_ones(harness: Harness) -> None:
+    servable(harness)
+    add_version(harness, "prompt")
+    finish(harness, "eval", accuracy=0.2)
+    assert harness.client.delete(f"/api/models/{SLUG}/versions/1").status_code == 204
+    found = page(harness)
+    assert found["next"]["label"] == "Train v2" and found["next"]["version"] == 2
+    row = next(item for item in harness.client.get("/api/models").json() if item["key"] == SLUG)
+    assert row["next_version"] == 2
+    assert add_version(harness, "prompt")["number"] == 2
+
+
 def test_a_worse_version_rolled_back_from_is_not_put_against_live(harness: Harness) -> None:
     servable(harness)
     add_version(harness, "prompt")

@@ -30,7 +30,7 @@ from minibrain.registry.models import BaseModel as BaseRow
 from minibrain.registry.service import latest_dataset_version, no_model
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
-from minibrain.tasks.service import live_version
+from minibrain.tasks.service import live_version, upcoming_version_number
 
 router = APIRouter(prefix="/api")
 
@@ -115,7 +115,7 @@ def busy(session: Session, model: Model) -> bool:
 
 def train_next(model: Model, limit: ServeOnly | None) -> NextAction | None:
     if limit is None:
-        upcoming = max((v.number for v in model.versions), default=0) + 1
+        upcoming = upcoming_version_number(model)
         return NextAction(kind="train", label=f"Train v{upcoming}", version=upcoming)
     if limit.target is None:
         return None

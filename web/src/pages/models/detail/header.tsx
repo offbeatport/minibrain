@@ -74,7 +74,8 @@ export function isDeployed(row: ModelRow): boolean {
 }
 
 export function nextVersion(row: ModelRow): number {
-    return Math.max(0, ...(row.versions ?? []).map((version) => version.number + 1));
+    const highest = Math.max(0, ...(row.versions ?? []).map((version) => version.number + 1));
+    return Math.max(highest, row.next_version ?? 0);
 }
 
 function trimmed(text: string): string {

@@ -3221,6 +3221,11 @@ export interface components {
             ready_version: number | null;
             /** Needed Bytes */
             needed_bytes: number | null;
+            /**
+             * Next Version
+             * @description The number the next version of a custom model gets.
+             */
+            next_version?: number | null;
             /** Publisher */
             publisher?: string | null;
             /** Size Bytes */
@@ -6811,6 +6816,11 @@ export interface components {
             ready_version: number | null;
             /** Needed Bytes */
             needed_bytes: number | null;
+            /**
+             * Next Version
+             * @description The number the next version of a custom model gets.
+             */
+            next_version?: number | null;
             /** Publisher */
             publisher?: string | null;
             /** Size Bytes */

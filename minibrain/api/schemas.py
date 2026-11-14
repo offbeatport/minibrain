@@ -1413,6 +1413,7 @@ class ModelFacts(BaseModel):
     current_version: int | None
     ready_version: int | None
     needed_bytes: int | None
+    next_version: int | None = Field(default=None, description="The number the next version of a custom model gets.")
     publisher: str | None = None
     size_bytes: int | None = None
     score: float | None = None

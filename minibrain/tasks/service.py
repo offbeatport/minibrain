@@ -183,9 +183,13 @@ def shots_of(session: Session, store: ArtifactStore, dataset_version: DatasetVer
     return [as_record(shot) for shot in read_split(dataset_version_location(session, store, dataset_version), "shots")]
 
 
-def next_version_number(model: Model) -> int:
+def upcoming_version_number(model: Model) -> int:
     highest = max((version.number for version in model.versions), default=-1)
-    model.last_version = max(highest, model.last_version) + 1
+    return max(highest, model.last_version) + 1
+
+
+def next_version_number(model: Model) -> int:
+    model.last_version = upcoming_version_number(model)
     return model.last_version
 
 

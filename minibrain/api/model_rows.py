@@ -60,7 +60,7 @@ from minibrain.registry.prices import DevicePrices, load_prices
 from minibrain.registry.service import latest_dataset_version
 from minibrain.settings import Settings
 from minibrain.tasks.rebase import ServeOnly, serve_only
-from minibrain.tasks.service import decision, held_out_score, serving_base, version_metric
+from minibrain.tasks.service import decision, held_out_score, serving_base, upcoming_version_number, version_metric
 
 FAILED_LABELS: dict[str, str] = {
     JobKind.TRAIN: "Training failed",
@@ -410,6 +410,7 @@ def custom_row(
         versions=version_rows(model, jobs, version_usage or {}, known, prices),
         active_jobs=sum(job.status in ACTIVE_JOB_STATUSES for job in jobs),
         ready_version=ready.number if ready is not None else None,
+        next_version=upcoming_version_number(model),
         needed_bytes=needed_bytes(base_weights) if base_weights else None,
         score=held_out_score(shown) if shown is not None else None,
         metric=version_metric(shown) if shown is not None else None,
