@@ -11,9 +11,7 @@ import {
     OptionalNumberField,
     Select,
     SelectContent,
-    SelectGroup,
     SelectItem,
-    SelectLabel,
     SelectTrigger,
     SelectValue,
     Switch,
@@ -22,7 +20,6 @@ import {
     TooltipTrigger,
 } from "obp-ui";
 import { type ReactNode, useState } from "react";
-import { ModelLabel } from "~/components/PublisherLogo";
 import {
     DEFAULT_PARAMETERS,
     type FunctionSpec,
@@ -83,96 +80,6 @@ function Labelled({
 
 function Note({ children }: { children: ReactNode }) {
     return <p className="text-sm text-muted-foreground">{children}</p>;
-}
-
-function targetLabel(target: Target): string {
-    if (target.kind === "base") {
-        return target.model_name;
-    }
-    return target.live
-        ? `${target.model_name} · live`
-        : `${target.model_name} · v${target.version}`;
-}
-
-function ModelPicker({
-    targets,
-    model,
-    onModel,
-}: {
-    targets: Target[];
-    model: string;
-    onModel: (name: string) => void;
-}) {
-    const custom = targets.filter((item) => item.kind === "custom");
-    const bases = targets.filter((item) => item.kind === "base");
-    return (
-        <Labelled
-            id="playground-model"
-            label="Model"
-            help="Any version of your models, the live one by name, or any base on this install, deployed or not."
-        >
-            <Select value={model} onValueChange={(next) => onModel(String(next ?? model))}>
-                <SelectTrigger id="playground-model" className="w-full">
-                    <SelectValue>
-                        {(value: string | null) => {
-                            const found = targets.find((item) => item.name === value);
-                            return found ? (
-                                <ModelLabel
-                                    publisher={found.publisher}
-                                    name={found.model_name}
-                                    label={targetLabel(found)}
-                                />
-                            ) : (
-                                "Pick a model"
-                            );
-                        }}
-                    </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                    {custom.length > 0 && (
-                        <SelectGroup>
-                            <SelectLabel>Your models</SelectLabel>
-                            {custom.map((item) => (
-                                <SelectItem
-                                    key={item.name}
-                                    value={item.name}
-                                    label={targetLabel(item)}
-                                >
-                                    <ModelLabel
-                                        publisher={item.publisher}
-                                        name={item.model_name}
-                                        label={targetLabel(item)}
-                                        detail={<span className="font-mono">{item.name}</span>}
-                                    />
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    )}
-                    {bases.length > 0 && (
-                        <SelectGroup>
-                            <SelectLabel>Base models</SelectLabel>
-                            {bases.map((item) => (
-                                <SelectItem
-                                    key={item.name}
-                                    value={item.name}
-                                    label={targetLabel(item)}
-                                >
-                                    <ModelLabel
-                                        publisher={item.publisher}
-                                        name={item.model_name}
-                                        label={targetLabel(item)}
-                                        detail={
-                                            item.deployed ? "Deployed" : "Installed, not deployed"
-                                        }
-                                    />
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    )}
-                </SelectContent>
-            </Select>
-        </Labelled>
-    );
 }
 
 function SafetyControls({
@@ -549,21 +456,15 @@ function StopControl({ settings, onChange }: { settings: Settings; onChange: Cha
 }
 
 export function SettingsPanel({
-    targets,
     guards,
     target,
-    model,
-    onModel,
     settings,
     onSettings,
     preset,
     onPreset,
 }: {
-    targets: Target[];
     guards: Guard[];
     target: Target | undefined;
-    model: string;
-    onModel: (name: string) => void;
     settings: Settings;
     onSettings: (next: Settings) => void;
     preset: number | null;
@@ -574,10 +475,11 @@ export function SettingsPanel({
     const limit = target?.context_tokens ?? TOKEN_CAP;
     return (
         <div className="flex flex-col">
-            <div className="flex flex-col gap-4 border-b px-4 py-3">
-                <ModelPicker targets={targets} model={model} onModel={onModel} />
-                {note && <Note>{note}</Note>}
-            </div>
+            {note && (
+                <div className="border-b px-4 py-3">
+                    <Note>{note}</Note>
+                </div>
+            )}
             <Group title="Presets">
                 <Presets
                     settings={settings}

@@ -1,7 +1,21 @@
 import { useRouter } from "@tanstack/react-router";
 import {
+    Code,
+    FlaskConical,
+    History,
+    MoreHorizontal,
+    PanelLeft,
+    PanelRight,
+    SlidersHorizontal,
+    SquarePen,
+} from "lucide-react";
+import {
     Button,
     Card,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
     EmptyState,
     Link,
     Sheet,
@@ -37,6 +51,7 @@ import {
     turnsOf,
 } from "~/lib/playground";
 import { Conversation } from "./playground/Conversation";
+import { ModelPicker } from "./playground/ModelPicker";
 import { Recent } from "./playground/Recent";
 import { SaveExample } from "./playground/SaveExample";
 import { SettingsPanel } from "./playground/SettingsPanel";
@@ -149,6 +164,7 @@ export function PlaygroundPage() {
     const [recentPanel, setRecentPanel] = useState(true);
     const [recentDrawer, setRecentDrawer] = useState(false);
     const [exampleFor, setExampleFor] = useState<string | null>(null);
+    const [code, setCode] = useState(false);
     const wide = useMedia(WIDE);
     const widest = useMedia(WIDEST);
     const aborter = useRef<AbortController | null>(null);
@@ -352,11 +368,8 @@ export function PlaygroundPage() {
           : null;
     const panelBody = target && (
         <SettingsPanel
-            targets={targets}
             guards={guards}
             target={target}
-            model={target.name}
-            onModel={pick}
             settings={settings}
             onSettings={loadSettings}
             preset={preset}
@@ -385,38 +398,59 @@ export function PlaygroundPage() {
                 caption="Chat with any of your models or installed bases, with the settings the API takes."
                 actions={
                     target && (
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant="outline"
-                                aria-expanded={widest ? recentPanel : recentDrawer}
-                                onClick={showRecent}
-                            >
-                                {recentColumn ? "Hide recent" : "Recent"}
-                            </Button>
+                        <div className="flex gap-2">
                             <Button
                                 variant="outline"
                                 disabled={busy || turns.length === 0}
                                 onClick={newChat}
                             >
+                                <SquarePen />
                                 New chat
                             </Button>
-                            {examples && (
-                                <Button
-                                    variant="outline"
-                                    disabled={busy || !wholeChat}
-                                    onClick={() => wholeChat && setExampleFor(wholeChat.id)}
-                                >
-                                    Save as test example
-                                </Button>
-                            )}
-                            <ViewCode body={preview} disabled={!target} />
-                            <Button
-                                variant="outline"
-                                aria-expanded={wide ? panel : drawer}
-                                onClick={showSettings}
-                            >
-                                {settingsColumn ? "Hide settings" : "Settings"}
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        aria-label="More Playground actions"
+                                    >
+                                        <MoreHorizontal />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onSelect={showRecent}>
+                                        {widest ? <PanelLeft /> : <History />}
+                                        {widest
+                                            ? recentPanel
+                                                ? "Hide recent chats"
+                                                : "Show recent chats"
+                                            : "Recent chats"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={showSettings}>
+                                        {wide ? <PanelRight /> : <SlidersHorizontal />}
+                                        {wide
+                                            ? panel
+                                                ? "Hide settings"
+                                                : "Show settings"
+                                            : "Settings"}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => setCode(true)}>
+                                        <Code />
+                                        View code
+                                    </DropdownMenuItem>
+                                    {examples && (
+                                        <DropdownMenuItem
+                                            disabled={busy || !wholeChat}
+                                            onSelect={() =>
+                                                wholeChat && setExampleFor(wholeChat.id)
+                                            }
+                                        >
+                                            <FlaskConical />
+                                            Save as test example
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         </div>
                     )
                 }
@@ -469,6 +503,13 @@ export function PlaygroundPage() {
                                     disabled={!target}
                                     onSend={send}
                                     onStop={() => aborter.current?.abort()}
+                                    tools={
+                                        <ModelPicker
+                                            targets={targets}
+                                            model={target.name}
+                                            onModel={pick}
+                                        />
+                                    }
                                 />
                             }
                         >
@@ -489,6 +530,7 @@ export function PlaygroundPage() {
                     )}
                 </div>
             )}
+            <ViewCode body={preview} open={code} onOpenChange={setCode} />
             {target && (
                 <SaveExample
                     key={exampleFor ?? "closed"}
@@ -515,7 +557,7 @@ export function PlaygroundPage() {
                         <SheetHeader className="px-4 pt-4">
                             <SheetTitle>Settings</SheetTitle>
                             <SheetDescription>
-                                Model, presets and what the next request sends.
+                                Presets and what the next request sends.
                             </SheetDescription>
                         </SheetHeader>
                         {panelBody}

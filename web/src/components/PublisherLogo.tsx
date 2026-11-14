@@ -27,6 +27,10 @@ const SIZES = {
 
 type Size = keyof typeof SIZES;
 
+export function providerOf(publisher?: string | null): ProviderId | undefined {
+    return publisher ? PROVIDERS[publisher] : undefined;
+}
+
 function LetterTile({ name, size }: { name: string; size: Size }) {
     return (
         <span
@@ -67,7 +71,7 @@ export function PublisherLogo({
     if (custom) {
         return <ModelAvatar name={name} avatar={avatar} size={size} />;
     }
-    const id = publisher ? PROVIDERS[publisher] : undefined;
+    const id = providerOf(publisher);
     if (id) {
         const { tile, logo } = SIZES[size];
         return (
