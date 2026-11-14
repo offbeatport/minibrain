@@ -70,17 +70,13 @@ def test_chats_are_saved_reopened_renamed_and_deleted_per_person(harness: Harnes
     assert harness.client.get(f"{SESSIONS}/{chat_id}").status_code == 404
 
 
-def test_nothing_is_saved_when_request_inputs_and_answers_are_not_kept(harness: Harness, tmp_path: Path) -> None:
+def test_chats_save_unless_request_content_is_locked_off(harness: Harness, tmp_path: Path) -> None:
     import_base(harness, tmp_path, "Spare Base", "spare-base")
     create_with_dataset(harness)
     base = target(harness, "spare-base")
-    assert base["chats_saved"] is False and "base models" in base["chats_note"]
-    refused = chat(harness)
-    assert refused.status_code == 403 and refused.json()["detail"] == base["chats_note"]
+    assert base["chats_saved"] is True and base["chats_note"] is None
     custom = target(harness, f"{SLUG}@0")
-    assert custom["chats_saved"] is False and "Chats with Support Triage are not saved" in custom["chats_note"]
-    assert harness.client.put(f"/api/models/{SLUG}/request-bodies", json={"kept": True}).status_code == 200
-    assert target(harness, f"{SLUG}@0")["chats_saved"] is True
+    assert custom["chats_saved"] is True
     saved = chat(harness, f"{SLUG}@0", version=0)
     assert saved.status_code == 201, saved.text
     assert set_policy(harness, "request_bodies_locked", True) == 200

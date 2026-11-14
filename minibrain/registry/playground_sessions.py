@@ -15,7 +15,6 @@ CONTENT = "content"
 TITLE_CHARS = 60
 UNTITLED = "New chat"
 LOCKED_OFF = "Chats are not saved: an admin turned off request content for every model (Settings, Security)."
-BASES_OFF = "Chats with base models are not saved: they keep no request content by default (Settings, Security)."
 
 
 def context_of(session_id: int, part: str) -> str:
@@ -50,16 +49,9 @@ def state_of(keys: Keys, row: PlaygroundSession) -> dict[str, Any]:
 
 
 def not_kept(policy: Policy, model: Model | None) -> str | None:
-    locked = bool(policy["request_bodies_locked"])
-    if model is None:
-        if policy["request_bodies"]:
-            return None
-        return LOCKED_OFF if locked else BASES_OFF
-    if policy.keeps_bodies(model.request_bodies):
-        return None
-    if locked:
+    if policy["request_bodies_locked"] and not policy["request_bodies"]:
         return LOCKED_OFF
-    return f"Chats with {model.name} are not saved: it does not keep request content ({model.name}, Settings)."
+    return None
 
 
 def purge(session: Session, days: int) -> int:
