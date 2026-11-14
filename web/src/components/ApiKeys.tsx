@@ -27,12 +27,10 @@ export function ApiKeys({
             title="API keys"
             description={description}
             actions={
-                <>
-                    <Button onClick={() => manager.create([scope])}>
-                        <KeyRound aria-hidden="true" />
-                        Create key
-                    </Button>
-                </>
+                <Button onClick={() => manager.create([scope])}>
+                    <KeyRound aria-hidden="true" />
+                    Create key
+                </Button>
             }
             bare
         >
