@@ -5,7 +5,7 @@ from minibrain.jobs.policy import LEASE
 from minibrain.jobs.queue import WorkerInfo, enqueue
 from minibrain.registry.models import Job, JobKind, now
 from tests.conftest import Harness
-from tests.test_flow import SLUG, add_version, create_with_dataset
+from tests.test_flow import SLUG, add_version, create_with_dataset, finish
 
 
 class Clock:
@@ -254,3 +254,22 @@ def test_jobs_filter_by_several_kinds(harness: Harness) -> None:
     everything = {item["kind"] for item in harness.client.get("/api/jobs").json()["items"]}
     assert everything == {"train", "eval"}
     assert [item["kind"] for item in harness.client.get("/api/jobs?kind=train").json()["items"]] == ["train"]
+
+
+def test_a_job_is_retried_once_so_two_runs_never_build_one_version(harness: Harness) -> None:
+    lora_job(harness)
+    claim = harness.claim(["train"])
+    assert claim is not None
+    fail(harness, claim, "bad", retryable=False)
+    again = harness.client.post(f"/api/jobs/{claim['job_id']}/retry").json()
+    second = harness.client.post(f"/api/jobs/{claim['job_id']}/retry")
+    assert second.status_code == 409 and f"job {again['id']}" in second.text
+    bulk = harness.client.post("/api/jobs/retry", json={"ids": [claim["job_id"]]}).json()
+    assert bulk[0]["done"] is False
+    queued = harness.client.get("/api/jobs?status=queued&kind=train").json()["items"]
+    assert [item["id"] for item in queued] == [again["id"]]
+    finish(harness, "train")
+    finish(harness, "eval", accuracy=0.9)
+    assert version_status(harness) == "ready"
+    assert harness.client.post(f"/api/jobs/{claim['job_id']}/retry").status_code == 409
+    assert version_status(harness) == "ready"

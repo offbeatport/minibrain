@@ -174,6 +174,30 @@ def refuse_orphan(job: Job) -> None:
         raise JobStateError(f"{name} v{job.version_number} is being deleted, so job {job.id} can't be retried")
 
 
+def retried_as(session: Session, job: Job) -> Job | None:
+    return session.scalar(select(Job).where(Job.retry_of == job.id).order_by(Job.id.desc()).limit(1))
+
+
+def same_work_active(session: Session, job: Job) -> Job | None:
+    if job.version_id is not None:
+        target = Job.version_id == job.version_id
+    elif job.base_model_id is not None:
+        target = Job.base_model_id == job.base_model_id
+    else:
+        return None
+    query = select(Job).where(target, Job.kind == job.kind, Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]))
+    return session.scalar(query.order_by(Job.id).limit(1))
+
+
+def refuse_rerun(session: Session, job: Job) -> None:
+    again = retried_as(session, job)
+    if again is not None:
+        raise JobStateError(f"job {job.id} was already retried as job {again.id}")
+    active = same_work_active(session, job)
+    if active is not None:
+        raise JobStateError(f"job {active.id} is already doing this work ({active.status})")
+
+
 def same_error_twice(job: Job, error: str) -> bool:
     finished = [attempt for attempt in job.attempts if attempt.outcome != AttemptOutcome.RUNNING]
     return len(finished) >= 2 and finished[-2].error == error
@@ -404,6 +428,7 @@ class SqlJobQueue:
         if job.status not in (JobStatus.FAILED, JobStatus.CANCELLED):
             raise JobStateError(f"job {job.id} is {job.status}; only failed or cancelled jobs can be retried")
         refuse_orphan(job)
+        refuse_rerun(session, job)
         again = enqueue(
             session,
             job.kind,
