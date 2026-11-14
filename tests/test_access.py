@@ -1,3 +1,4 @@
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
@@ -379,3 +380,42 @@ def test_every_response_refuses_framing_and_sniffing(harness: Harness) -> None:
         assert reply.headers["content-security-policy"] == "frame-ancestors 'none'"
         assert reply.headers["x-content-type-options"] == "nosniff"
         assert reply.headers["referrer-policy"] == "same-origin"
+
+
+RANKS = {"signed_in": 0, "viewer": 1, "builder": 2, "admin": 3}
+OPEN_PATHS = {"/healthz", "/readyz", "/metrics", "/{path:path}"}
+
+
+def filled(path: str) -> str:
+    return re.sub(r"\{[^}]+\}", "1", path)
+
+
+def test_every_guarded_api_route_refuses_lower_roles(harness: Harness, team: Team) -> None:
+    anonymous = TestClient(harness.app)
+    callers = ((anonymous, -1), (team.nobody, 0), (team.viewer, 1), (team.builder, 2))
+    let_through = []
+    for (method, path), role in sorted(ROUTE_ROLES.items()):
+        if role == "public":
+            continue
+        for client, rank in callers:
+            needed = RANKS[role] if client is not team.nobody or role == "signed_in" else 1
+            if rank >= needed or (method, path) == ("POST", "/api/auth/logout"):
+                continue
+            if client.request(method, filled(path), json={}).status_code not in (401, 403):
+                let_through.append((rank, method, path))
+    assert let_through == []
+
+
+def test_every_other_route_needs_its_token(harness: Harness) -> None:
+    anonymous = TestClient(harness.app)
+    signed_in = harness.client
+    let_through = []
+    for route in harness.app.routes:
+        path = getattr(route, "path", "")
+        if not isinstance(route, APIRoute) or path.startswith("/api/") or path in OPEN_PATHS:
+            continue
+        for method in sorted(route.methods or ()):
+            for client in (anonymous, signed_in):
+                if client.request(method, filled(path), json={}).status_code != 401:
+                    let_through.append((method, path))
+    assert let_through == []
