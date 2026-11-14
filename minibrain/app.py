@@ -50,7 +50,7 @@ from minibrain.api import (
     training_plan,
     versions,
 )
-from minibrain.api.access import Identify, TrustedProxy
+from minibrain.api.access import Identify, SecurityHeaders, TrustedProxy
 from minibrain.api.audit import PeerAddress
 from minibrain.api.catalog import schedule_forever
 from minibrain.api.sections import tag_sections
@@ -298,6 +298,7 @@ def create_app(
     app.add_middleware(Identify)
     app.add_middleware(TrustedProxy)
     app.add_middleware(RequestContext)
+    app.add_middleware(SecurityHeaders)
     for module in (
         auth,
         accounts,

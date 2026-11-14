@@ -35,6 +35,12 @@ SIGN_IN_NEEDED = "Sign in to use minibrain"
 SIGNED_OUT_HEADER = "X-Signed-Out"
 CSRF_MISSING = "This request has no valid CSRF token. Reload the page and try again."
 NO_ROLE = "You do not have access yet. Ask an admin to give you a role."
+SECURITY_HEADERS = (
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"content-security-policy", b"frame-ancestors 'none'"),
+    (b"referrer-policy", b"same-origin"),
+)
 
 
 def forwarded_client(value: str | None, proxy: ProxyConfig) -> str | None:
@@ -107,6 +113,26 @@ def with_header(send: Send, name: str, value: str) -> Send:
         await send(message)
 
     return sending
+
+
+class SecurityHeaders:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def sending(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = list(message.get("headers", []))
+                present = {name.lower() for name, _ in headers}
+                headers += [pair for pair in SECURITY_HEADERS if pair[0] not in present]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, sending)
 
 
 class Identify:

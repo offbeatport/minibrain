@@ -367,3 +367,15 @@ def test_the_api_reference_needs_a_role(harness: Harness) -> None:
         assert TestClient(harness.app).get(path).status_code == 401
         assert people.nobody.get(path).status_code == 403
         assert people.viewer.get(path).status_code == 200
+
+
+def test_every_response_refuses_framing_and_sniffing(harness: Harness) -> None:
+    harness.settings.web_dist.mkdir(parents=True, exist_ok=True)
+    (harness.settings.web_dist / "index.html").write_text("<!doctype html>")
+    anonymous = TestClient(harness.app)
+    replies = (anonymous.get("/settings/accounts"), anonymous.get("/api/accounts"), harness.client.get("/api/models"))
+    for reply in replies:
+        assert reply.headers["x-frame-options"] == "DENY"
+        assert reply.headers["content-security-policy"] == "frame-ancestors 'none'"
+        assert reply.headers["x-content-type-options"] == "nosniff"
+        assert reply.headers["referrer-policy"] == "same-origin"
