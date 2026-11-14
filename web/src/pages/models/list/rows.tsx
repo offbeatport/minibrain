@@ -34,7 +34,6 @@ import {
 } from "obp-ui";
 import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
-import { Sparkline } from "~/components/Sparkline";
 import type { HealthAction } from "~/components/models/HealthStatus";
 import { Requests } from "~/components/models/ModelMetrics";
 import type { Abilities } from "~/lib/access";
@@ -49,6 +48,9 @@ import {
     ModelAvatar,
     Muted,
     ScoreBadge,
+    ScoreBar,
+    ScoreFacts,
+    ScoreGain,
     StatusLineText,
     VersionName,
     VersionStatus,
@@ -56,6 +58,8 @@ import {
 import { COLUMNS, type Column } from "./filters";
 import {
     type ListModel,
+    baselineOf,
+    bestOf,
     canMakeLive,
     childCount,
     costOf,
@@ -68,7 +72,6 @@ import {
     pct,
     plural,
     replicasOf,
-    scoredVersions,
     statusLine,
     usageOf,
     variantLine,
@@ -207,36 +210,58 @@ function Milliseconds({ value }: { value: number | null | undefined }) {
 
 function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
     const headline = headlineOf(model);
-    if (model.kind === "base" || !headline) {
+    if (model.kind === "base" || !headline || headline.score == null) {
         return <Muted>{model.kind === "base" ? "Not scored" : "—"}</Muted>;
     }
     const live = liveOf(model);
+    const baseline = baselineOf(model);
+    const best = bestOf(model);
+    const better = best && best.number !== headline.number ? best : undefined;
+    const showBaseline = baseline && baseline.number !== headline.number ? baseline : undefined;
+    const facts: [string, number | null | undefined][] = [
+        [live ? `Live v${headline.number}` : `v${headline.number}, not live`, headline.score],
+        ...(better ? ([[`Best v${better.number}`, better.score]] as [string, number][]) : []),
+        ...(showBaseline
+            ? ([[`Prompt only v${showBaseline.number}`, showBaseline.score]] as [string, number][])
+            : []),
+    ];
     return (
-        <button
-            type="button"
-            aria-label={`Quick look at ${model.name}`}
-            onClick={() => on.peek(model)}
-            className="relative z-10 -mx-1.5 flex items-center gap-2.5 rounded-md px-1.5 py-1 text-left hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-        >
-            <Sparkline
-                points={scoredVersions(model).map((version) => ({
-                    key: String(version.number),
-                    label: `v${version.number}${version.live ? " live" : ""}`,
-                    value: version.score ?? 0,
-                    marked: version.live,
-                }))}
-                width={64}
-                height={24}
-                label={`${model.name} score over versions`}
-                format={pct}
-            />
-            <span className="flex flex-col tabular-nums">
-                <span>{pct(headline.score)}</span>
-                <span className="text-sm text-muted-foreground">
-                    {live ? `v${live.number} live` : `v${headline.number}, not live`}
-                </span>
-            </span>
-        </button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <button
+                    type="button"
+                    aria-label={`Quick look at ${model.name}, held-out score ${pct(headline.score)}`}
+                    onClick={() => on.peek(model)}
+                    className="relative z-10 -mx-1.5 flex w-[calc(100%+0.75rem)] max-w-44 flex-col gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                >
+                    <span className="flex items-baseline justify-between gap-2">
+                        <span
+                            className={cn(
+                                "font-medium tabular-nums",
+                                !live && "text-muted-foreground",
+                            )}
+                        >
+                            {pct(headline.score)}
+                        </span>
+                        {showBaseline?.score != null && (
+                            <ScoreGain
+                                value={headline.score - showBaseline.score}
+                                versus="prompt"
+                            />
+                        )}
+                    </span>
+                    <ScoreBar
+                        score={headline.score}
+                        live={Boolean(live)}
+                        baseline={showBaseline?.score}
+                        better={better?.score}
+                    />
+                </button>
+            </TooltipTrigger>
+            <TooltipContent>
+                <ScoreFacts rows={facts} />
+            </TooltipContent>
+        </Tooltip>
     );
 }
 
@@ -853,9 +878,14 @@ export function VersionLine({
                         version.score == null ? (
                             <Muted />
                         ) : (
-                            <span className="flex items-center gap-2 tabular-nums">
-                                <span>{pct(version.score)}</span>
-                                <ScoreBadge model={model} version={version} />
+                            <span className="flex max-w-44 flex-col gap-1">
+                                <span className="flex items-center gap-2 tabular-nums">
+                                    <span className={cn(!version.live && "text-muted-foreground")}>
+                                        {pct(version.score)}
+                                    </span>
+                                    <ScoreBadge model={model} version={version} />
+                                </span>
+                                <ScoreBar score={version.score} live={version.live} />
                             </span>
                         ),
                     requests: version.usage ? (

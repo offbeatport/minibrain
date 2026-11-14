@@ -1,4 +1,4 @@
-import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
+import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
 import type { ReactNode } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { PoolLink } from "~/components/PoolLink";
@@ -14,6 +14,7 @@ import {
     type Replica,
     type StatusLine,
     isBaseline,
+    pct,
     points,
     scoreNote,
     versionState,
@@ -327,5 +328,76 @@ export function DataCell({ dataset }: { dataset: ModelRow["dataset"] }) {
                 {newer && <span className="text-warning">{` · v${dataset.latest} available`}</span>}
             </span>
         </div>
+    );
+}
+
+function share(value: number): string {
+    return `${Math.min(100, Math.max(0, value * 100))}%`;
+}
+
+export function ScoreBar({
+    score,
+    live,
+    baseline,
+    better,
+}: {
+    score: number;
+    live: boolean;
+    baseline?: number | null;
+    better?: number | null;
+}) {
+    return (
+        <span aria-hidden="true" className="relative block h-1.5 w-full rounded-sm bg-muted">
+            {better != null && better > score && (
+                <span
+                    className="absolute inset-y-0 rounded-r-sm bg-success/50"
+                    style={{
+                        left: share(score),
+                        width: `calc(${share(better)} - ${share(score)})`,
+                    }}
+                />
+            )}
+            <span
+                className={cn(
+                    "absolute inset-y-0 left-0 rounded-sm",
+                    live ? "bg-primary" : "bg-muted-foreground/60",
+                )}
+                style={{ width: share(score) }}
+            />
+            {baseline != null && (
+                <span
+                    className="absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-sm bg-foreground/70"
+                    style={{ left: share(baseline) }}
+                />
+            )}
+        </span>
+    );
+}
+
+export function ScoreGain({ value, versus }: { value: number; versus: string }) {
+    const tone =
+        value > 0.0005
+            ? "text-success"
+            : value < -0.0005
+              ? "text-destructive"
+              : "text-muted-foreground";
+    return (
+        <span className="text-sm text-muted-foreground tabular-nums">
+            <span className={tone}>{points(value)}</span>
+            {` vs ${versus}`}
+        </span>
+    );
+}
+
+export function ScoreFacts({ rows }: { rows: [string, number | null | undefined][] }) {
+    return (
+        <span className="grid grid-cols-[auto_auto] gap-x-4 gap-y-1 tabular-nums">
+            {rows.map(([label, value]) => (
+                <span key={label} className="contents">
+                    <span>{label}</span>
+                    <span className="text-right">{pct(value)}</span>
+                </span>
+            ))}
+        </span>
     );
 }

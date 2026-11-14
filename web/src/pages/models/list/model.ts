@@ -168,6 +168,16 @@ export function scoredVersions(model: ListModel): ModelVersionRow[] {
         .sort((left, right) => left.number - right.number);
 }
 
+export function baselineOf(model: ListModel): ModelVersionRow | undefined {
+    return model.versions.find((version) => isBaseline(version) && version.score != null);
+}
+
+export function bestOf(model: ListModel): ModelVersionRow | undefined {
+    return scoredVersions(model)
+        .filter((version) => !isBaseline(version) && version.status === "ready")
+        .sort((left, right) => (right.score ?? 0) - (left.score ?? 0))[0];
+}
+
 export function headlineOf(model: ListModel): ModelVersionRow | undefined {
     return (
         liveOf(model) ??
