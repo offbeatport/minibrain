@@ -356,11 +356,16 @@ function VersionRow({
     const can = useCan();
     const router = useRouter();
     const client = useQueryClient();
+    const toast = useToast();
     const again = useMutation({
         mutationFn: retry,
         onSuccess: async (started) => {
             await client.invalidateQueries();
             router.history.push(jobHref(started));
+        },
+        onError: async (error) => {
+            toast({ title: "Retry failed", description: error.message, tone: "destructive" });
+            await client.invalidateQueries();
         },
     });
     const failedJob = version.status === "failed" ? version.job : null;
