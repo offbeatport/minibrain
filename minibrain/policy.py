@@ -444,7 +444,17 @@ def list_items(field: Field, value: Any) -> list[Any]:
     raise PolicyError(f"{field.label} is a list of names")
 
 
+def plain_text(field: Field, value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool) or not isinstance(value, str | int | float):
+        raise PolicyError(f"{field.label} is a single value")
+    return str(value).strip()
+
+
 def coerce(field: Field, value: Any) -> Any:
+    if field.kind in ("url", "host", "text"):
+        value = plain_text(field, value)
     if field.kind == "bool":
         if isinstance(value, str):
             return value.strip().lower() in TRUE

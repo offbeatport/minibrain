@@ -160,9 +160,19 @@ def test_licence_choices_carry_their_commercial_use(harness: Harness) -> None:
         ("data_folders", None),
         ("allowed_hosts", 5),
         ("allowed_hosts", [{}]),
+        ("siem_host", ["siem"]),
+        ("vault_mount", {"path": "transit"}),
+        ("otel_endpoint", ["https://otel.internal"]),
     ],
 )
 def test_values_of_the_wrong_type_are_refused(harness: Harness, name: str, value: object) -> None:
     assert set_policy(harness, name, value) == 403
     assert set_policy(harness, "audit_retention_days", "30") == 200
     assert policies(harness)["audit_retention_days"]["value"] == 30
+
+
+def test_an_empty_text_policy_is_blank_not_none(harness: Harness) -> None:
+    assert set_policy(harness, "siem_host", None) == 200
+    assert set_policy(harness, "vault_namespace", None) == 200
+    found = policies(harness)
+    assert (found["siem_host"]["value"], found["vault_namespace"]["value"]) == ("", "")
