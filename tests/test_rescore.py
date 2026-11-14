@@ -65,3 +65,17 @@ def test_versions_still_training_take_the_new_graders_without_a_job(harness: Har
     harness.client.put(f"/api/models/{SLUG}/graders", json={"graders": [{"name": "exact_match"}]})
     assert harness.client.post(f"/api/models/{SLUG}/rescore").json()["versions"] == [1]
     assert [item["name"] for item in versions(harness)[2]["graders"]] == ["exact_match"]
+
+
+def test_changing_graders_again_mid_rescore_scores_with_the_latest_ones(harness: Harness) -> None:
+    scored_assistant(harness)
+    harness.client.put(f"/api/models/{SLUG}/graders", json={"graders": [{"name": "exact_match"}]})
+    first = harness.client.post(f"/api/models/{SLUG}/rescore").json()["jobs"]
+    harness.client.put(f"/api/models/{SLUG}/graders", json={"graders": [{"name": "text_similarity"}]})
+    second = harness.client.post(f"/api/models/{SLUG}/rescore").json()["jobs"]
+    assert second != first
+    assert harness.client.get(f"/api/jobs/{first[0]}").json()["status"] == "cancelled"
+    claim, _ = answer(harness, {0: "No idea."})
+    assert claim["job_id"] == second[0]
+    assert claim["params"]["rescore"][0]["name"] == "text_similarity"
+    assert versions(harness)[1]["main_metric"] == "text_similarity"

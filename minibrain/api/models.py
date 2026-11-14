@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from minibrain.api.access import builder, sees_rows, viewer
 from minibrain.api.catalog import ensure_reachable
 from minibrain.api.data import apply_mapping, dataset_preview_of, query_rows
-from minibrain.api.deps import SessionDep, SettingsDep, StoreDep
+from minibrain.api.deps import QueueDep, SessionDep, SettingsDep, StoreDep
+from minibrain.api.jobs import cancel
 from minibrain.api.placing import audit_deploy, place_custom
 from minibrain.api.reserved_names import reserved_info
 from minibrain.api.schemas import (
@@ -512,9 +513,9 @@ def update_graders(name: str, body: GradersUpdate, session: SessionDep, settings
 @router.post(
     "/{name}/rescore", dependencies=[Depends(builder)], summary="Score every version again with the current graders"
 )
-def rescore_versions(name: str, session: SessionDep, settings: SettingsDep) -> RescoreResult:
+def rescore_versions(name: str, session: SessionDep, settings: SettingsDep, queue: QueueDep) -> RescoreResult:
     model = get_model(session, name)
-    jobs = rescore(session, settings, model)
+    jobs = rescore(session, settings, model, lambda job: cancel(session, queue, job, reason="rescore"))
     numbers = [job.version.number for job in jobs if job.version is not None]
     facts = {"name": model.name, "versions": numbers}
     session.add(AuditEvent(actor=current_actor(), action="model.rescore", target=name, detail=facts))
