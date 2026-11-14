@@ -1,41 +1,35 @@
-import { Braces, Code, MessagesSquare, Waypoints } from "lucide-react";
 import {
     CodeBlock,
     type CodeLanguage,
     Link,
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
+    type SoftwareId,
     SoftwareLogo,
 } from "obp-ui";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
+
+type HarnessGroup = "language" | "tool";
 
 export type Harness = {
     id: string;
     label: string;
+    logo: SoftwareId;
+    group: HarnessGroup;
     language: CodeLanguage;
-    title?: string;
+    file: string;
     code: string;
-    icon?: ReactNode;
 };
 
-const ICONS: Record<string, ReactNode> = {
-    curl: <SoftwareLogo id="curl" />,
-    python: <SoftwareLogo id="python" />,
-    javascript: <SoftwareLogo id="javascript" />,
-    env: <SoftwareLogo id="dotenv" />,
-    langchain: <SoftwareLogo id="langchain" />,
-    llamaindex: <Braces />,
-    litellm: <Waypoints />,
-    continue: <Code />,
-    openwebui: <MessagesSquare />,
-};
-
-function iconOf(item: Harness): ReactNode {
-    return item.icon ?? ICONS[item.id] ?? <Code />;
-}
+const GROUPS: { id: HarnessGroup; label: string }[] = [
+    { id: "language", label: "Languages" },
+    { id: "tool", label: "Frameworks and apps" },
+];
 
 export const SAMPLE = "I was charged twice";
 
@@ -44,18 +38,27 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "curl",
             label: "curl",
+            logo: "curl",
+            group: "language",
             language: "bash",
+            file: "Terminal",
             code: [
                 `curl ${baseUrl}/chat/completions \\`,
                 `  -H "Authorization: Bearer ${key}" \\`,
                 `  -H "Content-Type: application/json" \\`,
-                `  -d '{"model": "${model}", "messages": [{"role": "user", "content": "${SAMPLE}"}]}'`,
+                "  -d '{",
+                `    "model": "${model}",`,
+                `    "messages": [{"role": "user", "content": "${SAMPLE}"}]`,
+                "  }'",
             ].join("\n"),
         },
         {
             id: "python",
             label: "Python",
+            logo: "python",
+            group: "language",
             language: "python",
+            file: "app.py · pip install openai",
             code: [
                 "from openai import OpenAI",
                 "",
@@ -70,7 +73,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "javascript",
             label: "JavaScript",
+            logo: "javascript",
+            group: "language",
             language: "javascript",
+            file: "app.mjs · npm install openai",
             code: [
                 'import OpenAI from "openai";',
                 "",
@@ -85,8 +91,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "env",
             label: "Environment",
+            logo: "dotenv",
+            group: "language",
             language: "bash",
-            title: ".env",
+            file: ".env",
             code: [
                 `OPENAI_BASE_URL=${baseUrl}`,
                 `OPENAI_API_KEY=${key}`,
@@ -96,7 +104,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "langchain",
             label: "LangChain",
+            logo: "langchain",
+            group: "tool",
             language: "python",
+            file: "app.py · pip install langchain-openai",
             code: [
                 "from langchain_openai import ChatOpenAI",
                 "",
@@ -107,7 +118,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "llamaindex",
             label: "LlamaIndex",
+            logo: "llamaindex",
+            group: "tool",
             language: "python",
+            file: "app.py · pip install llama-index-llms-openai-like",
             code: [
                 "from llama_index.llms.openai_like import OpenAILike",
                 "",
@@ -123,8 +137,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "litellm",
             label: "LiteLLM",
+            logo: "litellm",
+            group: "tool",
             language: "yaml",
-            title: "config.yaml",
+            file: "config.yaml",
             code: [
                 "model_list:",
                 `  - model_name: ${model}`,
@@ -137,8 +153,10 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "continue",
             label: "Continue",
+            logo: "continue",
+            group: "tool",
             language: "yaml",
-            title: "config.yaml",
+            file: "~/.continue/config.yaml",
             code: [
                 "models:",
                 `  - name: ${model}`,
@@ -151,11 +169,52 @@ export function harnesses(baseUrl: string, model: string, key: string): Harness[
         {
             id: "openwebui",
             label: "Open WebUI",
+            logo: "openwebui",
+            group: "tool",
             language: "text",
-            title: "Settings → Connections → OpenAI API",
+            file: "Admin settings › Connections › OpenAI API",
             code: [`URL: ${baseUrl}`, `Key: ${key}`, `Model: ${model}`].join("\n"),
         },
     ];
+}
+
+function HarnessSelect({
+    items,
+    value,
+    onChange,
+}: {
+    items: Harness[];
+    value: Harness;
+    onChange: (id: string) => void;
+}) {
+    return (
+        <Select value={value.id} onValueChange={(next) => next && onChange(String(next))}>
+            <SelectTrigger aria-label="Language or tool" className="h-7 w-40 shrink-0">
+                <span className="flex min-w-0 items-center gap-2 text-foreground">
+                    <SoftwareLogo id={value.logo} className="size-4 shrink-0" />
+                    <span className="truncate">{value.label}</span>
+                </span>
+            </SelectTrigger>
+            <SelectContent>
+                {GROUPS.map((group) => (
+                    <SelectGroup key={group.id}>
+                        <SelectLabel>{group.label}</SelectLabel>
+                        {items
+                            .filter((entry) => entry.group === group.id)
+                            .map((entry) => (
+                                <SelectItem
+                                    key={entry.id}
+                                    value={entry.id}
+                                    icon={<SoftwareLogo id={entry.logo} className="size-4" />}
+                                >
+                                    {entry.label}
+                                </SelectItem>
+                            ))}
+                    </SelectGroup>
+                ))}
+            </SelectContent>
+        </Select>
+    );
 }
 
 export function HarnessConfigs({
@@ -163,17 +222,13 @@ export function HarnessConfigs({
     model,
     keyValue,
     hint = true,
-    extra = [],
 }: {
     baseUrl: string;
     model: string;
     keyValue: string | null;
     hint?: boolean;
-    extra?: Harness[];
 }) {
-    const key = keyValue ?? "YOUR_KEY";
-    const all = harnesses(baseUrl, model, key);
-    const items = [...all.slice(0, 3), ...extra, ...all.slice(3)];
+    const items = harnesses(baseUrl, model, keyValue ?? "YOUR_KEY");
     const [picked, setPicked] = useState(items[0]?.id ?? "curl");
     const item = items.find((entry) => entry.id === picked) ?? items[0];
     if (!item) {
@@ -181,27 +236,18 @@ export function HarnessConfigs({
     }
     const title = (
         <span className="flex min-w-0 items-center gap-3">
-            <Select value={item.id} onValueChange={(next) => next && setPicked(String(next))}>
-                <SelectTrigger aria-label="Language or tool" className="h-7 w-44 shrink-0">
-                    <span className="flex min-w-0 items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:shrink-0">
-                        {iconOf(item)}
-                        <span className="truncate">{item.label}</span>
-                    </span>
-                </SelectTrigger>
-                <SelectContent>
-                    {items.map((entry) => (
-                        <SelectItem key={entry.id} value={entry.id} icon={iconOf(entry)}>
-                            {entry.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <span className="truncate">{item.title ?? "Copy, paste and run."}</span>
+            <HarnessSelect items={items} value={item} onChange={setPicked} />
+            <span className="truncate font-mono">{item.file}</span>
         </span>
     );
     return (
         <div className="flex min-w-0 flex-col gap-2">
-            <CodeBlock code={item.code} language={item.language} title={title} />
+            <CodeBlock
+                code={item.code}
+                language={item.language}
+                title={title}
+                copyLabel={`Copy the ${item.label} snippet`}
+            />
             {hint && (
                 <p className="text-sm text-muted-foreground">
                     {!keyValue &&

@@ -1,7 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CircleCheck, CircleX, KeyRound, Send, ThumbsUp } from "lucide-react";
+import { BookOpen, Check, CircleCheck, CircleX, KeyRound, Send, TriangleAlert } from "lucide-react";
 import {
     Button,
+    CodeBlock,
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -9,19 +13,22 @@ import {
     DialogHeader,
     DialogTitle,
     Link,
-    Tooltip,
-    TooltipContent,
-    TooltipTrigger,
+    cn,
 } from "obp-ui";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { type KeyCreated, type ModelRow, api, unwrap } from "~/api/client";
-import { keys, useModel } from "~/api/queries";
+import { keys, useKeys, useModel } from "~/api/queries";
+import { BlockedButton } from "~/components/BlockedButton";
 import { CopyButton } from "~/components/CopyButton";
 import { HarnessConfigs, SAMPLE } from "~/components/HarnessConfigs";
 import { errorMessage } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { API_REFERENCE_PATH, modelPageHref } from "~/lib/modelLinks";
 import { isDeployed } from "./header";
+
+const KEY_PLACEHOLDER = "YOUR_KEY";
+
+const POLL_MS = 3000;
 
 function feedbackCurl(baseUrl: string, model: string, key: string, kept: boolean): string {
     const body = {
@@ -39,21 +46,7 @@ function feedbackCurl(baseUrl: string, model: string, key: string, kept: boolean
     ].join("\n");
 }
 
-function Copyable({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex min-w-0 flex-col gap-label">
-            <span className="text-sm text-muted-foreground">{label}</span>
-            <span className="flex h-8 min-w-0 items-center gap-1 rounded-md border bg-muted pr-0.5 pl-3">
-                <span className="flex-1 truncate font-mono text-sm">{value}</span>
-                <CopyButton value={value} label={`Copy ${label.toLowerCase()}`} />
-            </span>
-        </div>
-    );
-}
-
 type TestResult = { ok: true; answer: string; ms: number } | { ok: false; message: string };
-
-const POLL_MS = 3000;
 
 function keyName(model: string): string {
     const stamp = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -101,6 +94,113 @@ function useNewestRequest(model: string, open: boolean) {
     });
 }
 
+type StepState = "done" | "current" | "next";
+
+function StepMarker({ number, state }: { number: number; state: StepState }) {
+    return (
+        <span
+            className={cn(
+                "grid size-6 shrink-0 place-items-center rounded-md border text-sm font-medium tabular-nums",
+                state === "done" && "border-success/40 text-success",
+                state === "current" && "border-primary bg-primary text-primary-foreground",
+                state === "next" && "border-input text-muted-foreground",
+            )}
+        >
+            {state === "done" ? <Check aria-hidden="true" className="size-3.5" /> : number}
+            <span className="sr-only">{state === "done" ? `Step ${number}, done` : ""}</span>
+        </span>
+    );
+}
+
+function Step({
+    number,
+    state,
+    title,
+    aside,
+    last = false,
+    children,
+}: {
+    number: number;
+    state: StepState;
+    title: string;
+    aside?: ReactNode;
+    last?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <li className="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-4">
+            <div className="flex flex-col items-center">
+                <StepMarker number={number} state={state} />
+                {!last && <span aria-hidden="true" className="mt-2 w-px flex-1 bg-border" />}
+            </div>
+            <section className={cn("flex min-w-0 flex-col gap-3", !last && "pb-5")}>
+                <div className="flex min-h-6 items-center justify-between gap-3">
+                    <h3 className="font-medium">{title}</h3>
+                    {aside}
+                </div>
+                {children}
+            </section>
+        </li>
+    );
+}
+
+function Endpoint({ baseUrl, model }: { baseUrl: string; model: string }) {
+    const cells = [
+        { label: "Base URL", value: baseUrl },
+        { label: "Model", value: model },
+    ];
+    return (
+        <dl className="grid min-w-0 grid-cols-[3fr_2fr] divide-x rounded-md border">
+            {cells.map((cell) => (
+                <div key={cell.label} className="flex h-9 min-w-0 items-center gap-3 pr-0.5 pl-3">
+                    <dt className="shrink-0 text-sm text-muted-foreground">{cell.label}</dt>
+                    <dd className="min-w-0 flex-1 truncate font-mono text-sm">{cell.value}</dd>
+                    <CopyButton value={cell.value} label={`Copy ${cell.label.toLowerCase()}`} />
+                </div>
+            ))}
+        </dl>
+    );
+}
+
+function covers(
+    row: ModelRow,
+    key: { all_models: boolean; models: { kind: string; key: string }[] },
+) {
+    return key.all_models || key.models.some((m) => m.kind === row.kind && m.key === row.key);
+}
+
+function ExistingKeys({
+    row,
+    href,
+    onLeave,
+}: { row: ModelRow; href: string; onLeave: () => void }) {
+    const list = useKeys();
+    const count = (list.data ?? []).filter(
+        (key) => key.status === "active" && covers(row, key),
+    ).length;
+    return (
+        <span className="text-muted-foreground">
+            {"or use an existing key from "}
+            <Link href={href} onClick={onLeave} className="text-primary hover:underline">
+                API keys
+            </Link>
+            {count > 0 && (
+                <span className="tabular-nums">{` · ${count} ${count === 1 ? "covers" : "cover"} this model`}</span>
+            )}
+        </span>
+    );
+}
+
+function NewKey({ secret }: { secret: string }) {
+    return (
+        <div className="flex h-9 min-w-0 items-center gap-3 rounded-md border bg-muted pr-0.5 pl-3">
+            <KeyRound aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate font-mono text-sm">{secret}</span>
+            <CopyButton value={secret} label="Copy the API key" />
+        </div>
+    );
+}
+
 function KeyStep({
     row,
     secret,
@@ -133,47 +233,24 @@ function KeyStep({
         },
     });
     if (secret) {
-        return (
-            <div className="flex flex-col gap-1.5">
-                <Copyable label="API key, shown once" value={secret} />
-                <span className="text-sm text-muted-foreground">
-                    Filled into every example below. Copy it now; it is not shown again.
-                </span>
-            </div>
-        );
+        return <NewKey secret={secret} />;
     }
     if (!can.build) {
         return (
             <p className="text-muted-foreground">
                 Ask a Builder for a key that covers this model, and use it in place of{" "}
-                <span className="font-mono">YOUR_KEY</span>.
+                <span className="font-mono text-foreground">{KEY_PLACEHOLDER}</span>.
             </p>
         );
     }
     return (
-        <div className="flex flex-col gap-1.5">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    disabled={create.isPending}
-                    onClick={() => create.mutate()}
-                >
+        <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <Button type="button" disabled={create.isPending} onClick={() => create.mutate()}>
                     <KeyRound aria-hidden="true" />
-                    {create.isPending ? "Creating…" : "Create key"}
+                    {create.isPending ? "Creating…" : "Create a key"}
                 </Button>
-                <span className="text-muted-foreground">
-                    {"or use an existing key from "}
-                    <Link
-                        href={keysHref}
-                        onClick={onLeave}
-                        className="text-primary hover:underline"
-                    >
-                        API keys
-                    </Link>
-                    {" in place of "}
-                    <span className="font-mono">YOUR_KEY</span>
-                </span>
+                <ExistingKeys row={row} href={keysHref} onLeave={onLeave} />
             </div>
             {create.error && (
                 <span className="text-sm text-destructive">{errorMessage(create.error)}</span>
@@ -182,17 +259,50 @@ function KeyStep({
     );
 }
 
-function LiveCheck({
+function FeedbackSample({
     row,
     baseUrl,
-    secret,
-    open,
+    keyValue,
 }: {
     row: ModelRow;
     baseUrl: string;
-    secret: string | null;
-    open: boolean;
+    keyValue: string;
 }) {
+    const detail = useModel(row.kind === "custom" ? row.key : "");
+    const kept = detail.data?.request_bodies.kept ?? false;
+    return (
+        <CodeBlock
+            code={feedbackCurl(baseUrl, row.key, keyValue, kept)}
+            language="bash"
+            title="POST /v1/feedback"
+            copyLabel="Copy the feedback call"
+        />
+    );
+}
+
+function Feedback({
+    row,
+    baseUrl,
+    keyValue,
+}: {
+    row: ModelRow;
+    baseUrl: string;
+    keyValue: string;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-3">
+            <CollapsibleTrigger className="self-start font-normal text-muted-foreground hover:text-foreground">
+                Rate answers from your app; corrections become training data
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+                {open && <FeedbackSample row={row} baseUrl={baseUrl} keyValue={keyValue} />}
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
+function useLiveCheck(row: ModelRow, baseUrl: string, secret: string | null, open: boolean) {
     const newest = useNewestRequest(row.key, open);
     const baseline = useRef<number | null | undefined>(undefined);
     const [test, setTest] = useState<TestResult | null>(null);
@@ -217,62 +327,147 @@ function LiveCheck({
     }
     const arrived =
         latest && baseline.current !== undefined && latest.id !== baseline.current ? latest : null;
-    const deployed = isDeployed(row);
-    const blocked = !deployed
-        ? "Deploy it first; calls are refused until then."
-        : !secret
-          ? "Create a key first; the test uses it."
-          : null;
+    return { arrived, test, send };
+}
+
+type LiveCheckState = ReturnType<typeof useLiveCheck>;
+
+function StatusLine({
+    tone,
+    icon,
+    text,
+    detail,
+}: {
+    tone: string;
+    icon: ReactNode;
+    text: string;
+    detail?: string | null;
+}) {
     return (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2.5">
-            <div aria-live="polite" className="flex min-w-0 flex-1 flex-col gap-0.5">
-                {test && !test.ok ? (
-                    <span className="flex items-center gap-2 text-destructive">
-                        <CircleX aria-hidden="true" className="size-4 shrink-0" />
-                        {test.message}
-                    </span>
-                ) : arrived ? (
-                    <span className="flex items-center gap-2 text-success">
-                        <CircleCheck aria-hidden="true" className="size-4 shrink-0" />
-                        <span className="tabular-nums">
-                            {`Connected: request received · ${Math.round(arrived.latency_ms)} ms${arrived.key_name ? ` · key ${arrived.key_name}` : ""}`}
-                        </span>
-                    </span>
-                ) : (
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                        <span
-                            aria-hidden="true"
-                            className="size-2 shrink-0 animate-pulse rounded-full bg-muted-foreground motion-reduce:animate-none"
-                        />
-                        {deployed
-                            ? "Waiting for the first request…"
-                            : "Not deployed yet: calls are refused until you deploy it."}
-                    </span>
-                )}
-                {test?.ok && test.answer && (
-                    <span className="truncate pl-6 text-sm text-muted-foreground">
-                        {`Answered “${test.answer}”`}
+        <div className="flex min-w-0 items-start gap-2.5">
+            <span className={cn("flex h-5 shrink-0 items-center", tone)}>{icon}</span>
+            <div className="flex min-w-0 flex-col gap-0.5">
+                <span className={cn("truncate", tone)}>{text}</span>
+                {detail && (
+                    <span className="truncate text-sm text-muted-foreground tabular-nums">
+                        {detail}
                     </span>
                 )}
             </div>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <span>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={Boolean(blocked) || send.isPending}
-                            onClick={() => send.mutate()}
-                        >
-                            <Send aria-hidden="true" />
-                            {send.isPending ? "Sending…" : "Send test request"}
-                        </Button>
-                    </span>
-                </TooltipTrigger>
-                {blocked && <TooltipContent>{blocked}</TooltipContent>}
-            </Tooltip>
         </div>
     );
+}
+
+function LiveStatus({
+    row,
+    check,
+    canTest,
+}: {
+    row: ModelRow;
+    check: LiveCheckState;
+    canTest: boolean;
+}) {
+    const { arrived, test } = check;
+    if (test && !test.ok) {
+        return (
+            <StatusLine
+                tone="text-destructive"
+                icon={<CircleX aria-hidden="true" className="size-4" />}
+                text={test.message}
+            />
+        );
+    }
+    if (arrived || test?.ok) {
+        const latency = arrived ? `${Math.round(arrived.latency_ms)} ms` : null;
+        const detail = test?.ok
+            ? [test.answer ? `Answered “${test.answer}”` : "Answered", latency ?? `${test.ms} ms`]
+            : [latency, arrived?.key_name ? `key ${arrived.key_name}` : null];
+        return (
+            <StatusLine
+                tone="text-success"
+                icon={<CircleCheck aria-hidden="true" className="size-4" />}
+                text={arrived ? "Connected: a request arrived" : "Connected"}
+                detail={detail.filter(Boolean).join(" · ")}
+            />
+        );
+    }
+    const deployed = isDeployed(row);
+    return (
+        <StatusLine
+            tone="text-muted-foreground"
+            icon={
+                <span
+                    aria-hidden="true"
+                    className="size-2 animate-pulse rounded-full bg-muted-foreground motion-reduce:animate-none"
+                />
+            }
+            text={deployed ? "Waiting for the first request…" : "Not deployed yet"}
+            detail={
+                deployed
+                    ? canTest
+                        ? "Run the code above, or send a test request from here."
+                        : "Run the code above; this turns green when the call arrives."
+                    : "Calls are refused until you deploy it."
+            }
+        />
+    );
+}
+
+function blockedReason(row: ModelRow, secret: string | null, build: boolean): string | null {
+    if (!isDeployed(row)) {
+        return "Deploy it first; calls are refused until then.";
+    }
+    if (secret) {
+        return null;
+    }
+    return build
+        ? "Create a key first; the test uses it."
+        : "The test needs a key created here; run the code with yours instead.";
+}
+
+function LiveCheck({
+    row,
+    check,
+    secret,
+}: {
+    row: ModelRow;
+    check: LiveCheckState;
+    secret: string | null;
+}) {
+    const can = useCan();
+    const blocked = blockedReason(row, secret, can.build);
+    const { send } = check;
+    const label = send.isPending ? "Sending…" : "Send test request";
+    return (
+        <div className="flex min-w-0 items-center justify-between gap-4 rounded-md border py-2.5 pr-2.5 pl-3">
+            <div aria-live="polite" className="min-w-0 flex-1">
+                <LiveStatus row={row} check={check} canTest={!blocked} />
+            </div>
+            {blocked ? (
+                <BlockedButton reason={blocked} variant="outline">
+                    <Send aria-hidden="true" />
+                    {label}
+                </BlockedButton>
+            ) : (
+                <Button
+                    type="button"
+                    variant="outline"
+                    disabled={send.isPending}
+                    onClick={() => send.mutate()}
+                >
+                    <Send aria-hidden="true" />
+                    {label}
+                </Button>
+            )}
+        </div>
+    );
+}
+
+function stepStates(secret: string | null, connected: boolean): [StepState, StepState, StepState] {
+    if (connected) {
+        return ["done", "done", "done"];
+    }
+    return secret ? ["done", "current", "next"] : ["current", "next", "next"];
 }
 
 export function ConnectDialog({
@@ -287,55 +482,85 @@ export function ConnectDialog({
     keyValue?: string | null;
 }) {
     const baseUrl = `${window.location.origin}/v1`;
-    const custom = row.kind === "custom";
-    const detail = useModel(custom && open ? row.key : "");
-    const kept = detail.data?.request_bodies.kept ?? false;
     const [created, setCreated] = useState<KeyCreated | null>(null);
     const secret = keyValue ?? created?.secret ?? null;
-    const key = secret ?? "YOUR_KEY";
+    const key = secret ?? KEY_PLACEHOLDER;
     const keysHref = modelPageHref(row.key, "api");
+    const check = useLiveCheck(row, baseUrl, secret, open);
+    const connected = Boolean(check.arrived) || Boolean(check.test?.ok);
+    const [keyState, codeState, checkState] = stepStates(secret, connected);
     const close = () => {
         setCreated(null);
         onOpenChange(false);
     };
     return (
         <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-            <DialogContent className="sm:max-w-3xl">
-                <DialogHeader>
+            <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-3xl">
+                <DialogHeader className="gap-3 border-b p-7 pb-6">
                     <DialogTitle>{`Connect to ${row.name}`}</DialogTitle>
                     <DialogDescription>
-                        OpenAI-compatible, so any OpenAI client works.
+                        An OpenAI-compatible endpoint: any OpenAI client or tool works with these
+                        two values and a key.
                     </DialogDescription>
+                    <div className="pt-2">
+                        <Endpoint baseUrl={baseUrl} model={row.key} />
+                    </div>
                 </DialogHeader>
-                <div className="grid gap-4 sm:grid-cols-[3fr_2fr]">
-                    <Copyable label="Base URL" value={baseUrl} />
-                    <Copyable label="Model" value={row.key} />
-                </div>
-                <KeyStep
-                    row={row}
-                    secret={secret}
-                    onCreated={setCreated}
-                    keysHref={keysHref}
-                    onLeave={close}
-                />
-                <HarnessConfigs
-                    baseUrl={baseUrl}
-                    model={row.key}
-                    keyValue={secret}
-                    hint={false}
-                    extra={[
-                        {
-                            id: "feedback",
-                            label: "Feedback",
-                            icon: <ThumbsUp />,
-                            language: "bash",
-                            title: "Rate an answer by its id; corrections become training data",
-                            code: feedbackCurl(baseUrl, row.key, key, kept),
-                        },
-                    ]}
-                />
-                <LiveCheck row={row} baseUrl={baseUrl} secret={secret} open={open} />
-                <DialogFooter className="sm:justify-between">
+                <ol className="min-h-0 flex-1 overflow-y-auto px-7 py-5">
+                    <Step
+                        number={1}
+                        state={keyState}
+                        title={secret ? "Your API key" : "Get an API key"}
+                        aside={
+                            secret && (
+                                <span className="flex items-center gap-1.5 text-sm text-warning">
+                                    <TriangleAlert aria-hidden="true" className="size-3.5" />
+                                    Shown once: copy it now
+                                </span>
+                            )
+                        }
+                    >
+                        <KeyStep
+                            row={row}
+                            secret={secret}
+                            onCreated={setCreated}
+                            keysHref={keysHref}
+                            onLeave={close}
+                        />
+                    </Step>
+                    <Step
+                        number={2}
+                        state={codeState}
+                        title="Add it to your code"
+                        aside={
+                            <span className="text-sm text-muted-foreground">
+                                {secret ? (
+                                    "Your key is filled in"
+                                ) : (
+                                    <>
+                                        {"Replace "}
+                                        <span className="font-mono text-foreground">
+                                            {KEY_PLACEHOLDER}
+                                        </span>
+                                        {" with your key"}
+                                    </>
+                                )}
+                            </span>
+                        }
+                    >
+                        <HarnessConfigs
+                            baseUrl={baseUrl}
+                            model={row.key}
+                            keyValue={secret}
+                            hint={false}
+                        />
+                        <Feedback row={row} baseUrl={baseUrl} keyValue={key} />
+                    </Step>
+                    <Step number={3} state={checkState} title="Check the connection" last>
+                        <LiveCheck row={row} check={check} secret={secret} />
+                    </Step>
+                </ol>
+                <DialogFooter className="border-t px-7 py-4 sm:justify-between">
                     <Button variant="ghost" asChild>
                         <Link href={API_REFERENCE_PATH} onClick={close}>
                             <BookOpen aria-hidden="true" />
