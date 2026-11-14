@@ -12206,6 +12206,18 @@
             "type": "boolean",
             "title": "Scored"
           },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric",
+            "description": "The main metric that every accuracy on the card holds."
+          },
           "held_out": {
             "anyOf": [
               {
@@ -12778,11 +12790,20 @@
           },
           "accuracy": {
             "type": "number",
-            "title": "Accuracy"
+            "title": "Accuracy",
+            "description": "The main metric's value; metric on the evaluation names it."
           },
           "macro_f1": {
-            "type": "number",
-            "title": "Macro F1"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Macro F1",
+            "description": "Only for answers from a label set."
           },
           "invalid_rate": {
             "type": "number",

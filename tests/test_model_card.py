@@ -172,6 +172,25 @@ def test_markdown_export_renders_every_section_and_the_hash(harness: Harness) ->
     assert text == harness.client.get(f"{CARD}/1/card.md").text
 
 
+def test_a_free_text_card_names_its_metric_and_records_no_macro_f1(harness: Harness) -> None:
+    dataset = create_on_data(harness)["dataset"]
+    created = harness.client.post("/api/models", json={"name": "Writer", "preset": "general", "dataset": dataset})
+    assert created.status_code == 201, created.text
+    complete(harness, "eval", {})
+    complete(harness, "eval", {})
+    path = "/api/models/writer/versions/0"
+    evaluation = harness.client.get(f"{path}/card").json()["card"]["evaluation"]
+    assert evaluation["metric"] == "text_similarity"
+    assert evaluation["held_out"]["macro_f1"] is None
+    text = harness.client.get(f"{path}/card.md").text
+    assert "| Held-out text similarity |" in text
+    assert "Held-out accuracy" not in text
+    bom = harness.client.get(f"{path}/aibom.json").json()
+    analysis = bom["metadata"]["component"]["modelCard"]["quantitativeAnalysis"]["performanceMetrics"]
+    kinds = {item["type"] for item in analysis}
+    assert "text-similarity" in kinds and "accuracy" not in kinds and "macro-f1" not in kinds
+
+
 def test_edits_are_stored_per_version_and_audited(harness: Harness) -> None:
     before = trained_card(harness)
     body = {"intended_use": "  Route support tickets to a queue.  ", "known_limits": "English tickets only."}

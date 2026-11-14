@@ -243,16 +243,20 @@ def metric(kind: str, value: Any, slice_name: str) -> dict[str, str]:
     return {"type": kind, "value": text(value), "slice": slice_name}
 
 
-def score_metrics(score: CardScore | None, slice_name: str) -> list[dict[str, str]]:
+def metric_kind(name: str | None) -> str:
+    return "accuracy" if name is None or name == "label_accuracy" else name.replace("_", "-")
+
+
+def score_metrics(score: CardScore | None, main: str | None, slice_name: str) -> list[dict[str, str]]:
     if score is None:
         return []
     values = [
-        ("accuracy", score.accuracy),
+        (metric_kind(main), score.accuracy),
         ("macro-f1", score.macro_f1),
         ("invalid-rate", score.invalid_rate),
         ("examples", score.examples),
     ]
-    return [metric(kind, value, slice_name) for kind, value in values]
+    return [metric(kind, value, slice_name) for kind, value in values if value is not None]
 
 
 def label_metrics(evaluation: CardEvaluation) -> list[dict[str, str]]:
@@ -272,7 +276,8 @@ def label_metrics(evaluation: CardEvaluation) -> list[dict[str, str]]:
 def performance(evaluation: CardEvaluation) -> list[dict[str, str]]:
     latency = [("latency-p50-ms", evaluation.latency_p50_ms), ("latency-p95-ms", evaluation.latency_p95_ms)]
     timed = [metric(kind, value, "held-out") for kind, value in latency if value is not None]
-    scores = score_metrics(evaluation.held_out, "held-out") + score_metrics(evaluation.test_set, "test")
+    main = evaluation.metric
+    scores = score_metrics(evaluation.held_out, main, "held-out") + score_metrics(evaluation.test_set, main, "test")
     return scores + label_metrics(evaluation) + timed
 
 

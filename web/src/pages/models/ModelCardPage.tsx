@@ -44,6 +44,7 @@ import {
     PurposeSection,
     TrainingSection,
     UseSection,
+    scoreWord,
 } from "./ModelCardSections";
 import { Updated } from "./MyModels";
 
@@ -96,7 +97,7 @@ function Summary({ card, live }: { card: ModelCard; live: boolean }) {
                     value={<VersionState version={{ status: version.status, live }} />}
                 />
                 <Stat
-                    label="Held-out accuracy"
+                    label={`Held-out ${scoreWord(card)}`}
                     value={percent(card.evaluation.held_out?.accuracy)}
                 />
                 <Stat

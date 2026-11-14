@@ -3506,6 +3506,11 @@ export interface components {
         CardEvaluation: {
             /** Scored */
             scored: boolean;
+            /**
+             * Metric
+             * @description The main metric that every accuracy on the card holds.
+             */
+            metric?: string | null;
             held_out: components["schemas"]["CardScore"] | null;
             test_set: components["schemas"]["CardScore"] | null;
             /** Latency P50 Ms */
@@ -3647,10 +3652,16 @@ export interface components {
         CardScore: {
             /** Examples */
             examples: number;
-            /** Accuracy */
+            /**
+             * Accuracy
+             * @description The main metric's value; metric on the evaluation names it.
+             */
             accuracy: number;
-            /** Macro F1 */
-            macro_f1: number;
+            /**
+             * Macro F1
+             * @description Only for answers from a label set.
+             */
+            macro_f1: number | null;
             /** Invalid Rate */
             invalid_rate: number;
         };

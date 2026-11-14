@@ -31,6 +31,7 @@ import { PanelSection, Stat } from "~/components/Section";
 import { auditHref } from "~/lib/audit";
 import { costText, deviceTime, duration, headline, measuredOn, money, priced } from "~/lib/cost";
 import { count, milliseconds, percent } from "~/lib/format";
+import { metricName } from "~/lib/metrics";
 import { modelPageHref } from "~/lib/modelLinks";
 import { exactTime } from "~/lib/time";
 import { itemHref } from "../data/catalogue";
@@ -47,6 +48,11 @@ type CardEvent = Schemas["CardEvent"];
 type Run = Schemas["CardRun"];
 
 type Variant = "success" | "info" | "approval" | "neutral" | "warning" | "destructive";
+
+export function scoreWord(card: ModelCard): string {
+    const metric = card.evaluation.metric;
+    return !metric || metric === "label_accuracy" ? "accuracy" : metricName(metric).toLowerCase();
+}
 
 export const KIND_NAMES: Record<string, string> = {
     lora: "Trained (LoRA)",
@@ -550,10 +556,11 @@ function metricRow(metric: Metric, others: Compared[]): CompareRow {
 
 function metrics(card: ModelCard): Metric[] {
     const evaluation = card.evaluation;
+    const word = scoreWord(card);
     return [
         {
             id: "accuracy",
-            label: "Held-out accuracy",
+            label: `Held-out ${word}`,
             mine: evaluation.held_out?.accuracy,
             pick: (other) => other.held_out_accuracy,
             show: percent,
@@ -569,7 +576,7 @@ function metrics(card: ModelCard): Metric[] {
         },
         {
             id: "test",
-            label: "Test set accuracy",
+            label: `Test set ${word}`,
             mine: evaluation.test_set?.accuracy,
             pick: (other) => other.test_accuracy,
             show: percent,
@@ -751,7 +758,7 @@ export function EvaluationSection({ card }: { card: ModelCard }) {
                 {summary && <p className="pb-3 text-base font-semibold tabular-nums">{summary}</p>}
                 <div className="flex flex-wrap gap-x-8 gap-y-4">
                     <Stat label="Held-out rows" value={count(held?.examples)} />
-                    <Stat label="Held-out accuracy" value={percent(held?.accuracy)} />
+                    <Stat label={`Held-out ${scoreWord(card)}`} value={percent(held?.accuracy)} />
                     <Stat label="Macro F1" value={decimal(held?.macro_f1)} />
                     <Stat label="Not a label" value={percent(held?.invalid_rate)} />
                     <Stat label="Test set" value={percent(evaluation.test_set?.accuracy)} />

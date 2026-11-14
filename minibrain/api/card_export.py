@@ -85,6 +85,12 @@ def decimal(value: float | None) -> str:
     return NONE if value is None else f"{value:.3f}"
 
 
+def metric_word(metric: str | None) -> str:
+    if metric is None or metric == "label_accuracy":
+        return "accuracy"
+    return metric.replace("_", " ")
+
+
 def ms(value: float | None) -> str:
     return NONE if value is None else f"{round(value):,} ms"
 
@@ -319,13 +325,14 @@ def compare_lines(card: ModelCard) -> list[str]:
     held = evaluation.held_out
     test = evaluation.test_set
     kind = card.version.kind
+    word = metric_word(evaluation.metric)
     header = ["", f"This version (v{card.version.number})", *(name for name, _ in others)]
     columns = [comparison for _, comparison in others]
     rows = [
         ["Kind", KINDS.get(kind, kind), *(KINDS.get(o.kind, o.kind) for o in columns)],
         ["Same data", NONE, *("Yes" if o.same_data else "No" for o in columns)],
         [
-            "Held-out accuracy",
+            f"Held-out {word}",
             percent(held.accuracy if held else None),
             *(percent(o.held_out_accuracy) for o in columns),
         ],
@@ -335,7 +342,7 @@ def compare_lines(card: ModelCard) -> list[str]:
             decimal(held.macro_f1 if held else None),
             *(decimal(o.held_out_macro_f1) for o in columns),
         ],
-        ["Test set accuracy", percent(test.accuracy if test else None), *(percent(o.test_accuracy) for o in columns)],
+        [f"Test set {word}", percent(test.accuracy if test else None), *(percent(o.test_accuracy) for o in columns)],
         ["Latency p50", ms(evaluation.latency_p50_ms), *(ms(o.latency_p50_ms) for o in columns)],
         ["Latency p95", ms(evaluation.latency_p95_ms), *(ms(o.latency_p95_ms) for o in columns)],
         ["Device time per 1,000 requests", device_time(evaluation.cost), *(device_time(o.cost) for o in columns)],
@@ -367,7 +374,7 @@ def evaluation_section(card: ModelCard) -> list[str]:
     held = evaluation.held_out
     rows: Facts = [
         ("Held-out rows", held.examples if held else None),
-        ("Held-out accuracy", percent(held.accuracy) if held else None),
+        (f"Held-out {metric_word(evaluation.metric)}", percent(held.accuracy) if held else None),
         ("Held-out macro F1", decimal(held.macro_f1) if held else None),
         ("Answers not a label", percent(held.invalid_rate) if held else None),
         ("Test set", score_text(evaluation.test_set)),

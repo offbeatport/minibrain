@@ -132,8 +132,8 @@ class CardTraining(BaseModel):
 
 class CardScore(BaseModel):
     examples: int
-    accuracy: float
-    macro_f1: float
+    accuracy: float = Field(description="The main metric's value; metric on the evaluation names it.")
+    macro_f1: float | None = Field(description="Only for answers from a label set.")
     invalid_rate: float
 
 
@@ -183,6 +183,7 @@ class CardComparison(BaseModel):
 
 class CardEvaluation(BaseModel):
     scored: bool
+    metric: str | None = Field(default=None, description="The main metric that every accuracy on the card holds.")
     held_out: CardScore | None
     test_set: CardScore | None
     latency_p50_ms: float | None

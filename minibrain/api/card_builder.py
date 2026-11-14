@@ -352,7 +352,7 @@ def score_card(split: dict[str, Any] | None, metric: str | None) -> CardScore | 
     return CardScore(
         examples=int(split.get("examples", 0)),
         accuracy=rounded(main_of(split, metric)) or 0.0,
-        macro_f1=rounded(values.get("macro_f1", 0.0)) or 0.0,
+        macro_f1=rounded(values.get("macro_f1")),
         invalid_rate=rounded(split.get("invalid_rate", 0.0)) or 0.0,
     )
 
@@ -462,6 +462,7 @@ def evaluation_card(session: Session, model: Model, version: Version) -> CardEva
     metric = version_metric(version)
     return CardEvaluation(
         scored=is_scored(version),
+        metric=metric,
         held_out=score_card(split, metric),
         test_set=score_card(metrics.get("golden"), metric),
         latency_p50_ms=rounded(latency.get("p50_ms"), 1),
