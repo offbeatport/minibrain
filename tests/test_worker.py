@@ -1,10 +1,12 @@
 import threading
 import time
+from datetime import timedelta
 from typing import Any
 
 import pytest
 
 from minibrain import worker as worker_module
+from minibrain.jobs import queue as queue_module
 from tests.conftest import Harness
 from tests.test_flow import SLUG, add_version, create_with_dataset
 
@@ -70,6 +72,25 @@ def test_cancel_stops_the_child_process(harness: Harness, monkeypatch: pytest.Mo
     assert time.monotonic() - started < 25
     assert train_job(harness)["status"] == "cancelled"
     assert harness.client.get(f"/api/models/{SLUG}/versions").json()[0]["status"] == "failed"
+
+
+def test_lease_is_kept_while_the_worker_uploads_the_adapter(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+    queued_training(harness)
+    monkeypatch.setattr(queue_module, "LEASE", timedelta(seconds=1))
+    monkeypatch.setattr(worker_module, "HEARTBEAT_SECONDS", 0.2)
+    worker = harness.worker(kinds=["train"], modules=FAKE)
+    upload = worker.outputs
+
+    def slow_outputs(kind: str, attempt_dir: Any) -> dict[str, str]:
+        for _ in range(15):
+            time.sleep(0.2)
+            harness.queue.expire()
+        return upload(kind, attempt_dir)
+
+    monkeypatch.setattr(worker, "outputs", slow_outputs)
+    assert worker.run_once()
+    job = train_job(harness)
+    assert (job["status"], [attempt["outcome"] for attempt in job["attempts"]]) == ("succeeded", ["succeeded"])
 
 
 class Unreachable:

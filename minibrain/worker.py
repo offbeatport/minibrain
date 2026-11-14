@@ -285,6 +285,35 @@ class LineCollector:
         return drained
 
 
+class Lease:
+    def __init__(self, client: MainClient, job_id: int, token: str) -> None:
+        self.client = client
+        self.job_id = job_id
+        self.token = token
+        self.cancel = threading.Event()
+        self.lost = threading.Event()
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self.keep, daemon=True)
+        self.thread.start()
+
+    def keep(self) -> None:
+        while not self.done.wait(HEARTBEAT_SECONDS):
+            try:
+                if self.client.heartbeat(self.job_id, self.token).get("cancel"):
+                    self.cancel.set()
+            except LeaseLostError:
+                self.lost.set()
+                return
+            except WorkerStoppedError:
+                return
+            except Exception:
+                log.warning("could not renew the lease on job %s; trying again", self.job_id)
+
+    def end(self) -> None:
+        self.done.set()
+        self.thread.join()
+
+
 def failure_from(tail: list[str], exit_code: int) -> tuple[str, bool, str | None]:
     for line in reversed(tail):
         entry = structured(line)
@@ -424,13 +453,14 @@ class Worker:
         attempt_dir.mkdir(parents=True)
         log_path = attempt_dir / "log.txt"
         publisher: Publisher | None = None
+        lease = Lease(self.client, job_id, token)
         try:
             spec_path = attempt_dir / "spec.json"
             spec_path.write_text(json.dumps(self.spec(claim, workdir, attempt_dir)))
             arguments = [self.modules[kind], str(spec_path)]
             publisher = self.publisher(claim)
             exit_code, cancelled, tail = self.supervise(
-                job_id, token, arguments, log_path, claim.get("env") or {}, publisher, self.secrets(claim)
+                job_id, token, lease, arguments, log_path, claim.get("env") or {}, publisher, self.secrets(claim)
             )
             stored_error = publisher.finish() if publisher is not None else None
             log = self.upload_log(log_path)
@@ -449,11 +479,14 @@ class Worker:
             return
         except Exception as error:
             self.client.fail(job_id, token, f"worker error: {type(error).__name__}: {error}", True, None)
+        finally:
+            lease.end()
 
     def supervise(
         self,
         job_id: int,
         token: str,
+        lease: Lease,
         arguments: list[str],
         log_path: Path,
         env: dict[str, str] | None = None,
@@ -477,19 +510,19 @@ class Worker:
                 process.stdin.write(secrets)
         lines = LineCollector(process.stdout, log_path, publisher)
         cancelled = False
-        last_flush = last_beat = time.monotonic()
+        last_flush = time.monotonic()
         try:
             while process.poll() is None:
                 time.sleep(0.2)
+                if lease.lost.is_set():
+                    raise LeaseLostError(f"job {job_id} is no longer leased to this worker")
+                if lease.cancel.is_set() and not cancelled:
+                    cancelled = True
+                    stop_group(process)
                 moment = time.monotonic()
                 if moment - last_flush >= FLUSH_SECONDS:
                     self.flush(job_id, token, lines)
                     last_flush = moment
-                if moment - last_beat >= HEARTBEAT_SECONDS:
-                    last_beat = moment
-                    if self.client.heartbeat(job_id, token).get("cancel"):
-                        cancelled = True
-                        stop_group(process)
         except BaseException:
             stop_group(process)
             raise
