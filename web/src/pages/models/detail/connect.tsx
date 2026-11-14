@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, CircleCheck, CircleX, KeyRound, Send } from "lucide-react";
+import { BookOpen, CircleCheck, CircleX, KeyRound, Send, ThumbsUp } from "lucide-react";
 import {
     Button,
     Dialog,
@@ -327,6 +327,7 @@ export function ConnectDialog({
                         {
                             id: "feedback",
                             label: "Feedback",
+                            icon: <ThumbsUp />,
                             language: "bash",
                             title: "Rate an answer by its id; corrections become training data",
                             code: feedbackCurl(baseUrl, row.key, key, kept),

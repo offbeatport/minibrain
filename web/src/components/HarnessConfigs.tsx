@@ -1,4 +1,15 @@
-import { type CodeLanguage, CodeTabs, Link } from "obp-ui";
+import { Braces, Code, MessagesSquare, Waypoints } from "lucide-react";
+import {
+    CodeBlock,
+    type CodeLanguage,
+    Link,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SoftwareLogo,
+} from "obp-ui";
+import { type ReactNode, useState } from "react";
 import { API_REFERENCE_PATH } from "~/lib/modelLinks";
 
 export type Harness = {
@@ -7,7 +18,24 @@ export type Harness = {
     language: CodeLanguage;
     title?: string;
     code: string;
+    icon?: ReactNode;
 };
+
+const ICONS: Record<string, ReactNode> = {
+    curl: <SoftwareLogo id="curl" />,
+    python: <SoftwareLogo id="python" />,
+    javascript: <SoftwareLogo id="javascript" />,
+    env: <SoftwareLogo id="dotenv" />,
+    langchain: <SoftwareLogo id="langchain" />,
+    llamaindex: <Braces />,
+    litellm: <Waypoints />,
+    continue: <Code />,
+    openwebui: <MessagesSquare />,
+};
+
+function iconOf(item: Harness): ReactNode {
+    return item.icon ?? ICONS[item.id] ?? <Code />;
+}
 
 export const SAMPLE = "I was charged twice";
 
@@ -146,9 +174,34 @@ export function HarnessConfigs({
     const key = keyValue ?? "YOUR_KEY";
     const all = harnesses(baseUrl, model, key);
     const items = [...all.slice(0, 3), ...extra, ...all.slice(3)];
+    const [picked, setPicked] = useState(items[0]?.id ?? "curl");
+    const item = items.find((entry) => entry.id === picked) ?? items[0];
+    if (!item) {
+        return null;
+    }
+    const title = (
+        <span className="flex min-w-0 items-center gap-3">
+            <Select value={item.id} onValueChange={(next) => next && setPicked(String(next))}>
+                <SelectTrigger aria-label="Language or tool" className="h-7 w-44 shrink-0">
+                    <span className="flex min-w-0 items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+                        {iconOf(item)}
+                        <span className="truncate">{item.label}</span>
+                    </span>
+                </SelectTrigger>
+                <SelectContent>
+                    {items.map((entry) => (
+                        <SelectItem key={entry.id} value={entry.id} icon={iconOf(entry)}>
+                            {entry.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <span className="truncate">{item.title ?? "Copy, paste and run."}</span>
+        </span>
+    );
     return (
         <div className="flex min-w-0 flex-col gap-2">
-            <CodeTabs items={items} title="Copy, paste and run." />
+            <CodeBlock code={item.code} language={item.language} title={title} />
             {hint && (
                 <p className="text-sm text-muted-foreground">
                     {!keyValue &&

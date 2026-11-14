@@ -21,7 +21,7 @@ import { api, unwrap } from "~/api/client";
 import { ErrorLine } from "~/components/Section";
 import { useCan } from "~/lib/access";
 import { percent } from "~/lib/format";
-import { isDeployed } from "./header";
+import { ModelAvatar, isDeployed } from "./header";
 
 export function points(delta: number): string {
     const value = Math.abs(delta * 100).toFixed(1);
@@ -183,10 +183,17 @@ export function DeployVersionDialog({
             <DialogContent className="sm:max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {pick || !version
-                            ? `Deploy ${row.name}`
-                            : `Deploy v${version.number} of ${row.name}?`}
+                        {pick || !version ? "Deploy" : `Deploy v${version.number}?`}
                     </DialogTitle>
+                    <div className="flex items-center gap-3 rounded-md border px-3 py-2.5">
+                        <ModelAvatar row={row} size="md" />
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate font-medium">{row.name}</span>
+                            <span className="truncate font-mono text-sm text-muted-foreground">
+                                {row.key}
+                            </span>
+                        </span>
+                    </div>
                     {version && !already && (
                         <DialogDescription>
                             {[
