@@ -19,7 +19,6 @@ import {
     Wrench,
 } from "lucide-react";
 import {
-    Button,
     Checkbox,
     DropdownMenu,
     DropdownMenuContent,
@@ -48,7 +47,6 @@ import {
     ModelAvatar,
     Muted,
     ScoreBadge,
-    ScoreBar,
     ScoreFacts,
     ScoreGain,
     StatusLineText,
@@ -232,30 +230,19 @@ function QualityCell({ model, on }: { model: ListModel; on: Handlers }) {
                     type="button"
                     aria-label={`Quick look at ${model.name}, held-out score ${pct(headline.score)}`}
                     onClick={() => on.peek(model)}
-                    className="relative z-10 -mx-1.5 flex w-[calc(100%+0.75rem)] max-w-44 flex-col gap-1.5 rounded-md px-1.5 py-1 text-left hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    className="relative z-10 -mx-1.5 flex items-baseline gap-2 rounded-md px-1.5 py-1 text-left whitespace-nowrap hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
-                    <span className="flex items-baseline justify-between gap-2">
-                        <span
-                            className={cn(
-                                "font-medium tabular-nums",
-                                !live && "text-muted-foreground",
-                            )}
-                        >
-                            {pct(headline.score)}
-                        </span>
-                        {showBaseline?.score != null && (
-                            <ScoreGain
-                                value={headline.score - showBaseline.score}
-                                versus="prompt"
-                            />
+                    <span
+                        className={cn(
+                            "font-semibold tabular-nums",
+                            !live && "text-muted-foreground",
                         )}
+                    >
+                        {pct(headline.score)}
                     </span>
-                    <ScoreBar
-                        score={headline.score}
-                        live={Boolean(live)}
-                        baseline={showBaseline?.score}
-                        better={better?.score}
-                    />
+                    {showBaseline?.score != null && (
+                        <ScoreGain value={headline.score - showBaseline.score} versus="prompt" />
+                    )}
                 </button>
             </TooltipTrigger>
             <TooltipContent>
@@ -517,15 +504,7 @@ function MenuTrigger({ label, disabled }: { label: string; disabled?: boolean })
     );
 }
 
-function ActionsCell({
-    pad,
-    menu,
-    children,
-}: {
-    pad: string;
-    menu: ReactNode;
-    children?: ReactNode;
-}) {
+function ActionsCell({ pad, menu }: { pad: string; menu: ReactNode }) {
     return (
         <div
             className={cn(
@@ -533,7 +512,6 @@ function ActionsCell({
                 pad,
             )}
         >
-            <div className="relative z-20 flex items-center gap-1">{children}</div>
             <span aria-hidden="true" className="size-8 shrink-0" />
             {menu}
         </div>
@@ -556,6 +534,7 @@ function ModelMenu({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
                     <PanelRight />
                     Quick look
                 </DropdownMenuItem>
+                <UseItems model={model} on={on} />
                 {can.build && model.kind === "custom" && (
                     <CustomItems model={model} on={on} can={can} />
                 )}
@@ -567,59 +546,32 @@ function ModelMenu({ model, on, can }: { model: ListModel; on: Handlers; can: Ab
     );
 }
 
-function primaryOf(model: ListModel, on: Handlers, can: Abilities) {
+function ModelActions({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
+    return <ActionsCell pad="-my-3 py-3" menu={<ModelMenu model={model} on={on} can={can} />} />;
+}
+
+function UseItems({ model, on }: { model: ListModel; on: Handlers }) {
     const row = model.row;
-    const teardown = row.teardown;
-    if (teardown) {
-        const manages = can.admin || row.kind === "custom";
-        return teardown.state === "failed" && can.build && (manages || teardown.kind === "undeploy")
-            ? {
-                  label: needsReview(teardown) ? REVIEW_LABEL : RETRY_LABELS[teardown.kind],
-                  icon: <RotateCcw aria-hidden="true" />,
-                  run: () => on.retryTeardown(row),
-              }
-            : null;
-    }
-    const fix = row.health?.actions[0];
-    if (fix) {
-        const manages = can.admin || (can.build && row.kind === "custom");
-        return manages
-            ? {
-                  label: fix.label,
-                  icon: <Wrench aria-hidden="true" />,
-                  run: () => on.health(row, fix),
-              }
-            : null;
-    }
-    if (deployed(model)) {
-        return {
-            label: "Connect",
-            icon: <Plug aria-hidden="true" />,
-            run: () => on.open(modelPageHref(row.key, "api")),
-        };
+    if (row.teardown) {
+        return null;
     }
     const runnable =
         model.kind === "custom" ? row.can_test : row.availability.state === "available";
-    return runnable
-        ? {
-              label: "Try it",
-              icon: <Play aria-hidden="true" />,
-              run: () => on.open(playgroundHref(row.key)),
-          }
-        : null;
-}
-
-function ModelActions({ model, on, can }: { model: ListModel; on: Handlers; can: Abilities }) {
-    const primary = primaryOf(model, on, can);
     return (
-        <ActionsCell pad="-my-3 py-3" menu={<ModelMenu model={model} on={on} can={can} />}>
-            {primary && (
-                <Button variant="secondary" onClick={primary.run}>
-                    {primary.icon}
-                    {primary.label}
-                </Button>
+        <>
+            {runnable && (
+                <DropdownMenuItem onSelect={() => on.open(playgroundHref(row.key))}>
+                    <Play />
+                    Try it
+                </DropdownMenuItem>
             )}
-        </ActionsCell>
+            {deployed(model) && (
+                <DropdownMenuItem onSelect={() => on.open(modelPageHref(row.key, "api"))}>
+                    <Plug />
+                    Connect
+                </DropdownMenuItem>
+            )}
+        </>
     );
 }
 
@@ -775,6 +727,12 @@ function VersionMenu({
                     <Eye />
                     {`Open v${version.number}`}
                 </DropdownMenuItem>
+                {can.build && canMakeLive(model, version) && (
+                    <DropdownMenuItem onSelect={() => on.makeLive(model, version)}>
+                        <Rocket />
+                        {`Deploy v${version.number}`}
+                    </DropdownMenuItem>
+                )}
                 {versus && (
                     <DropdownMenuItem
                         onSelect={() => on.compare(model, [versus.number, version.number])}
@@ -834,7 +792,6 @@ export function VersionLine({
     ...props
 }: RowProps & { model: ListModel; version: ModelVersionRow; on: Handlers }) {
     const replicas = replicasOf(model);
-    const older = (liveOf(model)?.number ?? -1) > version.number;
     return (
         <li
             {...rowEvents(props, true)}
@@ -878,14 +835,11 @@ export function VersionLine({
                         version.score == null ? (
                             <Muted />
                         ) : (
-                            <span className="flex max-w-44 flex-col gap-1">
-                                <span className="flex items-center gap-2 tabular-nums">
-                                    <span className={cn(!version.live && "text-muted-foreground")}>
-                                        {pct(version.score)}
-                                    </span>
-                                    <ScoreBadge model={model} version={version} />
+                            <span className="flex items-center gap-2 tabular-nums">
+                                <span className={cn(!version.live && "text-muted-foreground")}>
+                                    {pct(version.score)}
                                 </span>
-                                <ScoreBar score={version.score} live={version.live} />
+                                <ScoreBadge model={model} version={version} />
                             </span>
                         ),
                     requests: version.usage ? (
@@ -905,18 +859,7 @@ export function VersionLine({
             <ActionsCell
                 pad="-my-1.5 py-1.5"
                 menu={<VersionMenu model={model} version={version} on={on} can={props.can} />}
-            >
-                {props.can.build && canMakeLive(model, version) && (
-                    <Button
-                        variant={
-                            older || version.promotion?.passed === false ? "outline" : "secondary"
-                        }
-                        onClick={() => on.makeLive(model, version)}
-                    >
-                        {`Deploy v${version.number}`}
-                    </Button>
-                )}
-            </ActionsCell>
+            />
         </li>
     );
 }
@@ -1023,6 +966,18 @@ export function VariantLine({
                                     {`Try ${label}`}
                                 </DropdownMenuItem>
                             )}
+                            {props.can.build && !live && ready && (
+                                <DropdownMenuItem onSelect={() => on.deploy([row])}>
+                                    <Rocket />
+                                    Deploy
+                                </DropdownMenuItem>
+                            )}
+                            {props.can.build && live && (
+                                <DropdownMenuItem onSelect={() => on.undeploy([row])}>
+                                    <PowerOff />
+                                    Undeploy
+                                </DropdownMenuItem>
+                            )}
                             {props.can.admin && (
                                 <>
                                     <DropdownMenuSeparator />
@@ -1047,18 +1002,7 @@ export function VariantLine({
                         </DropdownMenuContent>
                     </DropdownMenu>
                 }
-            >
-                {props.can.build && live && (
-                    <Button variant="outline" onClick={() => on.undeploy([row])}>
-                        Undeploy
-                    </Button>
-                )}
-                {props.can.build && !live && ready && (
-                    <Button variant="secondary" onClick={() => on.deploy([row])}>
-                        Deploy
-                    </Button>
-                )}
-            </ActionsCell>
+            />
         </li>
     );
 }

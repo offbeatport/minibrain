@@ -1,4 +1,4 @@
-import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger, cn } from "obp-ui";
+import { Badge, Link, Tooltip, TooltipContent, TooltipTrigger } from "obp-ui";
 import type { ReactNode } from "react";
 import type { ModelRow, ModelVersionRow } from "~/api/client";
 import { PoolLink } from "~/components/PoolLink";
@@ -328,49 +328,6 @@ export function DataCell({ dataset }: { dataset: ModelRow["dataset"] }) {
                 {newer && <span className="text-warning">{` · v${dataset.latest} available`}</span>}
             </span>
         </div>
-    );
-}
-
-function share(value: number): string {
-    return `${Math.min(100, Math.max(0, value * 100))}%`;
-}
-
-export function ScoreBar({
-    score,
-    live,
-    baseline,
-    better,
-}: {
-    score: number;
-    live: boolean;
-    baseline?: number | null;
-    better?: number | null;
-}) {
-    return (
-        <span aria-hidden="true" className="relative block h-1.5 w-full rounded-sm bg-muted">
-            {better != null && better > score && (
-                <span
-                    className="absolute inset-y-0 rounded-r-sm bg-success/50"
-                    style={{
-                        left: share(score),
-                        width: `calc(${share(better)} - ${share(score)})`,
-                    }}
-                />
-            )}
-            <span
-                className={cn(
-                    "absolute inset-y-0 left-0 rounded-sm",
-                    live ? "bg-primary" : "bg-muted-foreground/60",
-                )}
-                style={{ width: share(score) }}
-            />
-            {baseline != null && (
-                <span
-                    className="absolute -inset-y-1 w-0.5 -translate-x-1/2 rounded-sm bg-foreground/70"
-                    style={{ left: share(baseline) }}
-                />
-            )}
-        </span>
     );
 }
 
