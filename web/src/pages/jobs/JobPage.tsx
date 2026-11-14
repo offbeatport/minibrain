@@ -501,7 +501,7 @@ function JobView({ job, crumbs }: { job: JobDetail; crumbs: Crumb[] }) {
             <Serving job={job} />
             <ErrorLine error={metrics.error} onRetry={metrics.refetch} />
             <PanelSections>
-                <div className="grid items-start gap-x-6 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+                <div className="grid items-start gap-x-6 gap-y-10 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                     <ProgressSection job={job} metrics={metrics.data} />
                     <SettingsSection job={job} />
                 </div>
