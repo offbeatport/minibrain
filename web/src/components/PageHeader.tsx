@@ -23,41 +23,48 @@ export function PageHeader({
 }) {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const Icon = icon ? undefined : navEntryFor(pathname)?.icon;
-    const heading = (
-        <div className="flex min-w-0 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h1 className="flex items-center gap-3 text-3xl font-normal">
-                    {Icon && (
-                        <Icon
-                            aria-hidden="true"
-                            className="size-7 shrink-0 text-muted-foreground"
-                        />
-                    )}
+    const titleRow = (
+        <div className="flex min-w-0 items-center gap-x-3">
+            <h1 className="flex min-w-0 items-center gap-3 text-3xl font-normal">
+                {Icon && (
+                    <Icon aria-hidden="true" className="size-7 shrink-0 text-muted-foreground" />
+                )}
+                <span className="truncate" title={title}>
                     {title}
-                </h1>
-                {badge}
-            </div>
-            {caption && (
-                <p className={cn("text-base text-muted-foreground", Icon && "pl-10")}>{caption}</p>
-            )}
+                </span>
+            </h1>
+            {badge && <div className="shrink-0">{badge}</div>}
         </div>
+    );
+    const captionLine = caption && (
+        <p className={cn("text-base text-muted-foreground", Icon && "pl-10")}>{caption}</p>
+    );
+    const actionsBox = actions && (
+        <div className="ml-auto flex min-h-8 shrink-0 items-center gap-2">{actions}</div>
     );
     return (
         <header className="flex flex-col gap-2 pb-3">
             <PageCrumbs items={crumbs ?? [{ label: title }]} />
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                {icon ? (
-                    <div className="flex min-w-0 items-center gap-4">
+            {icon ? (
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex min-w-0 grow basis-48 items-center gap-4">
                         {icon}
-                        {heading}
+                        <div className="flex min-w-0 flex-1 flex-col gap-1">
+                            {titleRow}
+                            {captionLine}
+                        </div>
                     </div>
-                ) : (
-                    heading
-                )}
-                {actions && (
-                    <div className="flex min-h-8 flex-wrap items-center gap-2">{actions}</div>
-                )}
-            </div>
+                    {actionsBox}
+                </div>
+            ) : (
+                <div className="flex flex-col gap-1">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0 grow basis-48">{titleRow}</div>
+                        {actionsBox}
+                    </div>
+                    {captionLine}
+                </div>
+            )}
         </header>
     );
 }
