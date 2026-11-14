@@ -6,13 +6,13 @@ Principles: any size, own hardware, air-gapped, gated on scores
 ## Data
 - **Upload sources** · shipped · product, ml
   Add CSV, TSV, JSON, JSON Lines or Parquet files as tables.
-  UI: Data › Add › Upload file, Data › Uploads › drop a file · API: POST /api/sources
+  UI: Data › Add › Upload file, Data › Uploads › drop a file, Models › Add model › Dataset › Upload new · API: POST /api/sources, POST /api/datasets
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.
   UI: Data › Add › Upload file, Data › Add › Demo data · API: POST /api/sources, POST /api/demo-data/{file}
 - **Demo data** · shipped · product
   Try the whole flow on bundled demo data in minutes.
-  UI: Home › Get started, Models › Try with demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
+  UI: Home › Get started, Models › Try with demo data, Models › Add model › Dataset › Demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
 - **Large demo data** · shipped · ml
   Build 630,000- and 4,000,000-row demo sets for realistic runs.
   UI: Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}

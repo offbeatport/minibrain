@@ -1,7 +1,9 @@
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectSeparator,
     SelectTrigger,
     SelectValue,
@@ -17,7 +19,50 @@ export type PickOption = {
     description?: ReactNode;
     disabled?: boolean;
     separated?: boolean;
+    group?: string;
 };
+
+type Section = { group?: string; options: PickOption[] };
+
+function sectionsOf(options: PickOption[]): Section[] {
+    const sections: Section[] = [];
+    for (const option of options) {
+        const last = sections.at(-1);
+        if (last && last.group === option.group) {
+            last.options.push(option);
+        } else {
+            sections.push({ group: option.group, options: [option] });
+        }
+    }
+    return sections;
+}
+
+function pickItem(option: PickOption, large: boolean | undefined) {
+    return (
+        <SelectItem
+            key={option.value}
+            value={option.value}
+            disabled={option.disabled}
+            icon={option.icon}
+            description={option.description}
+            className={
+                large
+                    ? "gap-3 py-2.5 pl-3 [&_[data-slot=select-item-icon]]:size-5 [&_[data-slot=select-item-icon]_svg]:size-5"
+                    : undefined
+            }
+        >
+            <span className="truncate">{option.label}</span>
+            {option.meta && (
+                <span
+                    data-pick-meta
+                    className="ml-auto truncate pl-4 text-sm text-muted-foreground tabular-nums"
+                >
+                    {option.meta}
+                </span>
+            )}
+        </SelectItem>
+    );
+}
 
 export function PickSelect({
     id,
@@ -79,32 +124,24 @@ export function PickSelect({
                 )}
             </SelectTrigger>
             <SelectContent className={menuClassName}>
-                {options.map((option) => (
-                    <Fragment key={option.value}>
-                        {option.separated && <SelectSeparator />}
-                        <SelectItem
-                            value={option.value}
-                            disabled={option.disabled}
-                            icon={option.icon}
-                            description={option.description}
-                            className={
-                                large
-                                    ? "gap-3 py-2.5 pl-3 [&_[data-slot=select-item-icon]]:size-5 [&_[data-slot=select-item-icon]_svg]:size-5"
-                                    : undefined
-                            }
-                        >
-                            <span className="truncate">{option.label}</span>
-                            {option.meta && (
-                                <span
-                                    data-pick-meta
-                                    className="ml-auto truncate pl-4 text-sm text-muted-foreground tabular-nums"
-                                >
-                                    {option.meta}
-                                </span>
-                            )}
-                        </SelectItem>
-                    </Fragment>
-                ))}
+                {sectionsOf(options).map((section, index) =>
+                    section.group ? (
+                        <Fragment key={`group:${section.group}`}>
+                            {index > 0 && <SelectSeparator />}
+                            <SelectGroup>
+                                <SelectLabel>{section.group}</SelectLabel>
+                                {section.options.map((option) => pickItem(option, large))}
+                            </SelectGroup>
+                        </Fragment>
+                    ) : (
+                        section.options.map((option) => (
+                            <Fragment key={option.value}>
+                                {option.separated && <SelectSeparator />}
+                                {pickItem(option, large)}
+                            </Fragment>
+                        ))
+                    ),
+                )}
             </SelectContent>
         </Select>
     );

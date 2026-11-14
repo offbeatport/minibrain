@@ -8,6 +8,7 @@ export type ModelAvatar = Schemas["ModelAvatar"];
 export type ModelCreate = Schemas["ModelCreate"];
 export type LabelProposal = Schemas["LabelProposal"];
 export type OutputSuggestion = Schemas["OutputSuggestion"];
+export type DemoDataInfo = Schemas["DemoDataInfo"];
 export type VersionInfo = Schemas["VersionInfo"];
 export type JobInfo = Schemas["JobInfo"];
 export type JobDetail = Schemas["JobDetail"];

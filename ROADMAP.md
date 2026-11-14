@@ -1372,8 +1372,10 @@ keys, and `/v1` stays key-only.
     list, Callers and the request log; the secret is shown once), the endpoint and harness configs, the feedback API,
     kept inputs and answers, and the safety model, so everything the old deployment page showed is here.
 - Add model (`/models/new`) asks for the base model, from one picker (the kit's `TabbedSearchList` in a dialog:
-  one search over four tabs), a dataset (required; Create stays off until one is picked, with Upload new… opening the
-  Data page's Add menu), an output and a name; description and tags live in the model's Settings. It is the create-page pattern
+  one search over four tabs), a dataset (required; the menu lists the datasets, then Upload new…, which opens a dialog
+  with a drop zone that uploads the file, makes a dataset of it, named after the file, and picks it, then a Demo data
+  group of the demo files not yet added, where a pick adds the file as a dataset and picks it, 2026-11-14), an output
+  and a name; description and tags live in the model's Settings. It is the create-page pattern
   (2026-11-13): the form in one card with labels in a 9rem column, a sticky summary card on the right with the
   consequences and cost (memory and storage gauges, "v0 · untrained baseline, scored on N held-out rows", blocked
   reasons), Create model and Cancel under the form, and below 48rem one column with a sticky bottom bar. Output, under

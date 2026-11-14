@@ -2,8 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { useRouter, useRouterState } from "@tanstack/react-router";
 import { CubePlus, useToast } from "obp-ui";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import { type CatalogEntry, type DatasetSummary, type ModelRow, api, unwrap } from "~/api/client";
-import { useAllModels, useCatalog, useDatasets } from "~/api/queries";
+import {
+    type CatalogEntry,
+    type DatasetSummary,
+    type DemoDataInfo,
+    type ModelRow,
+    api,
+    unwrap,
+} from "~/api/client";
+import { useAllModels, useCatalog, useDatasets, useDemoData } from "~/api/queries";
 import { CreateLayout, FormCard } from "~/components/CreateLayout";
 import { FormControl, FormGroup, FormRow } from "~/components/FormRows";
 import { PageHeader } from "~/components/PageHeader";
@@ -16,6 +23,7 @@ import { count } from "~/lib/format";
 import { modelPageHref } from "~/lib/modelLinks";
 import { modelsHref } from "~/lib/modelsSearch";
 import { bytes } from "~/lib/time";
+import { useSourceAdder } from "../data/AddSource";
 import {
     AddModelNotices,
     AddModelSummary,
@@ -36,6 +44,7 @@ import {
     suggestedDraft,
     useOutputSuggestion,
 } from "./OutputField";
+import { UploadDatasetDialog, useDatasetMaker } from "./UploadDatasetDialog";
 import {
     type BaseOption,
     baseOptionFor,
@@ -71,7 +80,7 @@ function FieldError({ text }: { text: string | undefined }) {
 
 const UPLOAD_NEW = "upload-new";
 
-const UPLOAD_HREF = "/data?add=1";
+const DEMO_PREFIX = "demo:";
 
 type Picked =
     | { kind: "base"; key: string }
@@ -135,26 +144,47 @@ function outcomeOf(dataset: DatasetSummary | null): string {
     return `v0 · untrained baseline, scored on ${count(heldOut)} held-out rows`;
 }
 
+function unusedDemos(demos: DemoDataInfo[], datasets: DatasetSummary[]): DemoDataInfo[] {
+    const names = new Set(datasets.map((dataset) => dataset.name.toLowerCase()));
+    return demos.filter((demo) => !names.has(demo.name.toLowerCase()));
+}
+
 function DatasetPicker({
     value,
     datasets,
+    demos,
     invalid,
     onChange,
     onUpload,
+    onDemo,
 }: {
     value: string | null;
     datasets: DatasetSummary[];
+    demos: DemoDataInfo[];
     invalid: boolean;
     onChange: (slug: string) => void;
     onUpload: () => void;
+    onDemo: (demo: DemoDataInfo) => void;
 }) {
+    const pick = (next: string) => {
+        if (next === UPLOAD_NEW) {
+            onUpload();
+            return;
+        }
+        const demo = demos.find((item) => `${DEMO_PREFIX}${item.file}` === next);
+        if (demo) {
+            onDemo(demo);
+            return;
+        }
+        onChange(next);
+    };
     return (
         <PickSelect
             id="create-dataset"
             value={value}
             placeholder="Pick a dataset"
             invalid={invalid}
-            onChange={(next) => (next === UPLOAD_NEW ? onUpload() : onChange(next))}
+            onChange={pick}
             options={[
                 ...datasets.map((dataset) => ({
                     value: dataset.slug,
@@ -166,6 +196,12 @@ function DatasetPicker({
                     label: "Upload new…",
                     separated: datasets.length > 0,
                 },
+                ...demos.map((demo) => ({
+                    value: `${DEMO_PREFIX}${demo.file}`,
+                    label: demo.name,
+                    meta: `${count(demo.rows)} rows · ${count(demo.labels)} labels`,
+                    group: "Demo data",
+                })),
             ]}
         />
     );
@@ -191,6 +227,22 @@ export function AddModelPage() {
     const datasetList = datasets.data ?? [];
     const chosenDataset = datasetList.find((item) => item.slug === dataset) ?? null;
     const chosenSlug = chosenDataset?.slug ?? null;
+    const demoData = useDemoData();
+    const demos = unusedDemos(demoData.data ?? [], datasetList);
+    const [uploading, setUploading] = useState(false);
+    const [addingDemo, setAddingDemo] = useState<DemoDataInfo | null>(null);
+    const maker = useDatasetMaker(datasetList, (slug) => {
+        setAddingDemo(null);
+        setDataset(slug);
+    });
+    const demoAdder = useSourceAdder((source) =>
+        maker.mutate({ source, name: addingDemo?.name ?? source.name }),
+    );
+    const addDemo = (demo: DemoDataInfo) => {
+        setAddingDemo(demo);
+        demoAdder.addDemo(demo.file);
+    };
+    const demoBusy = demoAdder.pending !== null || maker.isPending;
     const suggestion = useOutputSuggestion(chosenSlug);
     const [output, setOutput] = useState(BLANK_OUTPUT);
     useEffect(() => {
@@ -396,11 +448,25 @@ export function AddModelPage() {
                         <DatasetPicker
                             value={dataset}
                             datasets={datasetList}
+                            demos={demoBusy ? [] : demos}
                             invalid={Boolean(shownFor("dataset"))}
                             onChange={setDataset}
-                            onUpload={() => router.history.push(UPLOAD_HREF)}
+                            onUpload={() => setUploading(true)}
+                            onDemo={addDemo}
                         />
+                        {demoBusy && addingDemo && (
+                            <span className="text-sm text-muted-foreground">
+                                {`Adding ${addingDemo.name}…`}
+                            </span>
+                        )}
                         <ErrorLine error={datasets.error} onRetry={datasets.refetch} />
+                        <ErrorLine error={demoAdder.error ?? maker.error} />
+                        <UploadDatasetDialog
+                            open={uploading}
+                            datasets={datasetList}
+                            onOpenChange={setUploading}
+                            onCreated={setDataset}
+                        />
                         <FieldError text={shownFor("dataset")} />
                     </FormControl>
                 </FormRow>
