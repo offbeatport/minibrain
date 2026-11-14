@@ -37,7 +37,7 @@ DATA = Section(
     "Sources, connections, datasets and their versions, and the data a custom model trains on.",
     (
         "/api/sources",
-        "/api/samples",
+        "/api/demo-data",
         "/api/query",
         "/api/data",
         "/api/datasets",

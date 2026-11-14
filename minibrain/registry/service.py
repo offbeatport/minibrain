@@ -21,7 +21,7 @@ from minibrain.registry.models import (
 )
 
 KEY_PREFIX = "mb_"
-RESERVED_ADDRESSES = frozenset({"new", "base", "custom", "name", "sample", "inspect", "import"})
+RESERVED_ADDRESSES = frozenset({"new", "base", "custom", "name", "demo", "inspect", "import"})
 ADDRESS_LENGTH = 48
 ADDRESS = re.compile(r"[a-z0-9](?:[a-z0-9.-]{0,46}[a-z0-9])?")
 

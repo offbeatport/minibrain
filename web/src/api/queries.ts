@@ -118,10 +118,10 @@ export function useDatasets() {
     return useQuery({ queryKey: keys.datasets, queryFn: () => unwrap(api.GET("/api/datasets")) });
 }
 
-export function useSamples() {
+export function useDemoData() {
     return useQuery({
-        queryKey: ["samples"],
-        queryFn: () => unwrap(api.GET("/api/samples")),
+        queryKey: ["demo-data"],
+        queryFn: () => unwrap(api.GET("/api/demo-data")),
         staleTime: Number.POSITIVE_INFINITY,
     });
 }

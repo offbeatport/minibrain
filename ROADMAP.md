@@ -173,8 +173,8 @@ view in the UI; `GET /api/presets` lists the presets, the ones coming and the gr
   system prompt (written on the model page) plus a few examples from the dataset; graders text similarity, plus the
   judge with a default rubric (correct, follows the instructions, concise) once a judge model is set; no checks; the
   default rule. `expected: data` takes expected answers from the data; the hook for distillation is `expected:
-  teacher`, which will fill them from a teacher model. Try with sample data on the empty Models page creates a Chat
-  assistant on the travel intents sample (base and name, like Add model); its model page then proposes the five
+  teacher`, which will fill them from a teacher model. Try with demo data on the empty Models page creates a Chat
+  assistant on the demo travel intents (base and name, like Add model); its model page then proposes the five
   intents as labels, which shows the narrowing flow rather than skipping it.
 - Custom: a JSON schema pasted in Evaluation › How it's scored › Answers (free text or labels through the API), any graders that fit it
   (free text: exact match and text similarity; JSON: JSON valid and field match by default), optional instructions as
@@ -1435,8 +1435,8 @@ keys, and `/v1` stays key-only.
   "From N selected sources" when rows are ticked in a source table, else "From sources…", which opens Uploads. Source:
   Upload file, Folder on the server, S3, Database, Lakehouse table (Iceberg, Delta Lake; the dialog picks the format
   first); an item that cannot work stays disabled and says why in its second line and a tooltip (no folders allowed,
-  no S3 or database connection), and admins get Open connections or Open security settings. Sample data: the bundled
-  samples. Group pages and Datasets have no add buttons of their own; a folder keeps Rename, Move to… and Delete, and
+  no S3 or database connection), and admins get Open connections or Open security settings. Demo data: the bundled
+  demo datasets. Group pages and Datasets have no add buttons of their own; a folder keeps Rename, Move to… and Delete, and
   the tree's row menus keep their items. Uploads
   also takes a file dropped on it (the kit's `DropZone`, with Choose a file for keyboard and click), through the same
   checks as the button: the same content opens the existing source, a taken name asks Replace or Keep both. A source

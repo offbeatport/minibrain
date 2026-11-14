@@ -829,8 +829,8 @@ export function DatasetsRoot({
                     onSelect={onSelect}
                     empty={
                         <p className="text-muted-foreground">
-                            No datasets yet. Use Add for a new dataset from your sources, or a
-                            sample that comes with one.
+                            No datasets yet. Use Add for a new dataset from your sources, or demo
+                            data that comes with one.
                         </p>
                     }
                 />

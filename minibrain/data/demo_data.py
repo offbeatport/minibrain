@@ -9,13 +9,13 @@ from minibrain.data.dataset_versions import take_version
 from minibrain.data.shared import Added, NameTaken, Outcome, add_dataset, add_source, guessed_template, source_columns
 from minibrain.registry.models import Dataset
 from minibrain.registry.service import NotFoundError, latest_version
-from minibrain.settings import Settings, sample_file
+from minibrain.settings import Settings, demo_file
 
-SAMPLE_TAG = "minibrain:sample"
+DEMO_TAG = "minibrain:demo"
 
 
 @dataclass(frozen=True)
-class Sample:
+class DemoData:
     file: str
     name: str
     format: str
@@ -25,8 +25,8 @@ class Sample:
     credit: str
 
 
-SAMPLES = (
-    Sample(
+DEMO_DATA = (
+    DemoData(
         file="demo_travel_intents.jsonl",
         name="Demo travel intents",
         format="JSON Lines",
@@ -35,7 +35,7 @@ SAMPLES = (
         description="Sort travel support messages into intents such as lost luggage or refunds. The quick demo.",
         credit="Filtered from CLINC150 (Larson et al., EMNLP 2019), CC BY 3.0.",
     ),
-    Sample(
+    DemoData(
         file="demo_banking77.csv",
         name="Demo Banking77",
         format="CSV",
@@ -44,7 +44,7 @@ SAMPLES = (
         description="Banking customer questions in 77 intents. Where training pays: many similar labels.",
         credit="Casanueva et al., PolyAI 2020, CC BY 4.0.",
     ),
-    Sample(
+    DemoData(
         file="demo_clinc150.parquet",
         name="Demo CLINC150",
         format="Parquet",
@@ -56,32 +56,32 @@ SAMPLES = (
 )
 
 
-def find_sample(file: str) -> Sample:
-    for sample in SAMPLES:
-        if sample.file == file:
-            return sample
-    raise NotFoundError(f"no sample called {file}")
+def find_demo(file: str) -> DemoData:
+    for demo in DEMO_DATA:
+        if demo.file == file:
+            return demo
+    raise NotFoundError(f"no demo data called {file}")
 
 
-def add_sample(session: Session, store: ArtifactStore, file: str, name_taken: NameTaken = NameTaken.KEEP_BOTH) -> Added:
-    sample = find_sample(file)
-    with sample_file(sample.file).open("rb") as stream:
-        added = add_source(session, store, sample.file, stream, name_taken)
+def add_demo(session: Session, store: ArtifactStore, file: str, name_taken: NameTaken = NameTaken.KEEP_BOTH) -> Added:
+    demo = find_demo(file)
+    with demo_file(demo.file).open("rb") as stream:
+        added = add_source(session, store, demo.file, stream, name_taken)
     if added.outcome == Outcome.CREATED:
-        added.source.description = f"Sample: {sample.description} {sample.credit}"
-        added.source.tags = [SAMPLE_TAG]
+        added.source.description = f"Demo data: {demo.description} {demo.credit}"
+        added.source.tags = [DEMO_TAG]
     return added
 
 
-def sample_dataset(session: Session, settings: Settings, store: ArtifactStore, file: str) -> Dataset:
-    sample = find_sample(file)
-    source = add_sample(session, store, file).source
+def demo_dataset(session: Session, settings: Settings, store: ArtifactStore, file: str) -> Dataset:
+    demo = find_demo(file)
+    source = add_demo(session, store, file).source
     template = guessed_template(source_columns(settings, store, source))
     found = session.scalars(select(Dataset).where(Dataset.source_id == source.id))
     dataset = next((item for item in found if template is not None and item.template == template), None)
     if dataset is None:
-        dataset = add_dataset(session, settings, store, free_dataset_name(session, sample.name, None), source)
-        dataset.description = sample.description
+        dataset = add_dataset(session, settings, store, free_dataset_name(session, demo.name, None), source)
+        dataset.description = demo.description
     if latest_version(dataset) is None:
         take_version(session, settings, dataset)
     return dataset

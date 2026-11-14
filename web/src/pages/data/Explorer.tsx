@@ -323,7 +323,7 @@ function GroupDetail({
                 activeTitle="Drop to upload"
                 description={
                     members.length === 0
-                        ? "CSV, TSV, JSON, JSON Lines or Parquet. Then make a dataset from it, or start from sample data under Add."
+                        ? "CSV, TSV, JSON, JSON Lines or Parquet. Then make a dataset from it, or start from demo data under Add."
                         : "CSV, TSV, JSON, JSON Lines or Parquet. A file already uploaded is not stored twice."
                 }
                 inputLabel="Data file to upload"
@@ -861,7 +861,7 @@ export function DataExplorer() {
                                 {!text && sourceList.length === 0 && (
                                     <p className="pr-3 pb-3 pl-11 text-muted-foreground">
                                         No sources yet. Use Add to upload a file, read a folder,
-                                        bucket or database, or try sample data.
+                                        bucket or database, or try demo data.
                                     </p>
                                 )}
                             </>

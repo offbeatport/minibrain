@@ -92,10 +92,10 @@ def test_last_use_is_reported_even_without_recent_requests(harness: Harness) -> 
     assert (usage["total"], usage["previous"], usage["p50_ms"]) == (0, 1, None)
 
 
-def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_demo_creates_a_model_with_mapped_data_each_time(harness: Harness, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("minibrain.api.catalog.cached_fully", lambda _variant: True)
     monkeypatch.setattr("minibrain.storage.disk_space", lambda _path: Space(free=100 * GIB, total=200 * GIB))
-    first = harness.client.post("/api/models/sample")
+    first = harness.client.post("/api/models/demo")
     assert first.status_code == 201, first.text
     body = first.json()
     assert (body["name"], body["preset"], body["source"]["file"]) == (
@@ -106,7 +106,7 @@ def test_sample_creates_a_model_with_mapped_data_each_time(harness: Harness, mon
     assert body["mapping"]["template"] == {"user": "{message}", "assistant": "{intent}"}
     assert body["dataset_version"]["rows"] == 750
     assert len(body["label_proposal"]["labels"]) == 5
-    again = harness.client.post("/api/models/sample").json()
+    again = harness.client.post("/api/models/demo").json()
     assert (again["name"], again["dataset"]) == ("Demo travel intents 2", body["dataset"])
 
 

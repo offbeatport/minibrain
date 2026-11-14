@@ -36,7 +36,7 @@ FROM python AS wheel-build
 WORKDIR /src
 COPY --from=lock /lock/build.txt /lock/build.txt
 COPY LICENSE hatch_build.py pyproject.toml ./
-COPY samples/ samples/
+COPY demo_data/ demo_data/
 COPY minibrain/ minibrain/
 COPY --from=web /src/web/dist/ web/dist/
 ARG COMMIT=""

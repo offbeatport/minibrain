@@ -18,7 +18,7 @@ import {
 import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import { useConnections } from "~/api/connectionQueries";
 import { useFolderRoots } from "~/api/dataQueries";
-import { useSamples } from "~/api/queries";
+import { useDemoData } from "~/api/queries";
 import { useCan } from "~/lib/access";
 import { count } from "~/lib/format";
 import { type AddKind, SOURCE_CHOICES, type SourceAdder, addSourceKind } from "./AddSource";
@@ -182,7 +182,7 @@ export function AddMenu({
     startOpen?: boolean;
 }) {
     const router = useRouter();
-    const samples = useSamples();
+    const demos = useDemoData();
     const blocks = useSourceBlocks();
     const can = useCan();
     const [open, setOpen] = useState(startOpen);
@@ -194,9 +194,9 @@ export function AddMenu({
               Object.values(blocks).some((block) => block.fixes.includes(fix)),
           )
         : [];
-    const sampleList = samples.data ?? [];
+    const demoList = demos.data ?? [];
     const label =
-        adder.pending === "upload" ? "Uploading…" : adder.pending === "sample" ? "Adding…" : "Add";
+        adder.pending === "upload" ? "Uploading…" : adder.pending === "demo" ? "Adding…" : "Add";
     return (
         <DropdownMenu open={open && idle} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild data-slot="button">
@@ -236,15 +236,15 @@ export function AddMenu({
                         </DropdownMenuItem>
                     ))}
                 </DropdownMenuGroup>
-                {(sampleList.length > 0 || samples.error) && (
+                {(demoList.length > 0 || demos.error) && (
                     <>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuLabel>Sample data</DropdownMenuLabel>
-                            {sampleList.map((item) => (
+                            <DropdownMenuLabel>Demo data</DropdownMenuLabel>
+                            {demoList.map((item) => (
                                 <DropdownMenuItem
                                     key={item.file}
-                                    onSelect={() => adder.addSample(item.file)}
+                                    onSelect={() => adder.addDemo(item.file)}
                                     className="items-start"
                                 >
                                     <FileTypeIcon name={item.file} className="mt-0.5" />
@@ -256,9 +256,9 @@ export function AddMenu({
                                     </span>
                                 </DropdownMenuItem>
                             ))}
-                            {samples.error ? (
+                            {demos.error ? (
                                 <p className="px-2.5 py-1.5 text-destructive">
-                                    Sample data could not be listed.
+                                    Demo data could not be listed.
                                 </p>
                             ) : null}
                         </DropdownMenuGroup>

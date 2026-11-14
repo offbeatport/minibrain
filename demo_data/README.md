@@ -1,7 +1,7 @@
-# Sample data
+# Demo data
 
-Ready-to-upload files for the Classify task. Upload one on a model's Data tab; the input and label columns are
-detected automatically.
+Bundled files for the Classify task. Add one under Data › Add › Demo data; the input and label columns are detected
+automatically.
 
 | File | Rows | Labels | Format | What it shows |
 |---|---|---|---|---|
@@ -31,4 +31,4 @@ for Banking77 and CLINC150.
 
 Changes from the originals: train, validation and test splits merged and shuffled (seed 7), label ids replaced by
 their names, and `demo_travel_intents.jsonl` filtered from CLINC150 to `book_flight`, `book_hotel`, `car_rental`,
-`flight_status` and `lost_luggage`. Rebuild with `uv run python samples/build.py`; dataset commits are pinned there.
+`flight_status` and `lost_luggage`. Rebuild with `uv run python demo_data/build.py`; dataset commits are pinned there.

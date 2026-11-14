@@ -267,7 +267,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/models/sample": {
+    "/api/models/demo": {
         parameters: {
             query?: never;
             header?: never;
@@ -276,8 +276,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Create the sample model */
-        post: operations["create_sample_api_models_sample_post"];
+        /** Create the demo model */
+        post: operations["create_demo_api_models_demo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -691,15 +691,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/samples": {
+    "/api/demo-data": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** List sample files */
-        get: operations["list_samples_api_samples_get"];
+        /** List demo data files */
+        get: operations["list_demo_data_api_demo_data_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -708,7 +708,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/samples/{file}": {
+    "/api/demo-data/{file}": {
         parameters: {
             query?: never;
             header?: never;
@@ -717,8 +717,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Add a sample file as a source */
-        post: operations["add_sample_source_api_samples__file__post"];
+        /** Add a demo data file as a source */
+        post: operations["add_demo_source_api_demo_data__file__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4659,6 +4659,92 @@ export interface components {
             /** Name */
             name?: string | null;
         };
+        /** DemoDataInfo */
+        DemoDataInfo: {
+            /** File */
+            file: string;
+            /** Name */
+            name: string;
+            /** Format */
+            format: string;
+            /** Rows */
+            rows: number;
+            /** Labels */
+            labels: number;
+            /** Description */
+            description: string;
+            /** Credit */
+            credit: string;
+        };
+        /** DemoModelDetail */
+        DemoModelDetail: {
+            /** Slug */
+            slug: string;
+            /** Name */
+            name: string;
+            /** Preset */
+            preset: string;
+            /** Base Model */
+            base_model: string;
+            /** Current Version */
+            current_version: number | null;
+            /**
+             * Deployed
+             * @default false
+             */
+            deployed?: boolean;
+            /** Main Metric */
+            main_metric?: string | null;
+            /** Current Score */
+            current_score: number | null;
+            /** Versions */
+            versions: number;
+            /** Active Jobs */
+            active_jobs: number;
+            avatar?: components["schemas"]["ModelAvatar"] | null;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "custom";
+            source: components["schemas"]["SourceInfo"] | null;
+            mapping: components["schemas"]["MappingInfo"];
+            /** Dataset */
+            dataset?: string | null;
+            /** Dataset Name */
+            dataset_name?: string | null;
+            dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
+            changed?: components["schemas"]["ChangeInfo"] | null;
+            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
+            /** Models */
+            models: string[];
+            request_bodies: components["schemas"]["RequestBodiesInfo"];
+            teardown?: components["schemas"]["TeardownInfo"] | null;
+            contract: components["schemas"]["ContractInfo"];
+            /** Contract Number */
+            contract_number: number;
+            /** Instructions */
+            instructions: string;
+            /** Default Instructions */
+            default_instructions: string;
+            /** Graders */
+            graders: components["schemas"]["GraderConfig"][];
+            /** Graders Default */
+            graders_default: boolean;
+            judge: components["schemas"]["JudgeInfo"];
+            safety: components["schemas"]["ModelSafety"];
+            promotion: components["schemas"]["PromotionInfo"];
+            /**
+             * Went Live
+             * @default false
+             */
+            went_live?: boolean;
+            label_proposal?: components["schemas"]["LabelProposal"] | null;
+            /** Base Name */
+            base_name: string;
+            /** Download Bytes */
+            download_bytes: number | null;
+        };
         /** DeployRequest */
         DeployRequest: {
             /** Deployed */
@@ -7847,92 +7933,6 @@ export interface components {
              */
             categories: string[];
         };
-        /** SampleDetail */
-        SampleDetail: {
-            /** Slug */
-            slug: string;
-            /** Name */
-            name: string;
-            /** Preset */
-            preset: string;
-            /** Base Model */
-            base_model: string;
-            /** Current Version */
-            current_version: number | null;
-            /**
-             * Deployed
-             * @default false
-             */
-            deployed?: boolean;
-            /** Main Metric */
-            main_metric?: string | null;
-            /** Current Score */
-            current_score: number | null;
-            /** Versions */
-            versions: number;
-            /** Active Jobs */
-            active_jobs: number;
-            avatar?: components["schemas"]["ModelAvatar"] | null;
-            /**
-             * Kind
-             * @constant
-             */
-            kind: "custom";
-            source: components["schemas"]["SourceInfo"] | null;
-            mapping: components["schemas"]["MappingInfo"];
-            /** Dataset */
-            dataset?: string | null;
-            /** Dataset Name */
-            dataset_name?: string | null;
-            dataset_version: components["schemas"]["DatasetVersionInfo"] | null;
-            changed?: components["schemas"]["ChangeInfo"] | null;
-            serve_only?: components["schemas"]["ServeOnlyInfo"] | null;
-            /** Models */
-            models: string[];
-            request_bodies: components["schemas"]["RequestBodiesInfo"];
-            teardown?: components["schemas"]["TeardownInfo"] | null;
-            contract: components["schemas"]["ContractInfo"];
-            /** Contract Number */
-            contract_number: number;
-            /** Instructions */
-            instructions: string;
-            /** Default Instructions */
-            default_instructions: string;
-            /** Graders */
-            graders: components["schemas"]["GraderConfig"][];
-            /** Graders Default */
-            graders_default: boolean;
-            judge: components["schemas"]["JudgeInfo"];
-            safety: components["schemas"]["ModelSafety"];
-            promotion: components["schemas"]["PromotionInfo"];
-            /**
-             * Went Live
-             * @default false
-             */
-            went_live?: boolean;
-            label_proposal?: components["schemas"]["LabelProposal"] | null;
-            /** Base Name */
-            base_name: string;
-            /** Download Bytes */
-            download_bytes: number | null;
-        };
-        /** SampleInfo */
-        SampleInfo: {
-            /** File */
-            file: string;
-            /** Name */
-            name: string;
-            /** Format */
-            format: string;
-            /** Rows */
-            rows: number;
-            /** Labels */
-            labels: number;
-            /** Description */
-            description: string;
-            /** Credit */
-            credit: string;
-        };
         /** SaveExampleBody */
         SaveExampleBody: {
             /** Messages */
@@ -9826,7 +9826,7 @@ export interface operations {
             };
         };
     };
-    create_sample_api_models_sample_post: {
+    create_demo_api_models_demo_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -9841,7 +9841,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SampleDetail"];
+                    "application/json": components["schemas"]["DemoModelDetail"];
                 };
             };
         };
@@ -10678,7 +10678,7 @@ export interface operations {
             };
         };
     };
-    list_samples_api_samples_get: {
+    list_demo_data_api_demo_data_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -10693,12 +10693,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SampleInfo"][];
+                    "application/json": components["schemas"]["DemoDataInfo"][];
                 };
             };
         };
     };
-    add_sample_source_api_samples__file__post: {
+    add_demo_source_api_demo_data__file__post: {
         parameters: {
             query?: {
                 name_taken?: components["schemas"]["NameTaken"];

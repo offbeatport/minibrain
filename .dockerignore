@@ -4,7 +4,7 @@
 !pyproject.toml
 !uv.lock
 !minibrain/
-!samples/
+!demo_data/
 !web/
 web/node_modules
 web/dist

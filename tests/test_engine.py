@@ -286,8 +286,8 @@ def test_a_rule_with_a_threshold_blocks_a_version_below_it(harness: Harness) -> 
     assert harness.client.post("/api/models/gated/versions/0/promote").status_code == 409
 
 
-def test_try_with_sample_data_is_a_chat_assistant_offered_the_travel_intents(harness: Harness) -> None:
-    created = harness.client.post("/api/models/sample")
+def test_try_with_demo_data_is_a_chat_assistant_offered_the_travel_intents(harness: Harness) -> None:
+    created = harness.client.post("/api/models/demo")
     assert created.status_code == 201, created.text
     found = created.json()
     assert (found["name"], found["preset"], found["dataset_name"]) == (
@@ -305,4 +305,4 @@ def test_try_with_sample_data_is_a_chat_assistant_offered_the_travel_intents(har
         "lost_luggage",
     ]
     assert found["label_proposal"]["dataset_version_id"] == found["dataset_version"]["id"]
-    assert harness.client.post("/api/models/sample").json()["name"] == "Demo travel intents 2"
+    assert harness.client.post("/api/models/demo").json()["name"] == "Demo travel intents 2"

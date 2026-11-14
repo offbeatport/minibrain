@@ -64,8 +64,8 @@ OpenTelemetry export to your own collector, a Prometheus `/metrics` endpoint and
 
 The first scoring job downloads the base model (Qwen3-0.6B, about 1.5 GB) into the Hugging Face cache.
 
-To try it, upload `samples/travel_intents.jsonl` (quick) or `samples/banking77.csv` (where training pays). See
-[`samples/README.md`](samples/README.md).
+To try it, add Demo travel intents (quick) or Demo Banking77 (where training pays) under Data › Add › Demo data. See
+[`demo_data/README.md`](demo_data/README.md).
 
 ## Models
 

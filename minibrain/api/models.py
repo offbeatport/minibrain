@@ -15,6 +15,7 @@ from minibrain.api.schemas import (
     ContractInfo,
     ContractUpdate,
     DatasetChoice,
+    DemoModelDetail,
     ExampleInfo,
     GraderConfig,
     GradersUpdate,
@@ -34,7 +35,6 @@ from minibrain.api.schemas import (
     QueryResponse,
     RequestBodiesUpdate,
     RescoreResult,
-    SampleDetail,
 )
 from minibrain.api.versions import audit_version, start_version
 from minibrain.api.views import detail
@@ -44,7 +44,7 @@ from minibrain.auth.roles import Role, allows
 from minibrain.base_models import DEFAULT_BASE_MODEL
 from minibrain.data import splits
 from minibrain.data.dataset_versions import cleanup, take_version, version_if_mapped
-from minibrain.data.samples import find_sample, sample_dataset
+from minibrain.data.demo_data import demo_dataset, find_demo
 from minibrain.data.shared import (
     aliases_for,
     dataset_of,
@@ -278,8 +278,8 @@ def read_custom(settings: Settings, model: Model) -> ModelDetail:
     return found.model_copy(update={"dataset_version": found.dataset_version.model_copy(update={"checks": checks})})
 
 
-SAMPLE_FILE = "demo_travel_intents.jsonl"
-SAMPLE_PRESET = "general"
+DEMO_FILE = "demo_travel_intents.jsonl"
+DEMO_PRESET = "general"
 
 
 def deploy_custom(session: Session, model: Model, deployed: bool, local: NodeReport, asked: Asked) -> bool:
@@ -321,10 +321,10 @@ def keep_request_bodies(
     return detail(settings, model)
 
 
-def fetch_sample_base(session: Session, settings: Settings, key: str) -> tuple[str, int | None]:
+def fetch_demo_base(session: Session, settings: Settings, key: str) -> tuple[str, int | None]:
     entry = session.get(CatalogModel, key)
     if entry is None or not entry.variants:
-        raise ConflictError(f"The sample needs {key}, which is missing from the model catalogue")
+        raise ConflictError(f"The demo needs {key}, which is missing from the model catalogue")
     model = session.get(BaseModel, key)
     if model is not None and model.status in (BaseModelStatus.AVAILABLE, *ACTIVE_STATUSES):
         return entry.name, None
@@ -335,29 +335,29 @@ def fetch_sample_base(session: Session, settings: Settings, key: str) -> tuple[s
         ensure_reachable(session, entry, variant)
         start_download(session, settings, entry, variant, current_actor())
     except (ConflictError, PolicyError) as error:
-        raise ConflictError(f"The sample needs {entry.name}, which is not on this install. {error}") from error
+        raise ConflictError(f"The demo needs {entry.name}, which is not on this install. {error}") from error
     return entry.name, variant.size_bytes
 
 
-def sample_body(session: Session, settings: Settings, store: ArtifactStore) -> ModelCreate:
-    sample = find_sample(SAMPLE_FILE)
-    dataset = sample_dataset(session, settings, store, SAMPLE_FILE)
+def demo_body(session: Session, settings: Settings, store: ArtifactStore) -> ModelCreate:
+    demo = find_demo(DEMO_FILE)
+    dataset = demo_dataset(session, settings, store, DEMO_FILE)
     return ModelCreate(
-        name=free_model_name(session, sample.name, numbered=False),
-        description=sample.description,
+        name=free_model_name(session, demo.name, numbered=False),
+        description=demo.description,
         base_model=DEFAULT_BASE_MODEL,
-        preset=SAMPLE_PRESET,
+        preset=DEMO_PRESET,
         dataset=dataset.slug,
     )
 
 
-@router.post("/sample", status_code=201, dependencies=[Depends(builder)], summary="Create the sample model")
-def create_sample(session: SessionDep, settings: SettingsDep, store: StoreDep) -> SampleDetail:
-    base_name, download_bytes = fetch_sample_base(session, settings, DEFAULT_BASE_MODEL)
-    body = sample_body(session, settings, store)
+@router.post("/demo", status_code=201, dependencies=[Depends(builder)], summary="Create the demo model")
+def create_demo(session: SessionDep, settings: SettingsDep, store: StoreDep) -> DemoModelDetail:
+    base_name, download_bytes = fetch_demo_base(session, settings, DEFAULT_BASE_MODEL)
+    body = demo_body(session, settings, store)
     model = configured(session, settings, store, body, DEFAULT_BASE_MODEL)
     session.commit()
-    return SampleDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
+    return DemoModelDetail(**detail(settings, model).model_dump(), base_name=base_name, download_bytes=download_bytes)
 
 
 @router.put("/{name}/dataset", dependencies=[Depends(builder)], summary="Choose the dataset a custom model trains on")

@@ -24,6 +24,7 @@ from minibrain.api.schemas import (
     DatasetVersionDiff,
     DatasetVersionInfo,
     DeltaSourceCreate,
+    DemoDataInfo,
     DiffRow,
     DismissRequest,
     FolderCreate,
@@ -38,7 +39,6 @@ from minibrain.api.schemas import (
     QueryRequest,
     QueryResponse,
     RelabelInfo,
-    SampleInfo,
     SourceAdded,
     SourceKind,
     SourceRef,
@@ -59,12 +59,12 @@ from minibrain.data.dataset_versions import (
     versions_of,
 )
 from minibrain.data.delta import DELTA
+from minibrain.data.demo_data import DEMO_DATA, add_demo
 from minibrain.data.diff import compare
 from minibrain.data.feedback import example_counts
 from minibrain.data.folders import allowed_roots
 from minibrain.data.limits import DataLimits, load_limits, save_limits
 from minibrain.data.remote import REMOTE_KINDS
-from minibrain.data.samples import SAMPLES, add_sample
 from minibrain.data.shared import (
     FOLDER,
     Added,
@@ -445,19 +445,19 @@ def add_delta_source(
     return added_source(session, settings, store, added, response)
 
 
-@router.get("/samples", dependencies=[Depends(builder)], summary="List sample files")
-def list_samples() -> list[SampleInfo]:
-    return [SampleInfo(**vars(sample)) for sample in SAMPLES]
+@router.get("/demo-data", dependencies=[Depends(builder)], summary="List demo data files")
+def list_demo_data() -> list[DemoDataInfo]:
+    return [DemoDataInfo(**vars(demo)) for demo in DEMO_DATA]
 
 
 @router.post(
-    "/samples/{file}",
+    "/demo-data/{file}",
     status_code=201,
     responses=ADDED_RESPONSES,
     dependencies=[Depends(builder)],
-    summary="Add a sample file as a source",
+    summary="Add a demo data file as a source",
 )
-def add_sample_source(
+def add_demo_source(
     file: str,
     response: Response,
     session: SessionDep,
@@ -465,7 +465,7 @@ def add_sample_source(
     store: StoreDep,
     name_taken: NameTaken = NameTaken.KEEP_BOTH,
 ) -> SourceAdded:
-    added = add_sample(session, store, file, name_taken)
+    added = add_demo(session, store, file, name_taken)
     return added_source(session, settings, store, added, response)
 
 

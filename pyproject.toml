@@ -54,9 +54,9 @@ build-backend = "hatchling.build"
 packages = ["minibrain"]
 
 [tool.hatch.build.targets.wheel.force-include]
-"samples/demo_travel_intents.jsonl" = "minibrain/samples/demo_travel_intents.jsonl"
-"samples/demo_banking77.csv" = "minibrain/samples/demo_banking77.csv"
-"samples/demo_clinc150.parquet" = "minibrain/samples/demo_clinc150.parquet"
+"demo_data/demo_travel_intents.jsonl" = "minibrain/demo_data/demo_travel_intents.jsonl"
+"demo_data/demo_banking77.csv" = "minibrain/demo_data/demo_banking77.csv"
+"demo_data/demo_clinc150.parquet" = "minibrain/demo_data/demo_clinc150.parquet"
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 path = "hatch_build.py"
@@ -103,7 +103,7 @@ ignore = ["S311"]
 "scripts/release_notes.py" = ["S603"]
 
 [tool.pyright]
-include = ["minibrain", "samples", "scripts", "tests", "hatch_build.py"]
+include = ["minibrain", "demo_data", "scripts", "tests", "hatch_build.py"]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
 venvPath = "."

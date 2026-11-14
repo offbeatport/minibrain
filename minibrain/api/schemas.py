@@ -196,7 +196,7 @@ SourceKind = Literal["upload", "folder", "s3", "database", "iceberg", "delta"]
 FileFormat = Literal[".csv", ".tsv", ".json", ".jsonl", ".parquet"]
 
 
-class SampleInfo(BaseModel):
+class DemoDataInfo(BaseModel):
     file: str
     name: str
     format: str
@@ -869,7 +869,7 @@ class ModelDetail(ModelSummary):
     label_proposal: LabelProposal | None = None
 
 
-class SampleDetail(ModelDetail):
+class DemoModelDetail(ModelDetail):
     base_name: str
     download_bytes: int | None
 

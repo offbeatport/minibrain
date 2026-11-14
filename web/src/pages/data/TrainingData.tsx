@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, cn } from "obp-ui";
 import { useState } from "react";
 import { type DatasetSummary, type SourceSummary, api, unwrap, uploadFile } from "~/api/client";
-import { keys, useDatasets, useSamples, useSources } from "~/api/queries";
+import { keys, useDatasets, useDemoData, useSources } from "~/api/queries";
 import { ErrorLine } from "~/components/Section";
 import { DATA_FILE_TYPES } from "~/lib/dataFiles";
 import { count } from "~/lib/format";
@@ -10,9 +10,9 @@ import { bytes } from "~/lib/time";
 import { DatasetMapping } from "./DatasetDetail";
 import { datasetsIn, freeDatasetName } from "./catalogue";
 
-type DataSource = "upload" | "dataset" | "sample";
+type DataSource = "upload" | "dataset" | "demo";
 
-const SAMPLE_TAGS = ["minibrain:sample", "sample"];
+const DEMO_TAG = "minibrain:demo";
 
 const FILE_BUTTON_FOCUS =
     "cursor-pointer has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-1 has-focus-visible:ring-offset-background";
@@ -133,14 +133,13 @@ function UploadChoice({ onDataset }: { onDataset: (slug: string) => void }) {
     );
 }
 
-function sampleDataset(
+function demoDataset(
     file: string,
     sources: SourceSummary[],
     datasets: DatasetSummary[],
 ): { dataset?: DatasetSummary; sourceId?: number } {
     const matching = sources.filter(
-        (source) =>
-            source.filename === file && source.tags.some((tag) => SAMPLE_TAGS.includes(tag)),
+        (source) => source.filename === file && source.tags.includes(DEMO_TAG),
     );
     const ids = new Set(matching.map((source) => source.id));
     const dataset = datasets.find(
@@ -149,16 +148,16 @@ function sampleDataset(
     return { dataset, sourceId: matching[0]?.id };
 }
 
-function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
-    const samples = useSamples();
+function DemoChoice({ onDataset }: { onDataset: (slug: string) => void }) {
+    const demos = useDemoData();
     const sources = useSources();
     const datasets = useDatasets();
     const refresh = useCatalogueRefresh();
     const [file, setFile] = useState("");
     const add = useMutation({
         mutationFn: async (chosen: string) => {
-            const sample = (samples.data ?? []).find((item) => item.file === chosen);
-            const found = sampleDataset(chosen, sources.data ?? [], datasets.data ?? []);
+            const demo = (demos.data ?? []).find((item) => item.file === chosen);
+            const found = demoDataset(chosen, sources.data ?? [], datasets.data ?? []);
             if (found.dataset) {
                 return found.dataset;
             }
@@ -166,7 +165,7 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                 found.sourceId ??
                 (
                     await unwrap(
-                        api.POST("/api/samples/{file}", { params: { path: { file: chosen } } }),
+                        api.POST("/api/demo-data/{file}", { params: { path: { file: chosen } } }),
                     )
                 ).id;
             return unwrap(
@@ -174,7 +173,7 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                     body: {
                         name: freeDatasetName(
                             datasetsIn(datasets.data ?? [], null),
-                            sample?.name ?? stem(chosen),
+                            demo?.name ?? stem(chosen),
                         ),
                         source_id: sourceId,
                     },
@@ -186,7 +185,7 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
             onDataset(dataset.slug);
         },
     });
-    const chosen = (samples.data ?? []).find((item) => item.file === file);
+    const chosen = (demos.data ?? []).find((item) => item.file === file);
     return (
         <div className="flex flex-col gap-1">
             <Select
@@ -200,17 +199,17 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                 }}
                 disabled={add.isPending || sources.isLoading || datasets.isLoading}
             >
-                <SelectTrigger aria-label="Sample" className="w-full max-w-sm">
-                    <SelectValue placeholder="Choose a sample" />
+                <SelectTrigger aria-label="Demo data" className="w-full max-w-sm">
+                    <SelectValue placeholder="Choose demo data" />
                 </SelectTrigger>
                 <SelectContent>
-                    {(samples.data ?? []).map((sample) => (
+                    {(demos.data ?? []).map((demo) => (
                         <SelectItem
-                            key={sample.file}
-                            value={sample.file}
-                            description={`${sample.format} · ${count(sample.rows)} rows · ${count(sample.labels)} labels`}
+                            key={demo.file}
+                            value={demo.file}
+                            description={`${demo.format} · ${count(demo.rows)} rows · ${count(demo.labels)} labels`}
                         >
-                            {sample.name}
+                            {demo.name}
                         </SelectItem>
                     ))}
                 </SelectContent>
@@ -221,7 +220,7 @@ function SampleChoice({ onDataset }: { onDataset: (slug: string) => void }) {
                 </span>
             )}
             <ErrorLine
-                error={failure(add.error ?? samples.error, "Try again, or upload a file instead.")}
+                error={failure(add.error ?? demos.error, "Try again, or upload a file instead.")}
             />
         </div>
     );
@@ -240,7 +239,7 @@ export function TrainingData({
     const options = datasets.data ?? [];
     const [source, setSource] = useState<DataSource>(dataset ? "dataset" : "upload");
     const mapped = Boolean(options.find((item) => item.slug === dataset)?.mapping.sql);
-    const showMapping = dataset !== "" && (source !== "sample" || (!mapped && !datasets.isLoading));
+    const showMapping = dataset !== "" && (source !== "demo" || (!mapped && !datasets.isLoading));
     return (
         <div className={cn("flex flex-col gap-4", className)}>
             <Select
@@ -264,8 +263,8 @@ export function TrainingData({
                     >
                         Use a dataset
                     </SelectItem>
-                    <SelectItem value="sample" description="Labelled intents to try training on">
-                        Sample data
+                    <SelectItem value="demo" description="Labelled intents to try training on">
+                        Demo data
                     </SelectItem>
                 </SelectContent>
             </Select>
@@ -288,7 +287,7 @@ export function TrainingData({
                     </SelectContent>
                 </Select>
             )}
-            {source === "sample" && <SampleChoice onDataset={onDataset} />}
+            {source === "demo" && <DemoChoice onDataset={onDataset} />}
             {showMapping && <DatasetMapping slug={dataset} />}
         </div>
     );

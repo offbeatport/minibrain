@@ -9,10 +9,10 @@ Principles: any size, own hardware, air-gapped, gated on scores
   UI: Data › Add › Upload file, Data › Uploads › drop a file · API: POST /api/sources
 - **Duplicate uploads** · shipped · product, ml
   Store each file once; a taken name offers Replace or Keep both.
-  UI: Data › Add › Upload file, Data › Add › Sample data · API: POST /api/sources, POST /api/samples/{file}
-- **Sample data** · shipped · product
-  Try the whole flow on bundled sample data in minutes.
-  UI: Home › Get started, Models › Try with demo data, Data › Add › Sample data · API: GET /api/samples, POST /api/samples/{file}, POST /api/models/sample
+  UI: Data › Add › Upload file, Data › Add › Demo data · API: POST /api/sources, POST /api/demo-data/{file}
+- **Demo data** · shipped · product
+  Try the whole flow on bundled demo data in minutes.
+  UI: Home › Get started, Models › Try with demo data, Data › Add › Demo data · API: GET /api/demo-data, POST /api/demo-data/{file}, POST /api/models/demo
 - **Folder sources** · shipped · ml, admin
   Read a server folder of files in place as one table.
   UI: Data › Add › Folder on the server · API: GET /api/data/folders, POST /api/sources/folders · Policy: data_folders

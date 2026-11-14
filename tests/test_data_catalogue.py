@@ -95,31 +95,31 @@ def test_splits_come_from_the_latest_version(harness: Harness) -> None:
     assert harness.client.get("/api/datasets/tickets").json()["splits"] is None
 
 
-def test_samples_are_listed_and_can_be_added_again_after_a_delete(harness: Harness) -> None:
-    samples = harness.client.get("/api/samples").json()
-    assert [sample["file"] for sample in samples] == [
+def test_demo_data_is_listed_and_can_be_added_again_after_a_delete(harness: Harness) -> None:
+    demos = harness.client.get("/api/demo-data").json()
+    assert [demo["file"] for demo in demos] == [
         "demo_travel_intents.jsonl",
         "demo_banking77.csv",
         "demo_clinc150.parquet",
     ]
-    first = harness.client.post("/api/samples/demo_banking77.csv").json()
+    first = harness.client.post("/api/demo-data/demo_banking77.csv").json()
     assert first["filename"] == "demo_banking77.csv"
-    assert first["tags"] == ["minibrain:sample"]
+    assert first["tags"] == ["minibrain:demo"]
     assert first["rows"] == 13_083
     assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
-    again = harness.client.post("/api/samples/demo_banking77.csv").json()
+    again = harness.client.post("/api/demo-data/demo_banking77.csv").json()
     assert again["id"] > first["id"]
     assert again["rows"] == 13_083
 
 
-def test_unknown_sample_is_not_found(harness: Harness) -> None:
-    assert harness.client.post("/api/samples/other.csv").status_code == 404
+def test_unknown_demo_data_is_not_found(harness: Harness) -> None:
+    assert harness.client.post("/api/demo-data/other.csv").status_code == 404
 
 
 def test_a_new_file_never_reads_a_deleted_file_staging(harness: Harness) -> None:
     first = upload(harness)
     assert harness.client.delete(f"/api/sources/{first['id']}").status_code == 204
-    second = harness.client.post("/api/samples/demo_travel_intents.jsonl").json()
+    second = harness.client.post("/api/demo-data/demo_travel_intents.jsonl").json()
     assert second["rows"] == 750
     assert {column["name"] for column in second["columns"]} != {column["name"] for column in first["columns"]}
 
@@ -131,16 +131,16 @@ def test_tags_keep_key_value_form_and_refuse_the_system_prefix(harness: Harness)
     )
     assert changed.status_code == 200, changed.text
     assert changed.json()["tags"] == ["team:fraud", "eu"]
-    refused = harness.client.patch(f"/api/sources/{source['id']}", json={"tags": ["minibrain:sample"]})
+    refused = harness.client.patch(f"/api/sources/{source['id']}", json={"tags": ["minibrain:demo"]})
     assert refused.status_code == 422
     assert harness.client.patch(f"/api/sources/{source['id']}", json={"tags": ["team:"]}).status_code == 422
 
 
 def test_editing_tags_keeps_the_system_tags(harness: Harness) -> None:
-    sample = harness.client.post("/api/samples/demo_travel_intents.jsonl").json()
-    assert sample["tags"] == ["minibrain:sample"]
-    edited = harness.client.patch(f"/api/sources/{sample['id']}", json={"tags": ["demo"]}).json()
-    assert edited["tags"] == ["minibrain:sample", "demo"]
+    demo = harness.client.post("/api/demo-data/demo_travel_intents.jsonl").json()
+    assert demo["tags"] == ["minibrain:demo"]
+    edited = harness.client.patch(f"/api/sources/{demo['id']}", json={"tags": ["demo"]}).json()
+    assert edited["tags"] == ["minibrain:demo", "demo"]
 
 
 def test_a_dataset_can_stack_sources_that_share_columns(harness: Harness) -> None:

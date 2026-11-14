@@ -735,20 +735,20 @@
         }
       }
     },
-    "/api/models/sample": {
+    "/api/models/demo": {
       "post": {
         "tags": [
           "Models"
         ],
-        "summary": "Create the sample model",
-        "operationId": "create_sample_api_models_sample_post",
+        "summary": "Create the demo model",
+        "operationId": "create_demo_api_models_demo_post",
         "responses": {
           "201": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SampleDetail"
+                  "$ref": "#/components/schemas/DemoModelDetail"
                 }
               }
             }
@@ -1938,13 +1938,13 @@
         }
       }
     },
-    "/api/samples": {
+    "/api/demo-data": {
       "get": {
         "tags": [
           "Data"
         ],
-        "summary": "List sample files",
-        "operationId": "list_samples_api_samples_get",
+        "summary": "List demo data files",
+        "operationId": "list_demo_data_api_demo_data_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1952,10 +1952,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/SampleInfo"
+                    "$ref": "#/components/schemas/DemoDataInfo"
                   },
                   "type": "array",
-                  "title": "Response List Samples Api Samples Get"
+                  "title": "Response List Demo Data Api Demo Data Get"
                 }
               }
             }
@@ -1963,13 +1963,13 @@
         }
       }
     },
-    "/api/samples/{file}": {
+    "/api/demo-data/{file}": {
       "post": {
         "tags": [
           "Data"
         ],
-        "summary": "Add a sample file as a source",
-        "operationId": "add_sample_source_api_samples__file__post",
+        "summary": "Add a demo data file as a source",
+        "operationId": "add_demo_source_api_demo_data__file__post",
         "parameters": [
           {
             "name": "file",
@@ -15725,6 +15725,309 @@
         ],
         "title": "DeltaSourceCreate"
       },
+      "DemoDataInfo": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "title": "File"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "format": {
+            "type": "string",
+            "title": "Format"
+          },
+          "rows": {
+            "type": "integer",
+            "title": "Rows"
+          },
+          "labels": {
+            "type": "integer",
+            "title": "Labels"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "credit": {
+            "type": "string",
+            "title": "Credit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "name",
+          "format",
+          "rows",
+          "labels",
+          "description",
+          "credit"
+        ],
+        "title": "DemoDataInfo"
+      },
+      "DemoModelDetail": {
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "Slug"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "preset": {
+            "type": "string",
+            "title": "Preset"
+          },
+          "base_model": {
+            "type": "string",
+            "title": "Base Model"
+          },
+          "current_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Version"
+          },
+          "deployed": {
+            "type": "boolean",
+            "title": "Deployed",
+            "default": false
+          },
+          "main_metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Main Metric"
+          },
+          "current_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Score"
+          },
+          "versions": {
+            "type": "integer",
+            "title": "Versions"
+          },
+          "active_jobs": {
+            "type": "integer",
+            "title": "Active Jobs"
+          },
+          "avatar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelAvatar"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "const": "custom",
+            "title": "Kind"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/MappingInfo"
+          },
+          "dataset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          },
+          "dataset_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetVersionInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "serve_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServeOnlyInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "request_bodies": {
+            "$ref": "#/components/schemas/RequestBodiesInfo"
+          },
+          "teardown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TeardownInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "contract": {
+            "$ref": "#/components/schemas/ContractInfo"
+          },
+          "contract_number": {
+            "type": "integer",
+            "title": "Contract Number"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "default_instructions": {
+            "type": "string",
+            "title": "Default Instructions"
+          },
+          "graders": {
+            "items": {
+              "$ref": "#/components/schemas/GraderConfig"
+            },
+            "type": "array",
+            "title": "Graders"
+          },
+          "graders_default": {
+            "type": "boolean",
+            "title": "Graders Default"
+          },
+          "judge": {
+            "$ref": "#/components/schemas/JudgeInfo"
+          },
+          "safety": {
+            "$ref": "#/components/schemas/ModelSafety"
+          },
+          "promotion": {
+            "$ref": "#/components/schemas/PromotionInfo"
+          },
+          "went_live": {
+            "type": "boolean",
+            "title": "Went Live",
+            "default": false
+          },
+          "label_proposal": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LabelProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "base_name": {
+            "type": "string",
+            "title": "Base Name"
+          },
+          "download_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Download Bytes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slug",
+          "name",
+          "preset",
+          "base_model",
+          "current_version",
+          "current_score",
+          "versions",
+          "active_jobs",
+          "kind",
+          "source",
+          "mapping",
+          "dataset_version",
+          "models",
+          "request_bodies",
+          "contract",
+          "contract_number",
+          "instructions",
+          "default_instructions",
+          "graders",
+          "graders_default",
+          "judge",
+          "safety",
+          "promotion",
+          "base_name",
+          "download_bytes"
+        ],
+        "title": "DemoModelDetail"
+      },
       "DeployRequest": {
         "properties": {
           "deployed": {
@@ -25351,309 +25654,6 @@
           "categories"
         ],
         "title": "SafetyVerdict"
-      },
-      "SampleDetail": {
-        "properties": {
-          "slug": {
-            "type": "string",
-            "title": "Slug"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "preset": {
-            "type": "string",
-            "title": "Preset"
-          },
-          "base_model": {
-            "type": "string",
-            "title": "Base Model"
-          },
-          "current_version": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Version"
-          },
-          "deployed": {
-            "type": "boolean",
-            "title": "Deployed",
-            "default": false
-          },
-          "main_metric": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Main Metric"
-          },
-          "current_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Current Score"
-          },
-          "versions": {
-            "type": "integer",
-            "title": "Versions"
-          },
-          "active_jobs": {
-            "type": "integer",
-            "title": "Active Jobs"
-          },
-          "avatar": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ModelAvatar"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "kind": {
-            "type": "string",
-            "const": "custom",
-            "title": "Kind"
-          },
-          "source": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SourceInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "mapping": {
-            "$ref": "#/components/schemas/MappingInfo"
-          },
-          "dataset": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset"
-          },
-          "dataset_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset Name"
-          },
-          "dataset_version": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DatasetVersionInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "changed": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ChangeInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "serve_only": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ServeOnlyInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "models": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Models"
-          },
-          "request_bodies": {
-            "$ref": "#/components/schemas/RequestBodiesInfo"
-          },
-          "teardown": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TeardownInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "contract": {
-            "$ref": "#/components/schemas/ContractInfo"
-          },
-          "contract_number": {
-            "type": "integer",
-            "title": "Contract Number"
-          },
-          "instructions": {
-            "type": "string",
-            "title": "Instructions"
-          },
-          "default_instructions": {
-            "type": "string",
-            "title": "Default Instructions"
-          },
-          "graders": {
-            "items": {
-              "$ref": "#/components/schemas/GraderConfig"
-            },
-            "type": "array",
-            "title": "Graders"
-          },
-          "graders_default": {
-            "type": "boolean",
-            "title": "Graders Default"
-          },
-          "judge": {
-            "$ref": "#/components/schemas/JudgeInfo"
-          },
-          "safety": {
-            "$ref": "#/components/schemas/ModelSafety"
-          },
-          "promotion": {
-            "$ref": "#/components/schemas/PromotionInfo"
-          },
-          "went_live": {
-            "type": "boolean",
-            "title": "Went Live",
-            "default": false
-          },
-          "label_proposal": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/LabelProposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "base_name": {
-            "type": "string",
-            "title": "Base Name"
-          },
-          "download_bytes": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Download Bytes"
-          }
-        },
-        "type": "object",
-        "required": [
-          "slug",
-          "name",
-          "preset",
-          "base_model",
-          "current_version",
-          "current_score",
-          "versions",
-          "active_jobs",
-          "kind",
-          "source",
-          "mapping",
-          "dataset_version",
-          "models",
-          "request_bodies",
-          "contract",
-          "contract_number",
-          "instructions",
-          "default_instructions",
-          "graders",
-          "graders_default",
-          "judge",
-          "safety",
-          "promotion",
-          "base_name",
-          "download_bytes"
-        ],
-        "title": "SampleDetail"
-      },
-      "SampleInfo": {
-        "properties": {
-          "file": {
-            "type": "string",
-            "title": "File"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "format": {
-            "type": "string",
-            "title": "Format"
-          },
-          "rows": {
-            "type": "integer",
-            "title": "Rows"
-          },
-          "labels": {
-            "type": "integer",
-            "title": "Labels"
-          },
-          "description": {
-            "type": "string",
-            "title": "Description"
-          },
-          "credit": {
-            "type": "string",
-            "title": "Credit"
-          }
-        },
-        "type": "object",
-        "required": [
-          "file",
-          "name",
-          "format",
-          "rows",
-          "labels",
-          "description",
-          "credit"
-        ],
-        "title": "SampleInfo"
       },
       "SaveExampleBody": {
         "properties": {

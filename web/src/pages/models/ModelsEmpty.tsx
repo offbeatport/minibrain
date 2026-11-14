@@ -12,17 +12,17 @@ export function ModelsEmpty() {
     const refresh = useModelsRefresh();
     const router = useRouter();
     const toast = useToast();
-    const sample = useMutation({
-        mutationFn: () => unwrap(api.POST("/api/models/sample")),
+    const demo = useMutation({
+        mutationFn: () => unwrap(api.POST("/api/models/demo")),
         onSuccess: async (created) => {
             await refresh();
-            const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} sample messages`;
+            const rows = `${created.name}: ${created.dataset_version?.rows ?? 0} demo messages`;
             const scored =
                 created.download_bytes === null
                     ? `Version 0 on ${created.base_name} is being scored`
                     : `Downloading ${created.base_name} (${bytes(created.download_bytes)}); version 0 is scored once it is here`;
             toast({
-                title: "Sample model added",
+                title: "Demo model added",
                 description: `${rows}. ${scored}. Its answers look like labels: open it to restrict them.`,
                 tone: "success",
                 action: {
@@ -33,7 +33,7 @@ export function ModelsEmpty() {
         },
         onError: (error) =>
             toast({
-                title: "The sample was not added",
+                title: "The demo was not added",
                 description: errorMessage(error),
                 tone: "destructive",
             }),
@@ -50,10 +50,10 @@ export function ModelsEmpty() {
             <Button
                 type="button"
                 variant="outline"
-                disabled={sample.isPending}
-                onClick={() => sample.mutate()}
+                disabled={demo.isPending}
+                onClick={() => demo.mutate()}
             >
-                {sample.isPending ? "Adding demo data…" : "Try with demo data"}
+                {demo.isPending ? "Adding demo data…" : "Try with demo data"}
             </Button>
         </div>
     );

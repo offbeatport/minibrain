@@ -38,9 +38,9 @@ class Settings:
         return path.read_text().strip()
 
 
-def sample_file(name: str) -> Path:
-    packaged = Path(__file__).resolve().parent / "samples" / name
-    return packaged if packaged.is_file() else REPO_ROOT / "samples" / name
+def demo_file(name: str) -> Path:
+    packaged = Path(__file__).resolve().parent / "demo_data" / name
+    return packaged if packaged.is_file() else REPO_ROOT / "demo_data" / name
 
 
 def default_web_dist() -> Path:
