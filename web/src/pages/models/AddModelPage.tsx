@@ -368,20 +368,6 @@ export function AddModelPage() {
                         </FormControl>
                     </FormRow>
                 )}
-                {option?.entry && (
-                    <FormRow label="Licence" align="start">
-                        <FormControl width="full">
-                            <Licence
-                                id="create-licence"
-                                option={option}
-                                plan={plan}
-                                accepted={accepted}
-                                onAccepted={setAccepted}
-                            />
-                            <FieldError text={shownFor("licence")} />
-                        </FormControl>
-                    </FormRow>
-                )}
                 <FormRow id="create-dataset" label="Dataset">
                     <FormControl>
                         <DatasetPicker
@@ -426,6 +412,20 @@ export function AddModelPage() {
                         ),
                     }}
                 />
+                {option?.entry && (
+                    <FormRow label="Licence" align="start">
+                        <FormControl width="full">
+                            <Licence
+                                id="create-licence"
+                                option={option}
+                                plan={plan}
+                                accepted={accepted}
+                                onAccepted={setAccepted}
+                            />
+                            <FieldError text={shownFor("licence")} />
+                        </FormControl>
+                    </FormRow>
+                )}
             </FormGroup>
         </FormCard>
     );
