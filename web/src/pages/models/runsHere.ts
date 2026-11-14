@@ -4,6 +4,7 @@ import {
     type CatalogResponse,
     type CatalogVariantInfo,
     type FitInfo,
+    type TrainFitInfo,
     api,
     unwrap,
 } from "~/api/client";
@@ -69,18 +70,18 @@ export function useTrainsHere(catalog: CatalogResponse | undefined): RunsHere {
     return matching(usePoolEntries(catalog), trainsAnywhere);
 }
 
-export type PoolFits = {
-    serve: string[];
-    train: string[];
+export type PoolFit = {
+    name: string;
+    fit: FitInfo | null;
+    trainFit: TrainFitInfo | null;
     checked: boolean;
-    fit: Record<string, FitInfo>;
 };
 
 export function usePoolFits(
     catalog: CatalogResponse | undefined,
     entryId: string | null | undefined,
     variantId: string | null | undefined,
-): PoolFits {
+): PoolFit[] {
     const others = (catalog?.pools ?? []).filter((pool) => pool.name !== catalog?.pool);
     const lists = useQueries({
         queries: others.map((pool) => ({
@@ -91,27 +92,22 @@ export function usePoolFits(
         })),
         combine: (results) => results.map((result) => result.data?.entries ?? null),
     });
+    if (!catalog) {
+        return [];
+    }
     const all = [
-        { name: catalog?.pool ?? "", entries: catalog?.entries ?? null },
+        { name: catalog.pool, entries: catalog.entries },
         ...others.map((pool, index) => ({ name: pool.name, entries: lists[index] ?? null })),
     ];
-    const variants = all.map((pool) => ({
-        name: pool.name,
-        variant: pool.entries
+    return all.map((pool) => {
+        const variant = pool.entries
             ?.find((entry) => entry.id === entryId)
-            ?.variants.find((variant) => variant.id === variantId),
-        checked: pool.entries !== null,
-    }));
-    return {
-        serve: variants
-            .filter((item) => item.variant && runnable(item.variant.fit.level))
-            .map((item) => item.name),
-        train: variants
-            .filter((item) => item.variant?.train_fit.level === "fits")
-            .map((item) => item.name),
-        checked: variants.every((item) => item.checked),
-        fit: Object.fromEntries(
-            variants.flatMap((item) => (item.variant ? [[item.name, item.variant.fit]] : [])),
-        ),
-    };
+            ?.variants.find((item) => item.id === variantId);
+        return {
+            name: pool.name,
+            fit: variant?.fit ?? null,
+            trainFit: variant?.train_fit ?? null,
+            checked: pool.entries !== null,
+        };
+    });
 }
