@@ -285,7 +285,9 @@ export function plainValue(value: unknown, policy?: PolicyInfo, key = ""): strin
             return String(value);
         }
         if (key === "days" || key.endsWith("_days")) {
-            return value === 0 ? "Forever" : `${value.toLocaleString()} days`;
+            return value === 0
+                ? "Forever"
+                : `${value.toLocaleString()} ${value === 1 ? "day" : "days"}`;
         }
         return value.toLocaleString();
     }

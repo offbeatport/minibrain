@@ -194,7 +194,7 @@ export function AuditIntegrity() {
 function retentionChoices(days: number): [number, string][] {
     return RETENTION_CHOICES.some(([value]) => value === days)
         ? RETENTION_CHOICES
-        : [...RETENTION_CHOICES, [days, `${days.toLocaleString()} days`]];
+        : [...RETENTION_CHOICES, [days, `${days.toLocaleString()} ${days === 1 ? "day" : "days"}`]];
 }
 
 export function retentionText(days: number): string {
