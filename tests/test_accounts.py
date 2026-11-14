@@ -272,6 +272,24 @@ def test_repeated_failures_lock_the_account_for_a_while(install: Install) -> Non
     assert browser.post("/api/auth/login", json={"email": ADMIN, "password": PASSWORD}).status_code == 200
 
 
+def test_an_unknown_email_costs_one_password_check_like_a_known_one(
+    install: Install, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    set_up(install, install.browser())
+    checks: list[str | None] = []
+
+    def counted(password: str, stored: str | None) -> bool:
+        checks.append(stored)
+        return verify_password(password, stored)
+
+    monkeypatch.setattr("minibrain.auth.accounts.verify_password", counted)
+    browser = install.browser()
+    for email in ("nobody@example.com", ADMIN):
+        refused = browser.post("/api/auth/login", json={"email": email, "password": "guess guess guess"})
+        assert refused.status_code == 401
+    assert len(checks) == 2 and checks[0] is None and checks[1] is not None
+
+
 def test_sessions_end_after_the_idle_and_absolute_lifetimes(install: Install) -> None:
     admin = set_up(install)
     with install.sessions() as session:

@@ -208,7 +208,7 @@ def sign_in(session: Session, email: str, password: str) -> User:
         verify_password(password, None)
         minutes = max(1, round((user.locked_until - moment).total_seconds() / 60))
         raise SignInError(f"Too many failed sign-ins. Try again in {minutes} minutes.")
-    if user is None or not verify_password(password, user.password_hash):
+    if not verify_password(password, user.password_hash if user is not None else None) or user is None:
         if user is not None:
             user.failed_sign_ins += 1
             if user.failed_sign_ins >= LOCK_AFTER:
